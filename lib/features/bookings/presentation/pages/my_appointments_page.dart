@@ -1,0 +1,1617 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../core/routes/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/unread_notifications_button.dart';
+import '../../../auth/provider/auth_provider.dart';
+import '../../../shop/presentation/pages/cart_page.dart';
+import '../../../shop/data/services/habito_booking_api.dart';
+import '../../../shop/presentation/pages/products_archive_page.dart';
+import '../../../shop/provider/shop_provider.dart';
+import 'appointment_detail_page.dart';
+import 'bookings_page.dart';
+
+class MyAppointmentsPage extends StatefulWidget {
+  final Map<String, dynamic>? initialArguments;
+
+  const MyAppointmentsPage({
+    super.key,
+    this.initialArguments,
+  });
+
+  static void clearCachedState() {
+    // La versión actual ya no mantiene caché estático en esta pantalla.
+    // Dejamos este hook para limpiar el estado compartido de forma segura
+    // cuando la sesión cambia.
+  }
+
+  @override
+  State<MyAppointmentsPage> createState() => _MyAppointmentsPageState();
+}
+
+class _MyAppointmentsPageState extends State<MyAppointmentsPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  AuthProvider? _authProvider;
+
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _allAppointments = [];
+  String? _loadedToken;
+
+  bool _didReadRouteArgs = false;
+  bool _didOpenPushAppointment = false;
+  int? _pushAppointmentId;
+  int? _pushBookingId;
+  bool _openFromPush = false;
+  int _loadRequestId = 0;
+  bool _isLoadingHistory = false;
+  bool _hasLoadedHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _authProvider = context.read<AuthProvider>();
+      _authProvider!.addListener(_onAuthChanged);
+      _loadAppointments();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_didReadRouteArgs) return;
+    _didReadRouteArgs = true;
+
+    final route = ModalRoute.of(context);
+    final args = widget.initialArguments ?? route?.settings.arguments;
+
+    if (args is Map) {
+      final map = Map<String, dynamic>.from(args);
+
+      _pushAppointmentId = _parseInt(
+        map['appointmentId'] ?? map['appointment_id'],
+      );
+      _pushBookingId = _parseInt(
+        map['bookingId'] ?? map['booking_id'],
+      );
+      _openFromPush = map['openFromPush'] == true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _authProvider?.removeListener(_onAuthChanged);
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && _tabController.index == 2) {
+      unawaited(_loadHistoryAppointments());
+    }
+  }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final token = auth.token?.trim();
+
+    if (!auth.isLoggedIn || token == null || token.isEmpty) {
+      setState(() {
+        _loadedToken = null;
+        _allAppointments = [];
+        _error = null;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    if (_loadedToken != token || _error != null || _allAppointments.isEmpty) {
+      _loadAppointments();
+    }
+  }
+
+  String _friendlyLoadError(Object error) {
+    final text = error.toString().replaceFirst('Exception: ', '').trim();
+    final lower = text.toLowerCase();
+
+    if (lower.contains('timeoutexception') ||
+        lower.contains('future not completed') ||
+        lower.contains('timed out')) {
+      return 'No pudimos cargar tus citas a tiempo. Revisa tu conexión e intenta nuevamente.';
+    }
+
+    if (lower.contains('socketexception') ||
+        lower.contains('clientexception') ||
+        lower.contains('connection')) {
+      return 'No pudimos conectar con tus citas. Revisa tu internet e intenta nuevamente.';
+    }
+
+    return text.isEmpty
+        ? 'No pudimos cargar tus citas. Intenta nuevamente.'
+        : text;
+  }
+
+  Future<void> _loadAppointments({
+    bool retryingFirstLoad = false,
+  }) async {
+    if (!mounted) return;
+
+    final auth = context.read<AuthProvider>();
+
+    if (!auth.isInitialized || auth.isLoading) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+      return;
+    }
+
+    final token = auth.token;
+
+    if (token == null || token.trim().isEmpty) {
+      setState(() {
+        _loadedToken = null;
+        _isLoading = false;
+        _error = null;
+        _allAppointments = [];
+      });
+      return;
+    }
+
+    final requestId = ++_loadRequestId;
+    final normalizedToken = token.trim();
+    final tokenChanged =
+        _loadedToken != null && _loadedToken != normalizedToken;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      if (tokenChanged) {
+        _allAppointments = [];
+      }
+    });
+
+    try {
+      final response = await _loadAllMyBookings(normalizedToken);
+      final rawList = _extractItemsFromResponse(response);
+
+      final appointments = rawList
+          .whereType<Map>()
+          .map((e) => _normalizeAppointment(Map<String, dynamic>.from(e)))
+          .toList();
+
+      _sortAppointments(appointments);
+
+      if (!mounted || requestId != _loadRequestId) return;
+
+      setState(() {
+        _loadedToken = normalizedToken;
+        _allAppointments = appointments;
+        _hasLoadedHistory = false;
+        _isLoading = false;
+      });
+
+      _tryOpenAppointmentFromPush();
+      unawaited(_loadHistoryAppointments(silent: true));
+    } catch (e) {
+      if (!mounted || requestId != _loadRequestId) return;
+
+      if (!retryingFirstLoad &&
+          _allAppointments.isEmpty &&
+          _isRetryableFirstLoadError(e)) {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (!mounted || requestId != _loadRequestId) return;
+        await _loadAppointments(retryingFirstLoad: true);
+        return;
+      }
+
+      setState(() {
+        _error = _friendlyLoadError(e);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadAllMyBookings(String token) async {
+    return _loadMyBookingsPages(
+      token: token,
+      view: 'upcoming',
+      pageLimit: 80,
+      maxPages: 4,
+    );
+  }
+
+  Future<Map<String, dynamic>> _loadMyBookingsPages({
+    required String token,
+    required String view,
+    int pageLimit = 50,
+    int maxPages = 6,
+  }) async {
+    final allItems = <dynamic>[];
+    Map<String, dynamic> lastResponse = <String, dynamic>{};
+
+    for (var page = 1; page <= maxPages; page++) {
+      final response = await HabitoBookingApi.getMyBookings(
+        token: token,
+        limit: pageLimit,
+        page: page,
+        includeRaw: false,
+        view: view,
+      );
+
+      lastResponse = response;
+      final items = _extractItemsFromResponse(response);
+      allItems.addAll(items);
+
+      if (response['has_more'] != true) {
+        break;
+      }
+    }
+
+    return {
+      ...lastResponse,
+      'items': allItems,
+      'total': allItems.length,
+    };
+  }
+
+  Future<void> _loadHistoryAppointments({bool silent = false}) async {
+    if (!mounted || _isLoadingHistory || _hasLoadedHistory) return;
+
+    final auth = context.read<AuthProvider>();
+    final token = auth.token?.trim();
+    if (!auth.isLoggedIn || token == null || token.isEmpty) return;
+
+    _isLoadingHistory = true;
+
+    try {
+      final response = await _loadMyBookingsPages(
+        token: token,
+        view: 'history',
+        pageLimit: 50,
+        maxPages: 6,
+      );
+      final rawList = _extractItemsFromResponse(response);
+      final history = rawList
+          .whereType<Map>()
+          .map((e) => _normalizeAppointment(Map<String, dynamic>.from(e)))
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _allAppointments = _mergeAppointments(_allAppointments, history);
+        _sortAppointments(_allAppointments);
+        _hasLoadedHistory = true;
+      });
+    } catch (e) {
+      if (!mounted || silent) return;
+      setState(() {
+        _error = _friendlyLoadError(e);
+      });
+    } finally {
+      _isLoadingHistory = false;
+    }
+  }
+
+  List<Map<String, dynamic>> _mergeAppointments(
+    List<Map<String, dynamic>> current,
+    List<Map<String, dynamic>> incoming,
+  ) {
+    final merged = <String, Map<String, dynamic>>{};
+
+    for (final item in [...current, ...incoming]) {
+      final key = _appointmentIdentity(item);
+      merged[key] = item;
+    }
+
+    return merged.values.toList();
+  }
+
+  String _appointmentIdentity(Map<String, dynamic> appointment) {
+    final appointmentId = _parseInt(
+      appointment['appointmentId'] ?? appointment['appointment_id'],
+    );
+    final bookingId = _parseInt(
+      appointment['bookingId'] ?? appointment['booking_id'],
+    );
+
+    if (appointmentId != null && appointmentId > 0) {
+      return 'appointment:$appointmentId';
+    }
+    if (bookingId != null && bookingId > 0) return 'booking:$bookingId';
+
+    return [
+      appointment['bookingStart'],
+      appointment['service_name'],
+      appointment['provider_name'],
+      appointment['status'],
+    ].join('|');
+  }
+
+  void _sortAppointments(List<Map<String, dynamic>> appointments) {
+    appointments.sort((a, b) {
+      final dateA = _resolveAppointmentDate(a);
+      final dateB = _resolveAppointmentDate(b);
+
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1;
+      if (dateB == null) return -1;
+
+      return dateB.compareTo(dateA);
+    });
+  }
+
+  bool _isRetryableFirstLoadError(Object error) {
+    final lower = error.toString().toLowerCase();
+    return lower.contains('timeout') ||
+        lower.contains('future not completed') ||
+        lower.contains('clientexception') ||
+        lower.contains('socketexception') ||
+        lower.contains('connection');
+  }
+
+  void _tryOpenAppointmentFromPush() {
+    if (!mounted) return;
+    if (_didOpenPushAppointment) return;
+    if (!_openFromPush) return;
+    if (_allAppointments.isEmpty) return;
+
+    Map<String, dynamic>? target;
+
+    if (_pushAppointmentId != null) {
+      for (final appointment in _allAppointments) {
+        final appointmentId = _parseInt(
+          appointment['appointmentId'] ??
+              appointment['appointment_id'] ??
+              appointment['id'],
+        );
+
+        if (appointmentId != null && appointmentId == _pushAppointmentId) {
+          target = appointment;
+          break;
+        }
+      }
+    }
+
+    if (target == null && _pushBookingId != null) {
+      for (final appointment in _allAppointments) {
+        final bookingMap = appointment['booking'];
+        int? bookingId;
+
+        if (bookingMap is Map) {
+          bookingId = _parseInt(bookingMap['id']);
+        }
+
+        bookingId ??= _parseInt(
+          appointment['bookingId'] ?? appointment['booking_id'],
+        );
+
+        if (bookingId != null && bookingId == _pushBookingId) {
+          target = appointment;
+          break;
+        }
+      }
+    }
+
+    if (target == null) {
+      return;
+    }
+
+    _didOpenPushAppointment = true;
+
+    final statusKey = _appointmentStatusKey(target);
+    int tabIndex = 0;
+
+    if (statusKey == 'confirmed' || statusKey == 'completed') {
+      tabIndex = 1;
+    } else if (statusKey == 'canceled' || statusKey == 'rejected') {
+      tabIndex = 2;
+    }
+
+    if (_tabController.index != tabIndex) {
+      _tabController.animateTo(tabIndex);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AppointmentDetailPage(appointment: target!),
+        ),
+      );
+    });
+  }
+
+  List<dynamic> _extractItemsFromResponse(dynamic response) {
+    if (response is List) {
+      return response;
+    }
+
+    if (response is Map<String, dynamic>) {
+      if (response['items'] is List) {
+        return List<dynamic>.from(response['items']);
+      }
+
+      if (response['data'] is List) {
+        return List<dynamic>.from(response['data']);
+      }
+
+      if (response['data'] is Map<String, dynamic>) {
+        final data = Map<String, dynamic>.from(response['data']);
+
+        if (data['items'] is List) {
+          return List<dynamic>.from(data['items']);
+        }
+
+        if (data['data'] is List) {
+          return List<dynamic>.from(data['data']);
+        }
+
+        if (data['appointments'] is List) {
+          return List<dynamic>.from(data['appointments']);
+        }
+      }
+
+      if (response['appointments'] is List) {
+        return List<dynamic>.from(response['appointments']);
+      }
+    }
+
+    throw Exception('La respuesta de citas no tiene el formato esperado.');
+  }
+
+  Map<String, dynamic> _normalizeAppointment(Map<String, dynamic> appointment) {
+    final raw = appointment['raw'] is Map
+        ? Map<String, dynamic>.from(appointment['raw'])
+        : <String, dynamic>{};
+
+    final rawBookings = raw['bookings'] is List
+        ? List<Map<String, dynamic>>.from(
+            (raw['bookings'] as List).whereType<Map>().map(
+                  (e) => Map<String, dynamic>.from(e),
+                ),
+          )
+        : <Map<String, dynamic>>[];
+
+    final rawBooking =
+        rawBookings.isNotEmpty ? rawBookings.first : <String, dynamic>{};
+
+    final rawCustomer = rawBooking['customer'] is Map
+        ? Map<String, dynamic>.from(rawBooking['customer'])
+        : <String, dynamic>{};
+
+    final rawPayments = rawBooking['payments'] is List
+        ? List<Map<String, dynamic>>.from(
+            (rawBooking['payments'] as List).whereType<Map>().map(
+                  (e) => Map<String, dynamic>.from(e),
+                ),
+          )
+        : <Map<String, dynamic>>[];
+
+    final rawPayment =
+        rawPayments.isNotEmpty ? rawPayments.first : <String, dynamic>{};
+
+    final serviceName = _firstNonEmpty([
+      appointment['service_name']?.toString(),
+      appointment['service']?.toString(),
+      _readNestedString(raw, ['service', 'name']),
+      _readNestedString(appointment, ['service', 'name']),
+    ]);
+
+    final providerName = _firstNonEmpty([
+      appointment['provider_name']?.toString(),
+      _readNestedString(raw, ['provider', 'fullName']),
+      _readNestedString(appointment, ['provider', 'fullName']),
+      [
+        _readNestedString(raw, ['provider', 'firstName']),
+        _readNestedString(raw, ['provider', 'lastName']),
+      ].where((e) => e != null && e.trim().isNotEmpty).join(' '),
+      [
+        _readNestedString(appointment, ['provider', 'firstName']),
+        _readNestedString(appointment, ['provider', 'lastName']),
+      ].where((e) => e != null && e.trim().isNotEmpty).join(' '),
+    ]);
+
+    final locationName = _firstNonEmpty([
+      appointment['location_name']?.toString(),
+      appointment['branch']?.toString(),
+      _readNestedString(raw, ['location', 'name']),
+      _readNestedString(appointment, ['location', 'name']),
+    ]);
+
+    final bookingStart = _firstNonEmpty([
+      appointment['booking_start']?.toString(),
+      appointment['bookingStart']?.toString(),
+      _readNestedString(raw, ['bookingStart']),
+    ]);
+
+    final bookingEnd = _firstNonEmpty([
+      appointment['booking_end']?.toString(),
+      appointment['bookingEnd']?.toString(),
+      _readNestedString(raw, ['bookingEnd']),
+    ]);
+
+    final resolvedStatus = _firstNonEmpty([
+      appointment['status']?.toString(),
+      appointment['statusRaw']?.toString(),
+      rawBooking['status']?.toString(),
+      _readNestedString(raw, ['status']),
+    ]);
+
+    final clientName = _firstNonEmpty([
+      appointment['customer_name']?.toString(),
+      appointment['customerName']?.toString(),
+      [
+        appointment['customer_first_name']?.toString(),
+        appointment['customer_last_name']?.toString(),
+      ].where((e) => e != null && e.trim().isNotEmpty).join(' '),
+      [
+        rawCustomer['firstName']?.toString(),
+        rawCustomer['lastName']?.toString(),
+      ].where((e) => e != null && e.trim().isNotEmpty).join(' '),
+    ]);
+
+    final appointmentId = _parseInt(
+      appointment['appointmentId'] ??
+          appointment['appointment_id'] ??
+          appointment['id'],
+    );
+
+    final providerId = _parseInt(
+      appointment['providerId'] ?? appointment['provider_id'],
+    );
+
+    final locationId = _parseInt(
+      appointment['locationId'] ?? appointment['location_id'],
+    );
+
+    final serviceId = _parseInt(
+      appointment['serviceId'] ?? appointment['service_id'],
+    );
+
+    final bookingId = _parseInt(
+      rawBooking['id'] ?? appointment['bookingId'] ?? appointment['booking_id'],
+    );
+    final statusNormalized = _firstNonEmpty([
+      appointment['status_normalized']?.toString(),
+      appointment['statusNormalized']?.toString(),
+      _normalizeStatusKey(resolvedStatus),
+    ]);
+    final statusLifecycle = _firstNonEmpty([
+      appointment['status_lifecycle']?.toString(),
+      appointment['statusLifecycle']?.toString(),
+    ]);
+    final statusDisplay = _firstNonEmpty([
+      appointment['status_display']?.toString(),
+      appointment['statusDisplay']?.toString(),
+    ]);
+    final isExpiredPending = _readBoolValue(
+          appointment['is_expired_pending'] ?? appointment['isExpiredPending'],
+        ) ??
+        false;
+
+    return {
+      ...appointment,
+      'status': resolvedStatus ?? '',
+      'status_normalized': statusNormalized ?? '',
+      'statusNormalized': statusNormalized ?? '',
+      'status_lifecycle': statusLifecycle ?? '',
+      'statusLifecycle': statusLifecycle ?? '',
+      'status_display': statusDisplay ?? '',
+      'statusDisplay': statusDisplay ?? '',
+      'is_expired_pending': isExpiredPending,
+      'isExpiredPending': isExpiredPending,
+      'service': serviceName ?? 'Servicio',
+      'branch': (locationName != null && locationName.trim().isNotEmpty)
+          ? locationName
+          : 'Sin sucursal',
+      'barber': providerName ?? 'Barbero',
+      'bookingStart': bookingStart ?? '',
+      'bookingEnd': bookingEnd ?? '',
+      'paymentStatus': _firstNonEmpty([
+        appointment['payment_status']?.toString(),
+        rawPayment['status']?.toString(),
+      ]),
+      'paymentGateway': _firstNonEmpty([
+        appointment['payment_gateway']?.toString(),
+        rawPayment['gateway']?.toString(),
+      ]),
+      'clientName': clientName ?? '-',
+      'clientPhone': _firstNonEmpty([
+            appointment['customer_phone']?.toString(),
+            rawCustomer['phone']?.toString(),
+          ]) ??
+          '-',
+      'clientEmail': _firstNonEmpty([
+            appointment['customer_email']?.toString(),
+            rawCustomer['email']?.toString(),
+          ]) ??
+          '-',
+      'bookingToken': _firstNonEmpty([
+            appointment['booking_token']?.toString(),
+            rawBooking['token']?.toString(),
+          ]) ??
+          '-',
+      'locationAddress': _firstNonEmpty([
+            appointment['location_address']?.toString(),
+            _readNestedString(raw, ['location', 'address']),
+          ]) ??
+          '-',
+      'locationPhone': _firstNonEmpty([
+            appointment['location_phone']?.toString(),
+            _readNestedString(raw, ['location', 'phone']),
+          ]) ??
+          '-',
+      'appointmentId': appointmentId,
+      'appointment_id': appointmentId,
+      'bookingId': bookingId,
+      'booking_id': bookingId,
+      'providerId': providerId,
+      'provider_id': providerId,
+      'barberId': providerId,
+      'locationId': locationId,
+      'location_id': locationId,
+      'serviceId': serviceId,
+      'service_id': serviceId,
+      'statusRaw': resolvedStatus ?? '',
+      'date': _displayDateFromNormalized(bookingStart),
+      'time': _displayTimeFromNormalized(bookingStart),
+    };
+  }
+
+  String? _readNestedString(Map<String, dynamic> map, List<String> path) {
+    dynamic current = map;
+
+    for (final segment in path) {
+      if (current is Map && current.containsKey(segment)) {
+        current = current[segment];
+      } else {
+        return null;
+      }
+    }
+
+    if (current == null) return null;
+    final text = current.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  String? _firstNonEmpty(List<String?> values) {
+    for (final value in values) {
+      if (value != null && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
+
+  bool? _readBoolValue(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+
+    final text = value.toString().trim().toLowerCase();
+    if (text.isEmpty) return null;
+
+    if (['1', 'true', 'yes', 'si', 'sí'].contains(text)) {
+      return true;
+    }
+
+    if (['0', 'false', 'no'].contains(text)) {
+      return false;
+    }
+
+    return null;
+  }
+
+  String _normalizeStatusKey(String? status) {
+    final value = (status ?? '').trim().toLowerCase();
+
+    switch (value) {
+      case 'approved':
+      case 'confirmed':
+      case 'confirmada':
+      case 'confirmado':
+      case 'aprobada':
+      case 'aprobado':
+        return 'confirmed';
+
+      case 'pending':
+      case 'pendiente':
+      case 'reservada':
+      case 'waiting':
+        return 'pending';
+
+      case 'expired_pending':
+      case 'pendiente_vencida':
+      case 'pendiente vencida':
+        return 'expired_pending';
+
+      case 'completed':
+      case 'completada':
+      case 'completado':
+        return 'completed';
+
+      case 'canceled':
+      case 'cancelled':
+      case 'cancelada':
+      case 'cancelado':
+        return 'canceled';
+
+      case 'rejected':
+      case 'rechazada':
+      case 'rechazado':
+        return 'rejected';
+
+      default:
+        return value;
+    }
+  }
+
+  String _appointmentStatusKey(Map<String, dynamic> appointment) {
+    final lifecycle = _firstNonEmpty([
+      appointment['status_lifecycle']?.toString(),
+      appointment['statusLifecycle']?.toString(),
+    ]);
+    if (lifecycle != null) {
+      return _normalizeStatusKey(lifecycle);
+    }
+
+    final expired = _readBoolValue(
+      appointment['is_expired_pending'] ?? appointment['isExpiredPending'],
+    );
+    if (expired == true) {
+      return 'expired_pending';
+    }
+
+    final normalized = _firstNonEmpty([
+      appointment['status_normalized']?.toString(),
+      appointment['statusNormalized']?.toString(),
+      appointment['status']?.toString(),
+    ]);
+
+    final key = _normalizeStatusKey(normalized);
+    if (key == 'pending' && _isPastAppointment(appointment)) {
+      return 'expired_pending';
+    }
+
+    return key;
+  }
+
+  DateTime? _resolveAppointmentDate(Map<String, dynamic> appointment) {
+    final String bookingStart =
+        appointment['booking_start']?.toString().trim() ??
+            appointment['bookingStart']?.toString().trim() ??
+            '';
+
+    if (bookingStart.isNotEmpty) {
+      final parsed = _parseBackendDateTime(bookingStart);
+      if (parsed != null) return parsed;
+    }
+
+    final timestamp = _parseInt(
+      appointment['booking_start_timestamp'] ??
+          appointment['bookingStartTimestamp'],
+    );
+    if (timestamp != null && timestamp > 0) {
+      return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000).toLocal();
+    }
+
+    final String dateString = appointment['date']?.toString() ?? '';
+    final parsedSpanish = _parseSpanishDate(dateString);
+    if (parsedSpanish == null) return null;
+
+    final String timeString = appointment['time']?.toString() ?? '';
+    final parsedTime = _parseTime(timeString);
+
+    if (parsedTime == null) {
+      return parsedSpanish;
+    }
+
+    return DateTime(
+      parsedSpanish.year,
+      parsedSpanish.month,
+      parsedSpanish.day,
+      parsedTime.hour,
+      parsedTime.minute,
+    );
+  }
+
+  DateTime? _parseBackendDateTime(String value) {
+    final clean = value.trim();
+    if (clean.isEmpty) return null;
+
+    try {
+      return DateTime.parse(clean).toLocal();
+    } catch (_) {}
+
+    try {
+      final normalized = clean.replaceFirst(' ', 'T');
+      return DateTime.parse(normalized).toLocal();
+    } catch (_) {}
+
+    return null;
+  }
+
+  DateTime? _parseSpanishDate(String value) {
+    final clean = value.trim();
+    if (clean.isEmpty) return null;
+
+    final months = <String, int>{
+      'enero': 1,
+      'febrero': 2,
+      'marzo': 3,
+      'abril': 4,
+      'mayo': 5,
+      'junio': 6,
+      'julio': 7,
+      'agosto': 8,
+      'septiembre': 9,
+      'setiembre': 9,
+      'octubre': 10,
+      'noviembre': 11,
+      'diciembre': 12,
+    };
+
+    final regex = RegExp(
+      r'^(\d{1,2})\s+de\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]+)\s+de\s+(\d{4})$',
+      caseSensitive: false,
+    );
+
+    final match = regex.firstMatch(clean);
+    if (match == null) return null;
+
+    final day = int.tryParse(match.group(1) ?? '');
+    final monthName = (match.group(2) ?? '').toLowerCase();
+    final year = int.tryParse(match.group(3) ?? '');
+    final month = months[monthName];
+
+    if (day == null || month == null || year == null) return null;
+
+    return DateTime(year, month, day);
+  }
+
+  TimeOfDay? _parseTime(String value) {
+    final clean = value.trim().toLowerCase();
+    if (clean.isEmpty) return null;
+
+    final regex = RegExp(r'^(\d{1,2}):(\d{2})\s*(am|pm)?$');
+    final match = regex.firstMatch(clean);
+
+    if (match == null) return null;
+
+    int hour = int.tryParse(match.group(1) ?? '') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '') ?? 0;
+    final period = match.group(3);
+
+    if (period == 'pm' && hour < 12) hour += 12;
+    if (period == 'am' && hour == 12) hour = 0;
+
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _displayDateFromNormalized(String? bookingStart) {
+    if (bookingStart == null || bookingStart.trim().isEmpty) {
+      return 'Sin fecha';
+    }
+
+    final date = _parseBackendDateTime(bookingStart);
+    if (date == null) return 'Sin fecha';
+
+    const months = <String>[
+      '',
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+
+    return '${date.day} de ${months[date.month]} de ${date.year}';
+  }
+
+  String _displayTimeFromNormalized(String? bookingStart) {
+    if (bookingStart == null || bookingStart.trim().isEmpty) {
+      return '';
+    }
+
+    final date = _parseBackendDateTime(bookingStart);
+    if (date == null) return '';
+
+    final hh = date.hour.toString().padLeft(2, '0');
+    final mm = date.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  List<Map<String, dynamic>> _appointmentsByTab(int index) {
+    switch (index) {
+      case 0:
+        return _allAppointments
+            .where(
+              (a) => _appointmentStatusKey(a) == 'pending',
+            )
+            .toList();
+      case 1:
+        return _allAppointments.where(
+          (a) {
+            final statusKey = _appointmentStatusKey(a);
+            return statusKey == 'confirmed' || statusKey == 'completed';
+          },
+        ).toList();
+      case 2:
+        return _allAppointments.where(
+          (a) {
+            final statusKey = _appointmentStatusKey(a);
+            return statusKey == 'canceled' || statusKey == 'rejected';
+          },
+        ).toList();
+      default:
+        return _allAppointments;
+    }
+  }
+
+  bool _isPastAppointment(Map<String, dynamic> appointment) {
+    final date = _resolveAppointmentDate(appointment);
+    if (date == null) return false;
+    return date.isBefore(DateTime.now());
+  }
+
+  Color _statusColorByKey(String statusKey) {
+    switch (statusKey) {
+      case 'confirmed':
+        return const Color(0xFF2E7D32);
+      case 'pending':
+        return const Color(0xFFF9A825);
+      case 'expired_pending':
+        return const Color(0xFF6B7280);
+      case 'completed':
+        return const Color(0xFF1565C0);
+      case 'rejected':
+        return const Color(0xFFB91C1C);
+      case 'canceled':
+        return const Color(0xFFC62828);
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  String _statusLabelByKey(String statusKey, {String? fallback}) {
+    switch (statusKey) {
+      case 'confirmed':
+        return 'Confirmada';
+      case 'pending':
+        return 'Pendiente';
+      case 'expired_pending':
+        return 'Pendiente vencida';
+      case 'completed':
+        return 'Completada';
+      case 'rejected':
+        return 'Rechazada';
+      case 'canceled':
+        return 'Cancelada';
+      default:
+        final cleanFallback = (fallback ?? '').trim();
+        return cleanFallback.isEmpty ? 'Sin estado' : cleanFallback;
+    }
+  }
+
+  Color _appointmentStatusColor(Map<String, dynamic> appointment) {
+    return _statusColorByKey(_appointmentStatusKey(appointment));
+  }
+
+  String _appointmentStatusLabel(Map<String, dynamic> appointment) {
+    final explicitDisplay = _firstNonEmpty([
+      appointment['status_display']?.toString(),
+      appointment['statusDisplay']?.toString(),
+    ]);
+
+    if (explicitDisplay != null) {
+      return explicitDisplay;
+    }
+
+    return _statusLabelByKey(
+      _appointmentStatusKey(appointment),
+      fallback: appointment['status']?.toString(),
+    );
+  }
+
+  String _displayServiceName(Map<String, dynamic> appointment) {
+    return appointment['service_name']?.toString() ??
+        appointment['service']?.toString() ??
+        _readNestedString(appointment, ['service', 'name']) ??
+        'Servicio';
+  }
+
+  String _displayBarberName(Map<String, dynamic> appointment) {
+    return appointment['provider_name']?.toString() ??
+        appointment['barber']?.toString() ??
+        _readNestedString(appointment, ['provider', 'fullName']) ??
+        'Barbero';
+  }
+
+  String _displayDate(Map<String, dynamic> appointment) {
+    final date = _resolveAppointmentDate(appointment);
+    if (date == null) {
+      return appointment['date']?.toString() ?? 'Sin fecha';
+    }
+
+    const months = <String>[
+      '',
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+
+    return '${date.day} de ${months[date.month]} de ${date.year}';
+  }
+
+  String _displayTime(Map<String, dynamic> appointment) {
+    final date = _resolveAppointmentDate(appointment);
+    if (date == null) {
+      return appointment['time']?.toString() ?? '';
+    }
+
+    final hh = date.hour.toString().padLeft(2, '0');
+    final mm = date.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  Future<void> _goToRebook(Map<String, dynamic> appointment) async {
+    final barberId = appointment['provider_id'];
+    final serviceId = appointment['service_id'];
+    final serviceName = _displayServiceName(appointment);
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingsPage(
+          service: serviceId != null
+              ? {
+                  'id': serviceId,
+                  'title': serviceName,
+                }
+              : null,
+          selectedBarber: barberId != null
+              ? {
+                  'id': barberId,
+                  'fullName': _displayBarberName(appointment),
+                  'locationId': appointment['locationId'],
+                }
+              : null,
+          initialBranch: appointment['branch']?.toString(),
+          initialBarber: _displayBarberName(appointment),
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    await _loadAppointments();
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 54, color: Colors.black26),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: () async {
+                await Navigator.pushNamed(context, AppRoutes.bookings);
+                if (!mounted) return;
+                await _loadAppointments();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Reservar ahora',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentCard(Map<String, dynamic> appointment) {
+    final statusColor = _appointmentStatusColor(appointment);
+    final canRebook = _appointmentStatusKey(appointment) == 'confirmed';
+
+    return GestureDetector(
+      onTap: () async {
+        final changed = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AppointmentDetailPage(appointment: appointment),
+          ),
+        );
+        if (!mounted) return;
+        if (changed == true) {
+          await _loadAppointments();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE7DFD4)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _displayServiceName(appointment),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _appointmentStatusLabel(appointment),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _infoRow(Icons.person_outline, _displayBarberName(appointment)),
+            const SizedBox(height: 8),
+            _infoRow(Icons.calendar_today_outlined, _displayDate(appointment)),
+            const SizedBox(height: 8),
+            _infoRow(Icons.access_time_outlined, _displayTime(appointment)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final changed = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AppointmentDetailPage(appointment: appointment),
+                        ),
+                      );
+                      if (!mounted) return;
+                      if (changed == true) {
+                        await _loadAppointments();
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF9C7732),
+                      side: const BorderSide(color: Color(0xFFD4AF37)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Ver detalle',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed:
+                        canRebook ? () => _goToRebook(appointment) : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      disabledBackgroundColor: const Color(0xFFE7DFD4),
+                      foregroundColor: AppColors.primary,
+                      disabledForegroundColor: const Color(0xFF9E9E9E),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Agendar nuevamente',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: const Color(0xFFD4AF37)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabContent(int tabIndex) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFD4AF37),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 54,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'No se pudieron cargar tus citas',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: _loadAppointments,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final items = _appointmentsByTab(tabIndex);
+
+    if (items.isEmpty) {
+      switch (tabIndex) {
+        case 0:
+          return _buildEmptyState(
+            icon: Icons.schedule,
+            title: 'No tienes citas pendientes',
+            subtitle: 'Cuando hagas una nueva reserva, aparecerá aquí.',
+          );
+        case 1:
+          return _buildEmptyState(
+            icon: Icons.check_circle_outline,
+            title: 'No tienes citas confirmadas',
+            subtitle: 'Tus próximas citas confirmadas aparecerán aquí.',
+          );
+        case 2:
+          return _buildEmptyState(
+            icon: Icons.cancel_outlined,
+            title: 'No tienes citas canceladas',
+            subtitle: 'Las citas canceladas se mostrarán aquí.',
+          );
+        default:
+          return const SizedBox.shrink();
+      }
+    }
+
+    return RefreshIndicator(
+      color: const Color(0xFFD4AF37),
+      backgroundColor: Colors.white,
+      onRefresh: _loadAppointments,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        itemCount: items.length,
+        itemBuilder: (_, index) {
+          return _buildAppointmentCard(items[index]);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartCount = context.watch<ShopProvider>().cartCount;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F4F1),
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: 64,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            children: [
+              _HeaderSquareAction(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProductsArchivePage(),
+                    ),
+                  );
+                },
+                child: const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const BookingsPage()),
+                      );
+                      if (!context.mounted) return;
+                      await _loadAppointments();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.edit_calendar_rounded, size: 20),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Nueva reserva',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const UnreadNotificationsButton(),
+              const SizedBox(width: 10),
+              _HeaderSquareAction(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CartPage()),
+                  );
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(
+                        Icons.shopping_bag_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    if (cartCount > 0)
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFD4AF37),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$cartCount',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFFD4AF37),
+          indicatorWeight: 3,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textSecondary,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+          indicatorSize: TabBarIndicatorSize.tab,
+          tabs: const [
+            Tab(text: 'Pendientes'),
+            Tab(text: 'Confirmadas'),
+            Tab(text: 'Canceladas'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildTabContent(0),
+          _buildTabContent(1),
+          _buildTabContent(2),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderSquareAction extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _HeaderSquareAction({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: child,
+      ),
+    );
+  }
+}

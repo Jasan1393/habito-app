@@ -1,0 +1,56 @@
+name: habito
+description: "App móvil de Hábito"
+publish_to: 'none'
+
+version: 2.9.0+19
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  url_launcher: ^6.3.1
+  add_2_calendar: ^3.0.1
+  share_plus: ^10.0.2
+  path_provider: ^2.1.4
+  cached_network_image: ^3.4.1
+  package_info_plus: ^8.1.2
+  provider: ^6.1.5+1
+  flutter_secure_storage: ^10.0.0
+  image_picker: ^1.1.2
+  local_auth: ^2.3.0
+
+  # Firebase / Push Notifications
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.7
+  flutter_local_notifications: ^18.0.1
+  geolocator: ^14.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/app_icon.png
+
+flutter_native_splash:
+  color: "#111111"
+  image: assets/images/logo_habito.png
+  android: true
+  ios: true
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/services/

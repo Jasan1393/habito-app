@@ -1,0 +1,73 @@
+import 'package:flutter/material.dart';
+
+import '../../features/auth/presentation/pages/auth_gate_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/bookings/presentation/pages/bookings_page.dart';
+import '../../features/bookings/presentation/pages/my_appointments_page.dart';
+import '../../features/bookings/presentation/pages/push_appointment_loader_page.dart';
+import '../../features/locations/presentation/pages/locations_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
+import '../../features/shop/presentation/pages/orders_page.dart';
+
+class AppRoutes {
+  static const String login = '/login';
+  static const String main = '/main';
+  static const String bookings = '/bookings';
+  static const String myAppointments = '/my-appointments';
+  static const String pushAppointment = '/push-appointment';
+  static const String orders = '/orders';
+  static const String notifications = '/notifications';
+  static const String locations = '/locations';
+
+  static Map<String, WidgetBuilder> get routes {
+    return {
+      login: (_) => const LoginPage(),
+      main: (_) => const AuthGatePage(),
+      bookings: (_) => const BookingsPage(),
+      myAppointments: (_) => const MyAppointmentsPage(),
+      locations: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        final map = args is Map ? Map<String, dynamic>.from(args) : {};
+        return LocationsPage(
+          selectedNavIndex: _parseInt(map['selectedNavIndex']) ?? 0,
+        );
+      },
+      orders: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        final map = args is Map ? Map<String, dynamic>.from(args) : {};
+        return OrdersPage(
+          selectedNavIndex: _parseInt(map['selectedNavIndex']) ?? 4,
+          initialOrderId:
+              _parseInt(map['orderId'] ?? map['order_id'] ?? map['order']),
+          openFromPush: _parseBool(map['openFromPush']) ?? false,
+        );
+      },
+      notifications: (_) => const NotificationsPage(),
+      pushAppointment: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        final map = args is Map ? Map<String, dynamic>.from(args) : {};
+
+        return PushAppointmentLoaderPage(
+          appointmentId:
+              _parseInt(map['appointmentId'] ?? map['appointment_id']),
+          bookingId: _parseInt(map['bookingId'] ?? map['booking_id']),
+        );
+      },
+    };
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
+
+  static bool? _parseBool(dynamic value) {
+    if (value is bool) return value;
+    final normalized = value?.toString().trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) return null;
+    if (normalized == 'true' || normalized == '1') return true;
+    if (normalized == 'false' || normalized == '0') return false;
+    return null;
+  }
+}

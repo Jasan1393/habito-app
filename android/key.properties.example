@@ -1,0 +1,4 @@
+storePassword=CAMBIAR_PASSWORD_KEYSTORE
+keyPassword=CAMBIAR_PASSWORD_LLAVE
+keyAlias=habito
+storeFile=../../../keystores/habito-release.jks
