@@ -66,3 +66,5 @@ ios/Flutter/Flutter.podspec
 # Local working backups/reports
 analyze*.txt
 pubspec.yaml.bak-*
+*.bak
+*.bak-*
