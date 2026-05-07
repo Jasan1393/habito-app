@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/points_api.dart';
 import '../models/points_history_entry.dart';
+import '../models/points_quote.dart';
 import '../models/points_summary.dart';
 
 class PointsProvider extends ChangeNotifier {
@@ -111,4 +112,22 @@ class PointsProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() => load(forceRefresh: true);
+
+  Future<PointsQuote> quoteRedemption({
+    required String context,
+    required double amount,
+    double requestedPoints = 0,
+  }) {
+    final token = _token;
+    if (token == null || token.isEmpty) {
+      throw Exception('Inicia sesion para usar tus puntos.');
+    }
+
+    return _api.quoteRedemption(
+      token: token,
+      context: context,
+      amount: amount,
+      requestedPoints: requestedPoints,
+    );
+  }
 }

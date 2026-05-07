@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../../core/config/app_config.dart';
 import '../../models/points_history_entry.dart';
+import '../../models/points_quote.dart';
 import '../../models/points_summary.dart';
 
 class PointsApi {
@@ -14,11 +15,12 @@ class PointsApi {
 
   PointsApi({http.Client? client}) : _client = client ?? http.Client();
 
-  Future<({
-    PointsSummary summary,
-    List<PointsHistoryEntry> history,
-    int historyTotal,
-  })> getSummary({
+  Future<
+      ({
+        PointsSummary summary,
+        List<PointsHistoryEntry> history,
+        int historyTotal,
+      })> getSummary({
     required String token,
     int historyLimit = 20,
   }) async {
@@ -28,9 +30,8 @@ class PointsApi {
       },
     );
 
-    final response = await _client
-        .get(uri, headers: _headers(token))
-        .timeout(_timeout);
+    final response =
+        await _client.get(uri, headers: _headers(token)).timeout(_timeout);
     final data = _unwrapSuccess(_decodeResponse(response));
     final payload = _asMap(data['data']);
     final summary = PointsSummary.fromJson(_asMap(payload['summary']));
@@ -63,9 +64,8 @@ class PointsApi {
       },
     );
 
-    final response = await _client
-        .get(uri, headers: _headers(token))
-        .timeout(_timeout);
+    final response =
+        await _client.get(uri, headers: _headers(token)).timeout(_timeout);
     final data = _unwrapSuccess(_decodeResponse(response));
     final payload = _asMap(data['data']);
     final items = payload['items'] is List
@@ -80,6 +80,28 @@ class PointsApi {
           ),
         )
         .toList();
+  }
+
+  Future<PointsQuote> quoteRedemption({
+    required String token,
+    required String context,
+    required double amount,
+    double requestedPoints = 0,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/points/quote');
+    final body = jsonEncode({
+      'context': context,
+      'amount': _formatAmount(amount),
+      if (requestedPoints > 0)
+        'requested_points': _formatAmount(requestedPoints),
+    });
+
+    final response = await _client
+        .post(uri, headers: _headers(token), body: body)
+        .timeout(_timeout);
+    final data = _unwrapSuccess(_decodeResponse(response));
+    final payload = _asMap(data['data']);
+    return PointsQuote.fromJson(_asMap(payload['quote']));
   }
 
   Map<String, String> _headers(String token) {
@@ -156,6 +178,8 @@ class PointsApi {
     if (value is Map) return Map<String, dynamic>.from(value);
     return <String, dynamic>{};
   }
+
+  String _formatAmount(double value) => value.toStringAsFixed(2);
 
   int? _parseInt(dynamic value) {
     if (value == null) return null;

@@ -69,18 +69,6 @@ class _LocationsPageState extends State<LocationsPage> {
     }
 
     try {
-      if (!forceRefresh) {
-        final cached = await HabitoBookingApi.getCachedLocations();
-        if (cached.isNotEmpty) {
-          _applyLocations(cached);
-          setState(() {
-            _isLoading = false;
-          });
-          unawaited(_loadLocations(forceRefresh: true));
-          return;
-        }
-      }
-
       final result = await HabitoBookingApi.getLocations(
         forceRefresh: forceRefresh,
       );
@@ -441,7 +429,9 @@ class _LocationsPageState extends State<LocationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
     final locations = _sortedLocations();
     final showDistances = _userLatitude != null && _userLongitude != null;
     final selectedNavIndex = widget.selectedNavIndex.clamp(0, 4).toInt();

@@ -1,9 +1,11 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
+import '../../../shop/provider/shop_provider.dart';
 import 'bookings_page.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
@@ -21,6 +23,8 @@ class AppointmentDetailPage extends StatefulWidget {
 class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Map<String, dynamic> get appointment => widget.appointment;
   bool _isCancelling = false;
+  bool _isUploadingProof = false;
+  Map<String, dynamic>? _paymentProofOverride;
 
   String _normalizeStatusKey(String? status) {
     final value = (status ?? '').trim().toLowerCase();
@@ -165,6 +169,100 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       return Map<String, dynamic>.from(value);
     }
     return <String, dynamic>{};
+  }
+
+  int? _findIntByKeys(
+    dynamic value,
+    Set<String> keys, {
+    int depth = 0,
+  }) {
+    if (depth > 8) return null;
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      for (final entry in map.entries) {
+        if (keys.contains(entry.key)) {
+          final parsed = _asInt(entry.value);
+          if (parsed != null && parsed > 0) return parsed;
+        }
+      }
+
+      for (final entry in map.entries) {
+        final found = _findIntByKeys(entry.value, keys, depth: depth + 1);
+        if (found != null && found > 0) return found;
+      }
+    }
+
+    if (value is List) {
+      for (final item in value) {
+        final found = _findIntByKeys(item, keys, depth: depth + 1);
+        if (found != null && found > 0) return found;
+      }
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _findMapByKeys(
+    dynamic value,
+    Set<String> keys, {
+    int depth = 0,
+  }) {
+    if (depth > 8) return <String, dynamic>{};
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      for (final entry in map.entries) {
+        if (keys.contains(entry.key) && entry.value is Map) {
+          return Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+
+      for (final entry in map.entries) {
+        final found = _findMapByKeys(entry.value, keys, depth: depth + 1);
+        if (found.isNotEmpty) return found;
+      }
+    }
+
+    if (value is List) {
+      for (final item in value) {
+        final found = _findMapByKeys(item, keys, depth: depth + 1);
+        if (found.isNotEmpty) return found;
+      }
+    }
+
+    return <String, dynamic>{};
+  }
+
+  String _formatPaymentMethod(String value) {
+    final text = value.trim();
+    if (text.isEmpty || text == '-') return 'No definido';
+
+    final lower = text.toLowerCase();
+    if (lower == 'bacs' || lower.contains('transfer')) {
+      return 'Transferencia';
+    }
+    if (lower.contains('point') || lower.contains('punto')) {
+      return 'Puntos Habito';
+    }
+    if (lower.contains('cash') || lower.contains('efectivo')) {
+      return 'Efectivo';
+    }
+    if (lower.contains('card') ||
+        lower.contains('tarjeta') ||
+        lower.contains('credito') ||
+        lower.contains('crédito')) {
+      return 'Tarjeta';
+    }
+
+    return text;
+  }
+
+  bool _isBankTransferPayment(String value) {
+    final lower = value.trim().toLowerCase();
+    return lower == 'bacs' ||
+        lower.contains('transfer') ||
+        lower.contains('transferencia');
   }
 
   DateTime? _parseBackendDateTime(String value) {
@@ -398,7 +496,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     required String statusKey,
     required String bookingStart,
   }) {
-    if (statusKey == 'cancelada') return 'La cita ya esta cancelada.';
+    if (statusKey == 'cancelada') return 'La cita ya está cancelada.';
     if (statusKey == 'rechazada') {
       return 'La cita fue rechazada y ya no se puede gestionar.';
     }
@@ -474,6 +572,76 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (mounted) {
         setState(() {
           _isCancelling = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _selectAndUploadPaymentProof(int orderId) async {
+    final auth = context.read<AuthProvider>();
+    final token = auth.token?.trim();
+
+    if (!auth.isLoggedIn || token == null || token.isEmpty || orderId <= 0) {
+      _showMessage(
+        context,
+        'No pudimos identificar el pedido para adjuntar el comprobante.',
+      );
+      return;
+    }
+
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 1800,
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _isUploadingProof = true;
+    });
+
+    try {
+      final shop = context.read<ShopProvider>();
+      final ok = await shop.uploadPaymentProof(
+        token: token,
+        orderId: orderId,
+        filePath: picked.path,
+      );
+
+      if (!mounted) return;
+
+      if (ok) {
+        final updatedOrder = shop.orders.firstWhere(
+          (order) => _asInt(order['id']) == orderId,
+          orElse: () => <String, dynamic>{},
+        );
+
+        setState(() {
+          _paymentProofOverride = _asMap(
+            updatedOrder['payment_proof'] ?? updatedOrder['paymentProof'],
+          );
+        });
+
+        _showMessage(
+            context, 'Comprobante recibido. Lo validaremos muy pronto.');
+        return;
+      }
+
+      _showMessage(
+        context,
+        shop.paymentProofError ?? 'No pudimos subir el comprobante.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(
+        context,
+        'No pudimos subir el comprobante: ${e.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingProof = false;
         });
       }
     }
@@ -561,12 +729,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ]) ??
         '-';
 
-    final String bookingToken = _firstNonEmpty([
-          appointmentMap['bookingToken']?.toString(),
-          appointmentMap['booking_token']?.toString(),
-        ]) ??
-        '-';
-
     final String locationAddress = _firstNonEmpty([
           appointmentMap['locationAddress']?.toString(),
           appointmentMap['location_address']?.toString(),
@@ -582,10 +744,57 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         '-';
 
     final String paymentGateway = _firstNonEmpty([
+          appointmentMap['paymentTitle']?.toString(),
+          appointmentMap['payment_title']?.toString(),
+          appointmentMap['paymentMethodTitle']?.toString(),
+          appointmentMap['payment_method_title']?.toString(),
+          appointmentMap['paymentMethod']?.toString(),
+          appointmentMap['payment_method']?.toString(),
           appointmentMap['paymentGateway']?.toString(),
           appointmentMap['payment_gateway']?.toString(),
+          bookingMap['paymentTitle']?.toString(),
+          bookingMap['payment_title']?.toString(),
+          bookingMap['paymentMethod']?.toString(),
+          bookingMap['payment_method']?.toString(),
         ]) ??
         '-';
+    final String paymentMethodDisplay = _formatPaymentMethod(paymentGateway);
+    final bool isBankTransfer = _isBankTransferPayment(paymentGateway);
+    final int? paymentOrderId = _findIntByKeys(
+      appointmentMap,
+      const {
+        'orderId',
+        'order_id',
+        'wooOrderId',
+        'woo_order_id',
+        'woocommerceOrderId',
+        'woocommerce_order_id',
+        'wcOrderId',
+        'wc_order_id',
+        'paymentOrderId',
+        'payment_order_id',
+        'shopOrderId',
+        'shop_order_id',
+      },
+    );
+    final paymentProof = _paymentProofOverride?.isNotEmpty == true
+        ? _paymentProofOverride!
+        : _findMapByKeys(
+            appointmentMap,
+            const {
+              'paymentProof',
+              'payment_proof',
+              'proof',
+              'transferProof',
+              'transfer_proof',
+            },
+          );
+    final proofUrl = (paymentProof['url'] ?? '').toString().trim();
+    final proofUploaded =
+        paymentProof['uploaded'] == true || proofUrl.isNotEmpty;
+    final proofUploadedAt =
+        (paymentProof['uploaded_at'] ?? paymentProof['uploadedAt'] ?? '')
+            .toString();
 
     final String reservationCode = _firstNonEmpty([
           appointmentMap['appointmentId']?.toString(),
@@ -667,6 +876,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           bookingStart: bookingStart,
         ) ??
         (!canCancel ? 'Fuera de ventana para cancelar.' : null);
+    final canUploadPaymentProof = isBankTransfer &&
+        !proofUploaded &&
+        paymentOrderId != null &&
+        paymentOrderId > 0 &&
+        !const {'cancelada', 'rechazada', 'completada'}
+            .contains(normalizedStatus);
 
     final extras = _extractExtras(appointmentMap, bookingMap);
 
@@ -1126,16 +1341,24 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ),
                 const SizedBox(height: 14),
                 _DetailRow(
-                  icon: Icons.qr_code_rounded,
-                  label: 'Token',
-                  value: bookingToken,
-                ),
-                const SizedBox(height: 14),
-                _DetailRow(
                   icon: Icons.credit_card_outlined,
-                  label: 'Método',
-                  value: paymentGateway,
+                  label: 'Forma de pago',
+                  value: paymentMethodDisplay,
                 ),
+                if (isBankTransfer) ...[
+                  const SizedBox(height: 14),
+                  _AppointmentPaymentProofPanel(
+                    uploaded: proofUploaded,
+                    uploadedAt: proofUploadedAt,
+                    isUploading: _isUploadingProof,
+                    canUpload: canUploadPaymentProof,
+                    hasLinkedOrder:
+                        paymentOrderId != null && paymentOrderId > 0,
+                    onUpload: paymentOrderId != null
+                        ? () => _selectAndUploadPaymentProof(paymentOrderId)
+                        : null,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1186,6 +1409,129 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AppointmentPaymentProofPanel extends StatelessWidget {
+  final bool uploaded;
+  final String uploadedAt;
+  final bool isUploading;
+  final bool canUpload;
+  final bool hasLinkedOrder;
+  final VoidCallback? onUpload;
+
+  const _AppointmentPaymentProofPanel({
+    required this.uploaded,
+    required this.uploadedAt,
+    required this.isUploading,
+    required this.canUpload,
+    required this.hasLinkedOrder,
+    required this.onUpload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor =
+        uploaded ? const Color(0xFF2E7D32) : const Color(0xFF9C7732);
+    final title =
+        uploaded ? 'Comprobante recibido' : 'Comprobante de transferencia';
+    final description = uploaded
+        ? 'Tu comprobante quedo adjunto para validacion.'
+        : hasLinkedOrder
+            ? 'Sube una foto clara del pago para confirmar la transferencia.'
+            : 'La cita aun no tiene un pedido vinculado para adjuntar el comprobante.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                uploaded
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.upload_file_rounded,
+                color: statusColor,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                    if (uploaded && uploadedAt.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        uploadedAt.split(' ').first,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!uploaded) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                onPressed: canUpload && !isUploading ? onUpload : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      AppColors.primary.withValues(alpha: 0.35),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: isUploading
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.add_photo_alternate_outlined, size: 19),
+                label: Text(
+                  isUploading ? 'Subiendo...' : 'Subir comprobante',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

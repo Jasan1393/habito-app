@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -183,9 +183,8 @@ class _BookingsPageState extends State<BookingsPage> {
       if (_contactType == 'business') {
         _identificationType = 'ruc';
       }
-      _province = kEcuadorProvinces.contains(user.province)
-          ? user.province
-          : 'Guayas';
+      _province =
+          kEcuadorProvinces.contains(user.province) ? user.province : 'Guayas';
 
       if (_businessNameController.text.trim().isEmpty &&
           user.businessName.trim().isNotEmpty) {
@@ -206,7 +205,7 @@ class _BookingsPageState extends State<BookingsPage> {
         _addressController.text = user.address.trim();
       }
     } catch (_) {
-      // Evita romper la pantalla si el provider aún no está listo.
+      // Evita romper la pantalla si el provider aÃºn no estÃ¡ listo.
     }
   }
 
@@ -836,11 +835,9 @@ class _BookingsPageState extends State<BookingsPage> {
           user?.pointsRedeemBookingsEnabled ??
           false,
       balance: summary?.balance ?? user?.pointsBalance ?? 0,
-      rate: summary?.redeemPointsPerUsd ??
-          user?.pointsRedeemPointsPerUsd ??
-          100,
-      minPoints:
-          summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
+      rate:
+          summary?.redeemPointsPerUsd ?? user?.pointsRedeemPointsPerUsd ?? 100,
+      minPoints: summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
       maxPercent:
           summary?.redeemMaxPercent ?? user?.pointsRedeemMaxPercent ?? 100,
       label: (summary?.label ?? user?.pointsLabel ?? 'Puntos').trim(),
@@ -891,11 +888,11 @@ class _BookingsPageState extends State<BookingsPage> {
     double pointsToUse,
   ) {
     if (totalPrice <= 0) {
-      return 'Selecciona un servicio para calcular cuántos ${pointsState.label.toLowerCase()} puedes usar en esta reserva.';
+      return 'Selecciona un servicio para calcular cuÃ¡ntos ${pointsState.label.toLowerCase()} puedes usar en esta reserva.';
     }
 
     if (pointsState.balance <= 0) {
-      return 'Aún no tienes ${pointsState.label.toLowerCase()} disponibles para aplicar en esta reserva.';
+      return 'AÃºn no tienes ${pointsState.label.toLowerCase()} disponibles para aplicar en esta reserva.';
     }
 
     if (pointsToUse <= 0) {
@@ -910,7 +907,7 @@ class _BookingsPageState extends State<BookingsPage> {
       return 'Tus ${pointsState.label.toLowerCase()} actuales no alcanzan para generar descuento en esta reserva.';
     }
 
-    return 'Puedes combinar tu método de pago con ${pointsState.label.toLowerCase()} para reducir el total de esta reserva.';
+    return 'Puedes combinar tu mÃ©todo de pago con ${pointsState.label.toLowerCase()} para reducir el total de esta reserva.';
   }
 
   int _getGrandTotalDuration() {
@@ -1047,9 +1044,8 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   String get _bookingDocumentLabel {
-    final label =
-        kIdentificationTypeLabels[_effectiveIdentificationType] ??
-            _effectiveIdentificationType;
+    final label = kIdentificationTypeLabels[_effectiveIdentificationType] ??
+        _effectiveIdentificationType;
     return 'Numero de $label';
   }
 
@@ -1097,7 +1093,7 @@ class _BookingsPageState extends State<BookingsPage> {
     }
 
     if (text.length < 5) {
-      return 'Ingresa un pasaporte valido';
+      return 'Ingresa un pasaporte vÃ¡lido';
     }
 
     return null;
@@ -1607,12 +1603,12 @@ class _BookingsPageState extends State<BookingsPage> {
   }) async {
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
     if (cleanPhone.isEmpty) {
-      _showMessage('No hay número de WhatsApp disponible para esta sucursal.');
+      _showMessage('No hay nÃºmero de WhatsApp disponible para esta sucursal.');
       return;
     }
 
     final message = Uri.encodeComponent(
-      'Hola 👋, tengo una cita agendada en HÁBITO.\n\n'
+      'Hola ðŸ‘‹, tengo una cita agendada en HÃBITO.\n\n'
       'Servicio: $serviceName\n'
       'Sucursal: $branch\n'
       'Fecha: $dateLabel\n'
@@ -1645,7 +1641,7 @@ class _BookingsPageState extends State<BookingsPage> {
     );
 
     if (!opened) {
-      _showMessage('No se pudo abrir la ubicación');
+      _showMessage('No se pudo abrir la ubicaciÃ³n');
     }
   }
 
@@ -1658,7 +1654,7 @@ class _BookingsPageState extends State<BookingsPage> {
     required String time,
   }) async {
     final text = Uri.encodeComponent(
-      '📅 Mi cita en HÁBITO\n\n'
+      'ðŸ“… Mi cita en HÃBITO\n\n'
       'Reserva: #$reservationCode\n'
       'Servicio: $serviceName\n'
       'Barbero: $barberName\n'
@@ -1673,7 +1669,7 @@ class _BookingsPageState extends State<BookingsPage> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       await Share.share(
-        '📅 Mi cita en HÁBITO\n\n'
+        'ðŸ“… Mi cita en HÃBITO\n\n'
         'Reserva: #$reservationCode\n'
         'Servicio: $serviceName\n'
         'Barbero: $barberName\n'
@@ -1711,7 +1707,7 @@ class _BookingsPageState extends State<BookingsPage> {
             '${two(utc.hour)}${two(utc.minute)}${two(utc.second)}Z';
       }
 
-      final summary = _sanitizeForIcs('Cita HÁBITO - $serviceName');
+      final summary = _sanitizeForIcs('Cita HÃBITO - $serviceName');
       final description = _sanitizeForIcs(
         'Reserva: #$reservationCode\n'
         'Servicio: $serviceName\n'
@@ -1813,10 +1809,10 @@ END:VCALENDAR
     const weekdays = [
       'lunes',
       'martes',
-      'miércoles',
+      'miÃ©rcoles',
       'jueves',
       'viernes',
-      'sábado',
+      'sÃ¡bado',
       'domingo',
     ];
 
@@ -1875,18 +1871,18 @@ END:VCALENDAR
     }
 
     if (!_isValidPhone(_phoneController.text)) {
-      _showMessage('Ingresa un número de celular válido');
+      _showMessage('Ingresa un nÃºmero de celular vÃ¡lido');
       return;
     }
 
     if (!_isValidEmail(_emailController.text)) {
-      _showMessage('Ingresa un correo electrónico válido');
+      _showMessage('Ingresa un correo electrÃ³nico vÃ¡lido');
       return;
     }
 
     if (_contactType == 'business' &&
         _businessNameController.text.trim().isEmpty) {
-      _showMessage('Ingresa la razon social');
+      _showMessage('Ingresa la razÃ³n social');
       return;
     }
 
@@ -1899,12 +1895,12 @@ END:VCALENDAR
     }
 
     if (_cityController.text.trim().isEmpty) {
-      _showMessage('Ingresa el canton o ciudad');
+      _showMessage('Ingresa el cantÃ³n o ciudad');
       return;
     }
 
     if (_addressController.text.trim().isEmpty) {
-      _showMessage('Ingresa la direccion principal');
+      _showMessage('Ingresa la direcciÃ³n principal');
       return;
     }
 
@@ -1955,7 +1951,7 @@ END:VCALENDAR
 
     if (!selectedPaymentMethod.canCreateManualOrder) {
       _showMessage(
-        '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.',
+        '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para reservas desde la app.',
       );
       return;
     }
@@ -1964,19 +1960,36 @@ END:VCALENDAR
       final authProvider = context.read<AuthProvider>();
       final pointsProvider = context.read<PointsProvider>();
 
+      final totalPrice = _getGrandTotalPrice();
+      var redeemPoints = 0.0;
+
       if (_usePoints) {
         await pointsProvider.refresh();
         if (!mounted) return;
-      }
 
-      final totalPrice = _getGrandTotalPrice();
-      final redeemPoints = _usePoints
-          ? _bookingPointsToUse(authProvider, totalPrice, pointsProvider)
-          : 0.0;
+        final quote = await pointsProvider.quoteRedemption(
+          context: 'booking',
+          amount: totalPrice,
+        );
+
+        if (!quote.canRedeem) {
+          setState(() {
+            _usePoints = false;
+          });
+          _showMessage(
+            quote.message.isNotEmpty
+                ? quote.message
+                : 'Tus puntos ya no estan disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
+          );
+          return;
+        }
+
+        redeemPoints = quote.points;
+      }
 
       if (_usePoints && redeemPoints <= 0) {
         _showMessage(
-          'Tus puntos ya no están disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
+          'Tus puntos ya no estÃ¡n disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
         );
         return;
       }
@@ -2000,7 +2013,7 @@ END:VCALENDAR
 
       if (isLoggedIn && (token == null || token.trim().isEmpty)) {
         throw Exception(
-          'La sesión está activa pero no se encontró el token de autenticación.',
+          'La sesiÃ³n estÃ¡ activa pero no se encontrÃ³ el token de autenticaciÃ³n.',
         );
       }
 
@@ -2052,7 +2065,7 @@ END:VCALENDAR
 
       if (reservationCodeValue == null || reservationCodeValue <= 0) {
         throw Exception(
-          'La reserva se creó, pero no pudimos confirmar el código de la cita. Revisa tus citas o intenta actualizar.',
+          'La reserva se creÃ³, pero no pudimos confirmar el cÃ³digo de la cita. Revisa tus citas o intenta actualizar.',
         );
       }
 
@@ -2126,7 +2139,7 @@ END:VCALENDAR
     final token = authProvider.token?.trim();
 
     if (!authProvider.isLoggedIn || token == null || token.isEmpty) {
-      _showMessage('Inicia sesión para reagendar tu cita.');
+      _showMessage('Inicia sesiÃ³n para reagendar tu cita.');
       return;
     }
 
@@ -2194,7 +2207,7 @@ END:VCALENDAR
     }
 
     if (_containsAny(lower, ['sesi', 'token', '401'])) {
-      return 'Tu sesión venció. Inicia sesión nuevamente para consultar horarios.';
+      return 'Tu sesiÃ³n venciÃ³. Inicia sesiÃ³n nuevamente para consultar horarios.';
     }
 
     if (_containsAny(lower, [
@@ -2203,7 +2216,7 @@ END:VCALENDAR
       'minimum notice',
       'booking_notice',
     ])) {
-      return 'Por ahora no hay horarios que cumplan con el tiempo mínimo de anticipación. Elige una hora más adelante.';
+      return 'Por ahora no hay horarios que cumplan con el tiempo mÃ­nimo de anticipaciÃ³n. Elige una hora mÃ¡s adelante.';
     }
 
     if (_containsAny(lower, [
@@ -2214,7 +2227,7 @@ END:VCALENDAR
       'connection',
       'conectar',
     ])) {
-      return 'No pudimos actualizar los horarios a tiempo. Revisa tu conexión e intenta nuevamente.';
+      return 'No pudimos actualizar los horarios a tiempo. Revisa tu conexiÃ³n e intenta nuevamente.';
     }
 
     if (_containsAny(lower, [
@@ -2235,15 +2248,15 @@ END:VCALENDAR
     final lower = message.toLowerCase();
 
     if (message.isEmpty) {
-      return 'inténtalo nuevamente en unos segundos.';
+      return 'intÃ©ntalo nuevamente en unos segundos.';
     }
 
     if (_containsAny(lower, ['sesi', 'token', '401'])) {
-      return 'Tu sesión venció. Inicia sesión nuevamente para continuar.';
+      return 'Tu sesiÃ³n venciÃ³. Inicia sesiÃ³n nuevamente para continuar.';
     }
 
     if (_containsAny(lower, ['no tienes permisos', '403', 'permisos'])) {
-      return 'No pudimos validar tu sesión para continuar. Intenta ingresar nuevamente.';
+      return 'No pudimos validar tu sesiÃ³n para continuar. Intenta ingresar nuevamente.';
     }
 
     if (_containsAny(lower, [
@@ -2252,7 +2265,7 @@ END:VCALENDAR
       'minimum notice',
       'booking_notice',
     ])) {
-      return 'Ese horario ya no cumple con el tiempo mínimo de anticipación. Elige uno más adelante.';
+      return 'Ese horario ya no cumple con el tiempo mÃ­nimo de anticipaciÃ³n. Elige uno mÃ¡s adelante.';
     }
 
     if (_containsAny(lower, [
@@ -2263,14 +2276,14 @@ END:VCALENDAR
       'already',
       'ocup',
     ])) {
-      return 'Ese horario ya no está disponible. Elige otro para continuar.';
+      return 'Ese horario ya no estÃ¡ disponible. Elige otro para continuar.';
     }
 
     if (_containsAny(lower, [
       'faltan campos obligatorios',
       'debes enviar customerid',
       'datos del cliente',
-      'correo electrónico',
+      'correo electrÃ³nico',
       'correo electronico',
       'celular',
       'first_name',
@@ -2281,22 +2294,22 @@ END:VCALENDAR
     }
 
     if (_containsAny(lower, [
-      'fecha/hora de la reserva es inválida',
+      'fecha/hora de la reserva es invÃ¡lida',
       'fecha/hora de la reserva es invalida',
       'booking_start',
       'fecha y hora',
     ])) {
-      return 'La fecha u hora seleccionada ya no es válida. Elige un horario nuevamente.';
+      return 'La fecha u hora seleccionada ya no es vÃ¡lida. Elige un horario nuevamente.';
     }
 
     if (_containsAny(lower, [
-      'ya está cancelada',
+      'ya estÃ¡ cancelada',
       'ya esta cancelada',
       'ya fue completada',
       'finalizada',
       'no se puede modificar',
     ])) {
-      return 'La cita ya no puede actualizarse porque su estado cambió.';
+      return 'La cita ya no puede actualizarse porque su estado cambiÃ³.';
     }
 
     if (_containsAny(lower, ['no encontramos la cita', 'booking_not_found'])) {
@@ -2311,7 +2324,7 @@ END:VCALENDAR
       'connection',
       'conectar',
     ])) {
-      return 'No pudimos completar la solicitud a tiempo. Revisa tu conexión e intenta nuevamente.';
+      return 'No pudimos completar la solicitud a tiempo. Revisa tu conexiÃ³n e intenta nuevamente.';
     }
 
     if (_containsAny(lower, ['error 500', 'error en el servidor'])) {
@@ -2387,7 +2400,7 @@ END:VCALENDAR
                     ),
                     const SizedBox(height: 14),
                     const Text(
-                      'Cita agendada con éxito',
+                      'Cita agendada con Ã©xito',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 22,
@@ -2397,7 +2410,7 @@ END:VCALENDAR
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Tu reserva ya quedó registrada correctamente.',
+                      'Tu reserva ya quedÃ³ registrada correctamente.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,
@@ -2418,7 +2431,7 @@ END:VCALENDAR
                       _summaryRow('Estado', statusLabel),
                     if (paymentMethodTitle != null &&
                         paymentMethodTitle.trim().isNotEmpty)
-                      _summaryRow('Método de pago', paymentMethodTitle),
+                      _summaryRow('MÃ©todo de pago', paymentMethodTitle),
                     if (paymentStatus != null &&
                         paymentStatus.trim().isNotEmpty)
                       _summaryRow(
@@ -2442,7 +2455,7 @@ END:VCALENDAR
                     const SizedBox(height: 10),
                     _actionButton(
                       icon: Icons.location_on_rounded,
-                      label: 'Ver ubicación / Cómo llegar',
+                      label: 'Ver ubicaciÃ³n / CÃ³mo llegar',
                       onTap: () async {
                         await _openLocation(
                           address: locationAddress,
@@ -2794,7 +2807,7 @@ END:VCALENDAR
               border: Border.all(color: const Color(0xFFF0DE9A)),
             ),
             child: Text(
-              'Extras seleccionados: ${_formatCurrency(_getSelectedExtrasPriceTotal())} · ${_formatDurationLabel(_getSelectedExtrasDurationTotal())}',
+              'Extras seleccionados: ${_formatCurrency(_getSelectedExtrasPriceTotal())} Â· ${_formatDurationLabel(_getSelectedExtrasDurationTotal())}',
               style: const TextStyle(
                 color: Color(0xFF9C7732),
                 fontSize: 13.5,
@@ -2818,6 +2831,8 @@ END:VCALENDAR
     final pointsToUse = _bookingPointsToUse(auth, totalPrice, pointsProvider);
     final pointsDiscount =
         _bookingPointsDiscount(auth, totalPrice, pointsProvider);
+    final projectedPayableTotal =
+        (totalPrice - pointsDiscount).clamp(0, double.infinity).toDouble();
     final canShowPointsModule = auth.isLoggedIn &&
         !_isEditing &&
         pointsState.enabled &&
@@ -2845,7 +2860,7 @@ END:VCALENDAR
               onTap: () {
                 if (!method.canCreateManualOrder) {
                   _showMessage(
-                    '${method.title} estará disponible pronto para reservas desde la app.',
+                    '${method.title} estarÃ¡ disponible pronto para reservas desde la app.',
                   );
                   return;
                 }
@@ -2910,6 +2925,8 @@ END:VCALENDAR
                     pointsLabel: pointsState.label,
                     points: pointsToUse,
                     discount: pointsDiscount,
+                    total: totalPrice,
+                    payableTotal: projectedPayableTotal,
                     balance: pointsState.balance,
                     onChanged: (value) {
                       setState(() {
@@ -2925,7 +2942,7 @@ END:VCALENDAR
         if (shop.paymentMethodsError != null) ...[
           const SizedBox(height: 2),
           const Text(
-            'No pudimos actualizar los métodos de pago. Usamos transferencia como respaldo.',
+            'No pudimos actualizar los mÃ©todos de pago. Usamos transferencia como respaldo.',
             style: TextStyle(
               color: AppColors.textSecondary,
               height: 1.35,
@@ -2952,7 +2969,7 @@ END:VCALENDAR
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Antes de confirmar revisaremos que el horario siga libre y que tus datos estén listos para la reserva.',
+                  'Antes de confirmar revisaremos que el horario siga libre y que tus datos estÃ©n listos para la reserva.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
@@ -3192,7 +3209,7 @@ END:VCALENDAR
                             Expanded(
                               child: Text(
                                 _selectedDate == null
-                                    ? 'Selecciona el dia de tu reserva'
+                                    ? 'Selecciona el dÃ­a de tu reserva'
                                     : _formatDate(_selectedDate!),
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
@@ -3299,10 +3316,10 @@ END:VCALENDAR
                           controller: _taxNumberController,
                           label: _bookingDocumentLabel,
                           icon: Icons.badge_outlined,
-                          keyboardType: _effectiveIdentificationType ==
-                                  'pasaporte'
-                              ? TextInputType.text
-                              : TextInputType.number,
+                          keyboardType:
+                              _effectiveIdentificationType == 'pasaporte'
+                                  ? TextInputType.text
+                                  : TextInputType.number,
                         ),
                         const SizedBox(height: 12),
                         _buildDropdownField(
@@ -3349,7 +3366,7 @@ END:VCALENDAR
                         const SizedBox(height: 12),
                         _buildTextField(
                           controller: _emailController,
-                          label: 'Correo electrónico',
+                          label: 'Correo electrÃ³nico',
                           icon: Icons.mail_outline_rounded,
                           keyboardType: TextInputType.emailAddress,
                         ),
@@ -3358,7 +3375,7 @@ END:VCALENDAR
                   ),
                   const SizedBox(height: 14),
                   _sectionCard(
-                    title: 'Método de pago',
+                    title: 'MÃ©todo de pago',
                     child: _buildPaymentMethodSection(
                       shop,
                       auth,
@@ -3392,7 +3409,7 @@ END:VCALENDAR
                             const SizedBox(width: 10),
                             const Expanded(
                               child: Text(
-                                'Resumen rápido',
+                                'Resumen rÃ¡pido',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: 16,
@@ -3437,11 +3454,11 @@ END:VCALENDAR
                           ),
                         if (pointsDiscount > 0)
                           _infoLine(
-                            'Puntos',
+                            'Descuento por puntos',
                             '-${_formatCurrency(pointsDiscount)}',
                           ),
                         _infoLine('Total', price),
-                        _infoLine('Duración', durationLabel),
+                        _infoLine('DuraciÃ³n', durationLabel),
                         _infoLine(
                             'Sucursal', _selectedLocation?['name'] ?? '-'),
                         _infoLine(
@@ -3530,7 +3547,7 @@ END:VCALENDAR
                     )
                   else if (!selectedPaymentMethod.canCreateManualOrder)
                     Text(
-                      '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.',
+                      '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para reservas desde la app.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
@@ -3879,7 +3896,7 @@ END:VCALENDAR
 
     if (_filteredEmployees.isEmpty) {
       return const Text(
-        'No encontramos barberos disponibles para esta seleccion.',
+        'No encontramos barberos disponibles para esta selecciÃ³n.',
         style: TextStyle(
           color: AppColors.textSecondary,
           fontSize: 13.5,
@@ -4068,6 +4085,8 @@ class _BookingPointsRedeemTile extends StatelessWidget {
   final String pointsLabel;
   final double points;
   final double discount;
+  final double total;
+  final double payableTotal;
   final double balance;
   final ValueChanged<bool> onChanged;
 
@@ -4076,6 +4095,8 @@ class _BookingPointsRedeemTile extends StatelessWidget {
     required this.pointsLabel,
     required this.points,
     required this.discount,
+    required this.total,
+    required this.payableTotal,
     required this.balance,
     required this.onChanged,
   });
@@ -4086,40 +4107,188 @@ class _BookingPointsRedeemTile extends StatelessWidget {
   }
 
   String _formatCurrency(double value) {
-    if (value == value.roundToDouble()) return '\$${value.toStringAsFixed(0)}';
     return '\$${value.toStringAsFixed(2)}';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F7F4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE4DED2)),
-      ),
-      child: SwitchListTile.adaptive(
-        value: enabled,
-        contentPadding: EdgeInsets.zero,
-        activeThumbColor: const Color(0xFFD4AF37),
-        activeTrackColor: const Color(0xFFE8D79D),
-        onChanged: onChanged,
-        title: Text(
-          'Usar $pointsLabel',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 13.5,
+    final pointsText = _formatPoints(points);
+    final balanceText = _formatPoints(balance);
+    final isFullPayment = payableTotal <= 0.009;
+
+    return InkWell(
+      onTap: () => onChanged(!enabled),
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFFFFFBEB) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: enabled ? const Color(0xFFD4AF37) : const Color(0xFFE4DED2),
+            width: enabled ? 1.4 : 1,
           ),
         ),
-        subtitle: Text(
-          '${_formatPoints(points)} de ${_formatPoints(balance)} disponibles · descuento ${_formatCurrency(discount)}',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12.5,
-            height: 1.35,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: enabled
+                        ? const Color(0xFFD4AF37)
+                        : const Color(0xFFF1EBDD),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.stars_rounded,
+                    color: enabled ? Colors.white : const Color(0xFF9C7732),
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        enabled
+                            ? 'Descuento aplicado'
+                            : 'Usar $pointsLabel en esta cita',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14.5,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$pointsText de $balanceText puntos disponibles',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12.4,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: enabled,
+                  activeThumbColor: const Color(0xFFD4AF37),
+                  activeTrackColor: const Color(0xFFE8D79D),
+                  onChanged: onChanged,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final metricWidth = compact
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 8) / 2;
+
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _BookingPointsMetric(
+                      width: metricWidth,
+                      label: 'Ahorras',
+                      value: _formatCurrency(discount),
+                      valueColor: const Color(0xFF2E7D32),
+                    ),
+                    _BookingPointsMetric(
+                      width: metricWidth,
+                      label: enabled ? 'Pagaras' : 'Pagarias',
+                      value: _formatCurrency(payableTotal),
+                      valueColor: isFullPayment
+                          ? const Color(0xFF2E7D32)
+                          : AppColors.textPrimary,
+                    ),
+                    _BookingPointsMetric(
+                      width: metricWidth,
+                      label: 'Total original',
+                      value: _formatCurrency(total),
+                      valueColor: AppColors.textSecondary,
+                    ),
+                  ],
+                );
+              },
+            ),
+            if (isFullPayment) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'La reserva queda cubierta al 100% con puntos.',
+                style: TextStyle(
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingPointsMetric extends StatelessWidget {
+  final double width;
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _BookingPointsMetric({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F7F4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE7DFD4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 15.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -4149,7 +4318,7 @@ class _BookingPaymentMethodTile extends StatelessWidget {
 
     final description = enabled
         ? _descriptionForBooking(method)
-        : '${_descriptionForBooking(method)} Estará disponible pronto.';
+        : '${_descriptionForBooking(method)} EstarÃ¡ disponible pronto.';
 
     return Material(
       color: Colors.transparent,
@@ -4250,18 +4419,18 @@ class _BookingPaymentMethodTile extends StatelessWidget {
 
   String _descriptionForBooking(ShopPaymentMethod method) {
     if (method.id == 'bacs') {
-      return 'Confirmamos tu cita y validas el pago con el equipo de Hábito.';
+      return 'Confirmamos tu cita y validas el pago con el equipo de HÃ¡bito.';
     }
 
     if (method.id == 'cod') {
-      return 'Confirma tu cita y paga directamente en la barbería.';
+      return 'Confirma tu cita y paga directamente en la barberÃ­a.';
     }
 
     if (method.description.trim().isNotEmpty) {
       return method.description.trim();
     }
 
-    return 'Selecciona este método para confirmar tu cita.';
+    return 'Selecciona este mÃ©todo para confirmar tu cita.';
   }
 }
 
@@ -4278,7 +4447,7 @@ class _BarberPickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = employee['fullName']?.toString() ?? 'Barbero Hábito';
+    final name = employee['fullName']?.toString() ?? 'Barbero HÃ¡bito';
     final imageUrl = employee['image']?.toString() ?? '';
 
     return Material(

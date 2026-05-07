@@ -29,7 +29,9 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,

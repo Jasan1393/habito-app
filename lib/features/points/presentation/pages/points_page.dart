@@ -35,7 +35,9 @@ class _PointsPageState extends State<PointsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -192,9 +194,9 @@ class _PointsPageState extends State<PointsPage> {
                 const SizedBox(height: 12),
                 if (!moduleEnabled)
                   _EmptyStateCard(
-                    title: 'Aun no activamos tus puntos',
+                    title: 'Aún no activamos tus puntos',
                     subtitle:
-                        'En cuanto el modulo quede activo en el bridge y en myCRED, aqui veras tu saldo y tus movimientos reales.',
+                        'En cuanto el módulo quede activo en el bridge y en myCRED, aquí verás tu saldo y tus movimientos reales.',
                   )
                 else if ((points.error ?? '').isNotEmpty && history.isEmpty)
                   _EmptyStateCard(
@@ -203,9 +205,9 @@ class _PointsPageState extends State<PointsPage> {
                   )
                 else if (history.isEmpty)
                   const _EmptyStateCard(
-                    title: 'Todavia no tienes movimientos',
+                    title: 'Todavía no tienes movimientos',
                     subtitle:
-                        'Tus puntos apareceran aqui cuando completes citas o pedidos que sumen beneficios.',
+                        'Tus puntos aparecerán aquí cuando completes citas o pedidos que sumen beneficios.',
                   )
                 else
                   ...history.map(
@@ -228,10 +230,10 @@ class _PointsPageState extends State<PointsPage> {
     required String? error,
   }) {
     if (!moduleEnabled) {
-      return 'Estamos preparando el programa de puntos para que lo veas aqui con saldo e historial reales.';
+      return 'Estamos preparando el programa de puntos para que lo veas aquí con saldo e historial reales.';
     }
     if (!mycredAvailable) {
-      return 'El modulo de puntos esta configurado, pero myCRED aun no esta disponible en el servidor.';
+      return 'El módulo de puntos está configurado, pero myCRED aún no está disponible en el servidor.';
     }
     if ((error ?? '').isNotEmpty) {
       return error!;

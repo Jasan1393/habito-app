@@ -31,7 +31,7 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
 
     try {
       if (forceRefresh) {
-        HabitoBookingApi.clearCache();
+        await HabitoBookingApi.clearServicesCache();
       }
 
       final items = await HabitoBookingApi.getServices(
@@ -77,7 +77,7 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
   }
 
   String _getServicePlaceholderImage(String name) {
-    return 'assets/images/services/Corte de Cabello.png';
+    return 'assets/images/services/Corte de Cabello.webp';
   }
 
   String _formatPrice(dynamic value) {
@@ -92,7 +92,7 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
   }
 
   String _formatDurationLabel(int seconds) {
-    if (seconds <= 0) return 'Duracion por confirmar';
+    if (seconds <= 0) return 'Duración por confirmar';
     final totalMinutes = (seconds / 60).round();
     if (totalMinutes < 60) return '$totalMinutes min';
     final hours = totalMinutes ~/ 60;
@@ -256,7 +256,7 @@ class _ServiceArchiveCard extends StatelessWidget {
     final imageUrl =
         (service['image'] ?? service['imageUrl'] ?? '').toString().trim();
     final placeholderImage = (service['placeholderImage'] ??
-            'assets/images/services/Corte de Cabello.png')
+            'assets/images/services/Corte de Cabello.webp')
         .toString();
 
     return Container(
@@ -345,7 +345,7 @@ class _ServiceArchiveCard extends StatelessWidget {
                     _MiniPill(label: (service['price'] ?? '\$0').toString()),
                     _MiniPill(
                       label:
-                          (service['durationLabel'] ?? 'Duracion').toString(),
+                          (service['durationLabel'] ?? 'Duración').toString(),
                     ),
                     if (extrasCount > 0)
                       _MiniPill(label: '$extrasCount extras disponibles'),

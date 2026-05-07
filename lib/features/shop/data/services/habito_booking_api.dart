@@ -56,6 +56,14 @@ class HabitoBookingApi {
     unawaited(_deleteCacheFile());
   }
 
+  static Future<void> clearServicesCache() async {
+    await _ensureLoaded();
+    _cachedServices = null;
+    _servicesCachedAt = null;
+    _servicesRefreshFuture = null;
+    await _persistCache();
+  }
+
   static void clearMyBookingsCache() {
     // La versión actual no mantiene una caché separada de mis reservas.
     // Conservamos este método para permitir limpieza centralizada de sesión.
@@ -113,7 +121,9 @@ class HabitoBookingApi {
     );
 
     if (data['success'] == true && data['data'] is List) {
-      _cachedServices = List<dynamic>.from(data['data']);
+      _cachedServices = _withResolvedServiceImages(
+        List<dynamic>.from(data['data']),
+      );
       _servicesCachedAt = DateTime.now();
       await _persistCache();
       return _cachedServices!;
@@ -127,6 +137,19 @@ class HabitoBookingApi {
   }
 
   static String extractServiceImageUrl(Map<String, dynamic> service) {
+    final cached = _extractImageCandidate(
+      service['_resolvedImage'] ?? service['resolvedImage'],
+    );
+    if (cached.isNotEmpty) return cached;
+
+    final resolved = _resolveServiceImageUrl(service);
+    if (resolved.isNotEmpty) {
+      service['_resolvedImage'] = resolved;
+    }
+    return resolved;
+  }
+
+  static String _resolveServiceImageUrl(Map<String, dynamic> service) {
     final raw = service['raw'] is Map
         ? Map<String, dynamic>.from(service['raw'] as Map)
         : const <String, dynamic>{};
@@ -180,6 +203,15 @@ class HabitoBookingApi {
     }
 
     return '';
+  }
+
+  static List<dynamic> _withResolvedServiceImages(List<dynamic> services) {
+    return services.map((service) {
+      if (service is! Map) return service;
+      final map = Map<String, dynamic>.from(service);
+      map['_resolvedImage'] = extractServiceImageUrl(map);
+      return map;
+    }).toList();
   }
 
   static bool _servicesHaveImages(List<dynamic> services) {
@@ -799,6 +831,18 @@ class HabitoBookingApi {
     final booking = item['booking'] is Map<String, dynamic>
         ? Map<String, dynamic>.from(item['booking'])
         : <String, dynamic>{};
+    final payment = item['payment'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(item['payment'])
+        : <String, dynamic>{};
+    final bookingPayments = booking['payments'] is List
+        ? List<Map<String, dynamic>>.from(
+            (booking['payments'] as List).whereType<Map>().map(
+                  (payment) => Map<String, dynamic>.from(payment),
+                ),
+          )
+        : <Map<String, dynamic>>[];
+    final firstBookingPayment =
+        bookingPayments.isNotEmpty ? bookingPayments.first : payment;
 
     final customer = booking['customer'] is Map<String, dynamic>
         ? Map<String, dynamic>.from(booking['customer'])
@@ -885,6 +929,53 @@ class HabitoBookingApi {
       'location_latitude': _asNum(location['latitude']),
       'location_longitude': _asNum(location['longitude']),
       'booking_id': _asInt(booking['id']),
+      'order_id': _asInt(
+        item['orderId'] ??
+            item['order_id'] ??
+            item['wooOrderId'] ??
+            item['woo_order_id'] ??
+            item['woocommerceOrderId'] ??
+            item['woocommerce_order_id'] ??
+            booking['orderId'] ??
+            booking['order_id'] ??
+            booking['wooOrderId'] ??
+            booking['woo_order_id'] ??
+            firstBookingPayment['orderId'] ??
+            firstBookingPayment['order_id'],
+      ),
+      'payment_title': _firstNonEmpty([
+        item['paymentTitle']?.toString(),
+        item['payment_title']?.toString(),
+        item['paymentMethodTitle']?.toString(),
+        item['payment_method_title']?.toString(),
+        booking['paymentTitle']?.toString(),
+        booking['payment_title']?.toString(),
+      ]),
+      'payment_method': _firstNonEmpty([
+        item['paymentMethod']?.toString(),
+        item['payment_method']?.toString(),
+        booking['paymentMethod']?.toString(),
+        booking['payment_method']?.toString(),
+        firstBookingPayment['gateway']?.toString(),
+      ]),
+      'payment_gateway': _firstNonEmpty([
+        item['paymentGateway']?.toString(),
+        item['payment_gateway']?.toString(),
+        booking['paymentGateway']?.toString(),
+        booking['payment_gateway']?.toString(),
+        firstBookingPayment['gateway']?.toString(),
+      ]),
+      'payment_status': _firstNonEmpty([
+        item['paymentStatus']?.toString(),
+        item['payment_status']?.toString(),
+        booking['paymentStatus']?.toString(),
+        booking['payment_status']?.toString(),
+        firstBookingPayment['status']?.toString(),
+      ]),
+      'payment_proof': item['payment_proof'] ??
+          item['paymentProof'] ??
+          booking['payment_proof'] ??
+          booking['paymentProof'],
       'customer_id': _asInt(
         booking['customerId'] ?? customer['id'] ?? item['customerId'],
       ),
@@ -1010,6 +1101,16 @@ class HabitoBookingApi {
             payload['customerId'],
       ),
       'payment_id': _asInt(payment['id'] ?? payload['paymentId']),
+      'order_id': _asInt(
+        habitoPayment['order_id'] ??
+            habitoPayment['orderId'] ??
+            habitoPayment['woo_order_id'] ??
+            habitoPayment['wooOrderId'] ??
+            payload['order_id'] ??
+            payload['orderId'] ??
+            responseData['order_id'] ??
+            responseData['orderId'],
+      ),
       'status': booking['status']?.toString() ??
           appointment['status']?.toString() ??
           payload['status']?.toString() ??
@@ -1081,6 +1182,10 @@ class HabitoBookingApi {
           payload['payment_title']?.toString(),
       'payment_flow': habitoPayment['flow']?.toString() ??
           payload['payment_flow']?.toString(),
+      'payment_proof': habitoPayment['payment_proof'] ??
+          habitoPayment['paymentProof'] ??
+          payload['payment_proof'] ??
+          payload['paymentProof'],
       'payment_amount': _asNum(payment['amount']),
       'invoice_number': _asInt(payment['invoiceNumber']),
       'extras': bookingExtras,
@@ -1410,7 +1515,7 @@ class HabitoBookingApi {
       _restoreListCache(
         decoded['services'],
         onData: (items, cachedAt) {
-          _cachedServices = items;
+          _cachedServices = _withResolvedServiceImages(items);
           _servicesCachedAt = cachedAt;
         },
       );

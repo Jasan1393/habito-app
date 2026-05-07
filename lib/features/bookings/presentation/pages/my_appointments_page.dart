@@ -50,6 +50,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   int _loadRequestId = 0;
   bool _isLoadingHistory = false;
   bool _hasLoadedHistory = false;
+  bool _didAutoFocusNonEmptyTab = false;
 
   @override
   void initState() {
@@ -96,6 +97,10 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   }
 
   void _onTabChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+
     if (!_tabController.indexIsChanging && _tabController.index == 2) {
       unawaited(_loadHistoryAppointments());
     }
@@ -200,8 +205,14 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
         _allAppointments = appointments;
         _hasLoadedHistory = false;
         _isLoading = false;
+        if (tokenChanged) {
+          _didAutoFocusNonEmptyTab = false;
+        }
       });
 
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusFirstNonEmptyTab();
+      });
       _tryOpenAppointmentFromPush();
       unawaited(_loadHistoryAppointments(silent: true));
     } catch (e) {
@@ -976,6 +987,94 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     }
   }
 
+  int _tabCount(int index) => _appointmentsByTab(index).length;
+
+  String _tabTitle(int index) {
+    switch (index) {
+      case 0:
+        return 'Pendientes';
+      case 1:
+        return 'Confirmadas';
+      case 2:
+        return 'Canceladas';
+      default:
+        return 'Citas';
+    }
+  }
+
+  String _tabDescription(int index) {
+    switch (index) {
+      case 0:
+        return 'Por aprobar';
+      case 1:
+        return 'Listas para asistir';
+      case 2:
+        return 'Historial cerrado';
+      default:
+        return 'Tus reservas';
+    }
+  }
+
+  IconData _tabIcon(int index) {
+    switch (index) {
+      case 0:
+        return Icons.hourglass_top_rounded;
+      case 1:
+        return Icons.event_available_rounded;
+      case 2:
+        return Icons.event_busy_rounded;
+      default:
+        return Icons.calendar_month_rounded;
+    }
+  }
+
+  Color _tabColor(int index) {
+    switch (index) {
+      case 0:
+        return const Color(0xFFF59E0B);
+      case 1:
+        return const Color(0xFF2E7D32);
+      case 2:
+        return const Color(0xFFC62828);
+      default:
+        return AppColors.primary;
+    }
+  }
+
+  int? _suggestedTabForEmpty(int currentIndex) {
+    final preferred = currentIndex == 0
+        ? const [1, 2]
+        : currentIndex == 1
+            ? const [0, 2]
+            : const [1, 0];
+
+    for (final index in preferred) {
+      if (_tabCount(index) > 0) return index;
+    }
+
+    return null;
+  }
+
+  void _focusFirstNonEmptyTab() {
+    if (!mounted || _didAutoFocusNonEmptyTab || _allAppointments.isEmpty) {
+      return;
+    }
+
+    _didAutoFocusNonEmptyTab = true;
+
+    if (_tabController.index != 0 || _tabCount(0) > 0) {
+      return;
+    }
+
+    final suggested = _suggestedTabForEmpty(0);
+    if (suggested != null && suggested != _tabController.index) {
+      if (suggested == 2) {
+        unawaited(_loadHistoryAppointments());
+      }
+      _tabController.animateTo(suggested);
+    }
+  }
+
   bool _isPastAppointment(Map<String, dynamic> appointment) {
     final date = _resolveAppointmentDate(appointment);
     if (date == null) return false;
@@ -1127,6 +1226,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     required IconData icon,
     required String title,
     required String subtitle,
+    int? suggestedTabIndex,
   }) {
     return Center(
       child: Padding(
@@ -1155,27 +1255,58 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
-            ElevatedButton(
-              onPressed: () async {
-                await Navigator.pushNamed(context, AppRoutes.bookings);
-                if (!mounted) return;
-                await _loadAppointments();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (suggestedTabIndex != null)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      if (suggestedTabIndex == 2) {
+                        unawaited(_loadHistoryAppointments());
+                      }
+                      _tabController.animateTo(suggestedTabIndex);
+                    },
+                    icon: Icon(_tabIcon(suggestedTabIndex), size: 18),
+                    label: Text(
+                      'Ver ${_tabTitle(suggestedTabIndex).toLowerCase()} (${_tabCount(suggestedTabIndex)})',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: Color(0xFFD4AF37)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await Navigator.pushNamed(context, AppRoutes.bookings);
+                    if (!mounted) return;
+                    await _loadAppointments();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4AF37),
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Reservar ahora',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Reservar ahora',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+              ],
             ),
           ],
         ),
@@ -1339,6 +1470,119 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     );
   }
 
+  Widget _buildAppointmentsOverview() {
+    final selectedIndex = _tabController.index;
+    final total = _tabCount(0) + _tabCount(1) + _tabCount(2);
+    final selectedCount = _tabCount(selectedIndex);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            Color(0xFF2D3F7F),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: Color(0xFFD4AF37),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mis citas',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      total == 0
+                          ? 'Aqui veras tus reservas y su estado.'
+                          : '$selectedCount en ${_tabTitle(selectedIndex).toLowerCase()} - $total en total',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 420;
+              final itemWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 16) / 3;
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(3, (index) {
+                  return _AppointmentStatusSummaryCard(
+                    width: itemWidth,
+                    icon: _tabIcon(index),
+                    title: _tabTitle(index),
+                    description: _tabDescription(index),
+                    count: _tabCount(index),
+                    color: _tabColor(index),
+                    selected: selectedIndex == index,
+                    loading: index == 2 && _isLoadingHistory,
+                    onTap: () {
+                      if (index == 2) {
+                        unawaited(_loadHistoryAppointments());
+                      }
+                      _tabController.animateTo(index);
+                    },
+                  );
+                }),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTabContent(int tabIndex) {
     if (_isLoading) {
       return const Center(
@@ -1401,24 +1645,34 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     final items = _appointmentsByTab(tabIndex);
 
     if (items.isEmpty) {
+      final suggestedTabIndex = _suggestedTabForEmpty(tabIndex);
       switch (tabIndex) {
         case 0:
           return _buildEmptyState(
             icon: Icons.schedule,
             title: 'No tienes citas pendientes',
-            subtitle: 'Cuando hagas una nueva reserva, aparecerá aquí.',
+            subtitle: suggestedTabIndex != null
+                ? 'No hay citas pendientes, pero si tienes reservas en otra categoria.'
+                : 'Cuando hagas una nueva reserva, aparecera aqui.',
+            suggestedTabIndex: suggestedTabIndex,
           );
         case 1:
           return _buildEmptyState(
             icon: Icons.check_circle_outline,
             title: 'No tienes citas confirmadas',
-            subtitle: 'Tus próximas citas confirmadas aparecerán aquí.',
+            subtitle: suggestedTabIndex != null
+                ? 'No hay citas confirmadas ahora. Puedes revisar otra categoria.'
+                : 'Tus proximas citas confirmadas apareceran aqui.',
+            suggestedTabIndex: suggestedTabIndex,
           );
         case 2:
           return _buildEmptyState(
             icon: Icons.cancel_outlined,
             title: 'No tienes citas canceladas',
-            subtitle: 'Las citas canceladas se mostrarán aquí.',
+            subtitle: suggestedTabIndex != null
+                ? 'No hay citas canceladas. Tus citas activas estan en otra categoria.'
+                : 'Las citas canceladas se mostraran aqui.',
+            suggestedTabIndex: suggestedTabIndex,
           );
         default:
           return const SizedBox.shrink();
@@ -1431,7 +1685,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
       onRefresh: _loadAppointments,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: items.length,
         itemBuilder: (_, index) {
           return _buildAppointmentCard(items[index]);
@@ -1563,31 +1817,152 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
             ],
           ),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFFD4AF37),
-          indicatorWeight: 3,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          tabs: const [
-            Tab(text: 'Pendientes'),
-            Tab(text: 'Confirmadas'),
-            Tab(text: 'Canceladas'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildTabContent(0),
-          _buildTabContent(1),
-          _buildTabContent(2),
+          _buildAppointmentsOverview(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTabContent(0),
+                _buildTabContent(1),
+                _buildTabContent(2),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _AppointmentStatusSummaryCard extends StatelessWidget {
+  final double width;
+  final IconData icon;
+  final String title;
+  final String description;
+  final int count;
+  final Color color;
+  final bool selected;
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _AppointmentStatusSummaryCard({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.count,
+    required this.color,
+    required this.selected,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final background =
+        selected ? Colors.white : Colors.white.withValues(alpha: 0.10);
+    final foreground = selected ? AppColors.primary : Colors.white;
+    final secondary = selected
+        ? AppColors.textSecondary
+        : Colors.white.withValues(alpha: 0.72);
+
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFD4AF37)
+                    : Colors.white.withValues(alpha: 0.14),
+                width: selected ? 1.4 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? color.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: selected ? color : const Color(0xFFD4AF37),
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: foreground,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          if (loading)
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: selected ? color : Colors.white,
+                              ),
+                            )
+                          else
+                            Text(
+                              '$count',
+                              style: TextStyle(
+                                color: selected ? color : Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: secondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

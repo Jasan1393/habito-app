@@ -50,7 +50,7 @@ class _ShopPageState extends State<ShopPage> {
     });
     try {
       if (forceRefresh) {
-        HabitoBookingApi.clearCache();
+        await HabitoBookingApi.clearServicesCache();
       }
       final items = await HabitoBookingApi.getServices(
         forceRefresh: forceRefresh,
@@ -128,7 +128,7 @@ class _ShopPageState extends State<ShopPage> {
   }
 
   String _getServicePlaceholderImage(String name) {
-    return 'assets/images/services/Corte de Cabello.png';
+    return 'assets/images/services/Corte de Cabello.webp';
   }
 
   String _formatPrice(dynamic value) {
@@ -220,7 +220,9 @@ class _ShopPageState extends State<ShopPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -435,7 +437,7 @@ class _ServiceCard extends StatelessWidget {
     final imageUrl =
         (service['image'] ?? service['imageUrl'] ?? '').toString().trim();
     final placeholderImage = (service['placeholderImage'] ??
-            'assets/images/services/Corte de Cabello.png')
+            'assets/images/services/Corte de Cabello.webp')
         .toString();
 
     return _PressableCard(

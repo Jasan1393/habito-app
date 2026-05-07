@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -314,6 +314,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   List<Map<String, dynamic>> _pickupLocations = [];
   bool _isLoadingPickupLocations = false;
   bool _isBillingEditing = false;
+  bool _isSubmittingCheckout = false;
   bool _usePoints = false;
   String _documentType = 'cedula';
   String _selectedProvince = 'Guayas';
@@ -329,9 +330,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _billingPhoneController.text = user?.phone ?? '';
     _documentType = _normalizeDocumentType(user?.identificationType);
     _documentController.text = user?.taxNumber ?? '';
-    _selectedProvince = kEcuadorProvinces.contains(user?.province)
-        ? user!.province
-        : 'Guayas';
+    _selectedProvince =
+        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Guayas';
     _selectedCanton = _resolveInitialCanton(
       province: _selectedProvince,
       city: user?.city ?? '',
@@ -429,11 +429,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
           user?.pointsRedeemBookingsEnabled ??
           false,
       balance: summary?.balance ?? user?.pointsBalance ?? 0,
-      rate: summary?.redeemPointsPerUsd ??
-          user?.pointsRedeemPointsPerUsd ??
-          100,
-      minPoints:
-          summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
+      rate:
+          summary?.redeemPointsPerUsd ?? user?.pointsRedeemPointsPerUsd ?? 100,
+      minPoints: summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
       maxPercent:
           summary?.redeemMaxPercent ?? user?.pointsRedeemMaxPercent ?? 100,
       label: (summary?.label ?? user?.pointsLabel ?? 'Puntos').trim(),
@@ -503,19 +501,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
 
     try {
-      final cached = await HabitoShopApi.getWarehouses();
-      if (mounted && cached.isNotEmpty) {
-        setState(() {
-          _pickupLocations = cached
-              .whereType<Map>()
-              .map(
-                  (item) => _normalizeLocation(Map<String, dynamic>.from(item)))
-              .where((item) => item['id'] != null)
-              .toList();
-        });
-      }
-
-      final fresh = await HabitoShopApi.getWarehouses(forceRefresh: true);
+      final fresh = await HabitoShopApi.getWarehouses();
       if (!mounted) return;
       setState(() {
         _pickupLocations = fresh
@@ -525,7 +511,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             .toList();
       });
     } catch (_) {
-      // El checkout puede continuar con envío aunque las sucursales no carguen.
+      // El checkout puede continuar con envÃ­o aunque las sucursales no carguen.
     } finally {
       if (mounted) {
         setState(() {
@@ -605,24 +591,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final documentLabel = _documentLabel;
     final document = _documentController.text.trim();
 
-    if (name.isEmpty) missing.add('nombre de facturación');
+    if (name.isEmpty) missing.add('nombre de facturaciÃ³n');
     if (email.isEmpty) {
-      missing.add('correo electrónico');
+      missing.add('correo electrÃ³nico');
     } else if (!_isValidEmail(email)) {
-      missing.add('correo electrónico válido');
+      missing.add('correo electrÃ³nico vÃ¡lido');
     }
-    if (phoneDigits.length < 7) missing.add('número de teléfono');
+    if (phoneDigits.length < 7) missing.add('nÃºmero de telÃ©fono');
     if (document.isEmpty) {
       missing.add(documentLabel);
     } else if (!_isValidDocument(document)) {
-      missing.add('$documentLabel válido');
+      missing.add('$documentLabel vÃ¡lido');
     }
 
     if (fulfillmentMethod == ShopFulfillmentMethod.delivery) {
       if (_selectedProvince.trim().isEmpty) missing.add('provincia');
-      if (_selectedCanton.trim().isEmpty) missing.add('cantón');
+      if (_selectedCanton.trim().isEmpty) missing.add('cantÃ³n');
       if (_addressController.text.trim().isEmpty) {
-        missing.add('dirección de entrega');
+        missing.add('direcciÃ³n de entrega');
       }
     } else if (context.read<ShopProvider>().pickupLocationName.isEmpty) {
       missing.add('sucursal preferida de retiro');
@@ -639,10 +625,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (missing.isEmpty) return;
     final hasBillingIssue = missing.any(
       (item) =>
-          item.contains('facturación') ||
+          item.contains('facturaciÃ³n') ||
           item.contains('correo') ||
-          item.contains('teléfono') ||
-          item.contains('cédula') ||
+          item.contains('telÃ©fono') ||
+          item.contains('cÃ©dula') ||
           item.contains('RUC'),
     );
     if (hasBillingIssue && !_isBillingEditing) {
@@ -738,8 +724,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final auth = context.read<AuthProvider>();
     final shop = context.read<ShopProvider>();
     final pointsProvider = context.read<PointsProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     final selectedPaymentMethod = _selectedPaymentMethod(shop.paymentMethods);
     final fulfillmentMethod = shop.fulfillmentMethod;
+
+    if (_isSubmittingCheckout || shop.isCreatingOrder) return;
 
     final missingInfo = _missingCheckoutInfo(fulfillmentMethod);
     if (missingInfo.isNotEmpty) {
@@ -752,7 +741,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _showMissingCheckoutInfo(['revisa los datos marcados en rojo']);
       return;
     }
-    if (!auth.isLoggedIn || auth.user == null || auth.token == null) return;
+    if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Inicia sesion para confirmar tu pedido.'),
+        ),
+      );
+      return;
+    }
 
     if (fulfillmentMethod == ShopFulfillmentMethod.pickup &&
         shop.pickupLocationName.isEmpty) {
@@ -768,17 +764,79 @@ class _CheckoutPageState extends State<CheckoutPage> {
         (_selectedProvince.isEmpty || _selectedCanton.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selecciona provincia y cantón para el envío.'),
+          content: Text('Selecciona provincia y cantÃ³n para el envÃ­o.'),
         ),
       );
       return;
     }
 
-    if (!selectedPaymentMethod.canCreateManualOrder) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    setState(() {
+      _isSubmittingCheckout = true;
+    });
+
+    void stopSubmitting() {
+      if (mounted) {
+        setState(() {
+          _isSubmittingCheckout = false;
+        });
+      }
+    }
+
+    final orderTotal = shop.orderTotalFor(fulfillmentMethod);
+    var redeemPoints = 0.0;
+    var redeemDiscount = 0.0;
+
+    if (_usePoints) {
+      try {
+        await pointsProvider.refresh();
+        if (!mounted) return;
+
+        final quote = await pointsProvider.quoteRedemption(
+          context: 'order',
+          amount: orderTotal,
+        );
+
+        if (!quote.canRedeem) {
+          setState(() {
+            _usePoints = false;
+            _isSubmittingCheckout = false;
+          });
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                quote.message.isNotEmpty
+                    ? quote.message
+                    : 'Tus puntos ya no estan disponibles para este pedido.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        redeemPoints = quote.points;
+        redeemDiscount = quote.discount;
+      } catch (e) {
+        if (!mounted) return;
+        stopSubmitting();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'No pudimos validar tus puntos: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    final pointsCoverTotal = redeemDiscount + 0.001 >= orderTotal;
+
+    if (!selectedPaymentMethod.canCreateManualOrder && !pointsCoverTotal) {
+      stopSubmitting();
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '${selectedPaymentMethod.title} estará disponible pronto para pedidos desde la app.',
+            '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para pedidos desde la app.',
           ),
         ),
       );
@@ -786,13 +844,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     final nameParts = _splitCustomerName(_billingNameController.text);
-    final redeemPoints = _usePoints
-        ? _pointsToUse(
-            auth,
-            shop.orderTotalFor(fulfillmentMethod),
-            pointsProvider,
-          )
-        : 0.0;
     final order = await shop.checkout(
       token: auth.token!,
       user: auth.user!,
@@ -825,6 +876,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (order == null) {
       final error = shop.checkoutError ?? 'No pudimos crear tu pedido.';
+      stopSubmitting();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error)),
       );
@@ -836,6 +888,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       unawaited(pointsProvider.refresh());
     }
 
+    stopSubmitting();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Tu pedido fue creado correctamente.'),
@@ -867,13 +920,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
             .toList(growable: false);
         final selectedPaymentMethod = _selectedPaymentMethod(paymentMethods);
         final fulfillmentMethod = shop.fulfillmentMethod;
+        final isSubmittingCheckout =
+            _isSubmittingCheckout || shop.isCreatingOrder;
         final shippingTotal = shop.shippingTotalFor(fulfillmentMethod);
         final orderTotal = shop.orderTotalFor(fulfillmentMethod);
         final pointsToUse = _pointsToUse(auth, orderTotal, pointsProvider);
-        final pointsDiscount =
-            _usePoints ? _pointsDiscount(auth, orderTotal, pointsProvider) : 0.0;
+        final projectedPointsDiscount =
+            _pointsDiscount(auth, orderTotal, pointsProvider);
+        final pointsDiscount = _usePoints ? projectedPointsDiscount : 0.0;
         final payableTotal =
             (orderTotal - pointsDiscount).clamp(0, double.infinity).toDouble();
+        final projectedPayableTotal = (orderTotal - projectedPointsDiscount)
+            .clamp(0, double.infinity)
+            .toDouble();
         final taxLabel = shop.taxBreakdownLabel;
 
         return Scaffold(
@@ -954,8 +1013,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     const Divider(height: 24),
                     if (pointsDiscount > 0) ...[
                       _CheckoutRow(
-                        label: 'Puntos',
+                        label: 'Descuento por puntos',
                         value: '-${_formatPrice(pointsDiscount)}',
+                        valueColor: const Color(0xFF2E7D32),
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -968,20 +1028,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
               ),
               const SizedBox(height: 20),
-                if (pointsToUse > 0) ...[
-                  _PointsRedeemTile(
-                    enabled: _usePoints,
-                    pointsLabel: pointsState.label,
-                    points: pointsToUse,
-                    discount: _pointsDiscount(
-                      auth,
-                      orderTotal,
-                      pointsProvider,
-                    ),
-                    balance: pointsState.balance,
-                    onChanged: (value) {
-                      setState(() {
-                        _usePoints = value;
+              if (pointsToUse > 0) ...[
+                _PointsRedeemTile(
+                  enabled: _usePoints,
+                  pointsLabel: pointsState.label,
+                  points: pointsToUse,
+                  discount: projectedPointsDiscount,
+                  total: orderTotal,
+                  payableTotal: projectedPayableTotal,
+                  balance: pointsState.balance,
+                  onChanged: (value) {
+                    setState(() {
+                      _usePoints = value;
                     });
                   },
                   formatPrice: _formatPrice,
@@ -1136,7 +1194,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ),
                     if (shop.paymentMethodsError != null) ...[
                       Text(
-                        'No pudimos actualizar los métodos de pago. Usamos transferencia como respaldo.',
+                        'No pudimos actualizar los mÃ©todos de pago. Usamos transferencia como respaldo.',
                         style: TextStyle(
                           color: AppColors.textSecondary.withValues(
                             alpha: 0.9,
@@ -1179,7 +1237,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               SizedBox(
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: shop.isCreatingOrder ? null : _submit,
+                  onPressed: isSubmittingCheckout ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD4AF37),
                     foregroundColor: Colors.black,
@@ -1187,7 +1245,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  child: shop.isCreatingOrder
+                  child: isSubmittingCheckout
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -1217,6 +1275,8 @@ class _PointsRedeemTile extends StatelessWidget {
   final String pointsLabel;
   final double points;
   final double discount;
+  final double total;
+  final double payableTotal;
   final double balance;
   final ValueChanged<bool> onChanged;
   final String Function(double value) formatPrice;
@@ -1226,33 +1286,209 @@ class _PointsRedeemTile extends StatelessWidget {
     required this.pointsLabel,
     required this.points,
     required this.discount,
+    required this.total,
+    required this.payableTotal,
     required this.balance,
     required this.onChanged,
     required this.formatPrice,
   });
 
+  String _formatPoints(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(2);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pointsText = _formatPoints(points);
+    final balanceText = _formatPoints(balance);
+    final isFullPayment = payableTotal <= 0.009;
+    final statusLabel = enabled ? 'Descuento activo' : 'Activar descuento';
+
     return _CheckoutCard(
-      child: SwitchListTile.adaptive(
-        value: enabled,
-        contentPadding: EdgeInsets.zero,
-        activeThumbColor: const Color(0xFFD4AF37),
-        activeTrackColor: const Color(0xFFE8D79D),
-        onChanged: onChanged,
-        title: Text(
-          'Usar $pointsLabel',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w800,
+      child: InkWell(
+        onTap: () => onChanged(!enabled),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: enabled ? const Color(0xFFFFFBEB) : const Color(0xFFF8F7F4),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color:
+                  enabled ? const Color(0xFFD4AF37) : const Color(0xFFE7DFD4),
+              width: enabled ? 1.4 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: enabled
+                          ? const Color(0xFFD4AF37)
+                          : const Color(0xFFF1EBDD),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.stars_rounded,
+                      color: enabled ? Colors.white : const Color(0xFF9C7732),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Usar $pointsLabel',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$pointsText de $balanceText puntos disponibles',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: enabled
+                          ? const Color(0xFF7A5B1B)
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: enabled,
+                    activeThumbColor: const Color(0xFFD4AF37),
+                    activeTrackColor: const Color(0xFFE8D79D),
+                    onChanged: onChanged,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 430;
+                  final metricWidth = compact
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 16) / 3;
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _PointsCheckoutMetric(
+                        width: metricWidth,
+                        label: 'Ahorras',
+                        value: formatPrice(discount),
+                        valueColor: const Color(0xFF2E7D32),
+                      ),
+                      _PointsCheckoutMetric(
+                        width: metricWidth,
+                        label: enabled ? 'Pagaras' : 'Pagarias',
+                        value: formatPrice(payableTotal),
+                        valueColor: isFullPayment
+                            ? const Color(0xFF2E7D32)
+                            : AppColors.textPrimary,
+                      ),
+                      _PointsCheckoutMetric(
+                        width: metricWidth,
+                        label: 'Total original',
+                        value: formatPrice(total),
+                        valueColor: AppColors.textSecondary,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              if (isFullPayment) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Con este canje el pedido queda cubierto al 100%.',
+                  style: TextStyle(
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        subtitle: Text(
-          '${points.toStringAsFixed(points == points.roundToDouble() ? 0 : 2)} de ${balance.toStringAsFixed(balance == balance.roundToDouble() ? 0 : 2)} $pointsLabel disponibles · descuento ${formatPrice(discount)}',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.35,
-          ),
+      ),
+    );
+  }
+}
+
+class _PointsCheckoutMetric extends StatelessWidget {
+  final double width;
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _PointsCheckoutMetric({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE7DFD4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1424,11 +1660,13 @@ class _CheckoutRow extends StatelessWidget {
   final String label;
   final String value;
   final bool highlight;
+  final Color? valueColor;
 
   const _CheckoutRow({
     required this.label,
     required this.value,
     this.highlight = false,
+    this.valueColor,
   });
 
   @override
@@ -1448,7 +1686,7 @@ class _CheckoutRow extends StatelessWidget {
           style: TextStyle(
             fontSize: highlight ? 20 : 16,
             fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
+            color: valueColor ?? AppColors.textPrimary,
           ),
         ),
       ],
@@ -1628,8 +1866,8 @@ class _PickupLocationSelector extends StatelessWidget {
               Expanded(
                 child: Text(
                   locationName.isEmpty
-                      ? 'Indica tu sucursal preferida para coordinar el retiro. No se cobrará envío.'
-                      : 'Retiro preferido en $locationName. Te avisaremos cuando el pedido esté listo.',
+                      ? 'Indica tu sucursal preferida para coordinar el retiro. No se cobrarÃ¡ envÃ­o.'
+                      : 'Retiro preferido en $locationName. Te avisaremos cuando el pedido estÃ© listo.',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
@@ -1704,7 +1942,7 @@ class _PaymentMethodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badgeText = method.requiresOnlinePayment
-        ? 'Pago en línea'
+        ? 'Pago en lÃ­nea'
         : method.id == 'bacs'
             ? 'Transferencia'
             : 'Disponible';
@@ -1781,7 +2019,7 @@ class _PaymentMethodTile extends StatelessWidget {
                     Text(
                       enabled
                           ? method.description
-                          : '${method.description} Estará disponible pronto para pedidos desde la app.',
+                          : '${method.description} EstarÃ¡ disponible pronto para pedidos desde la app.',
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         height: 1.35,
@@ -1824,7 +2062,7 @@ class _BillingDetailsForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final documentLabel = documentType == 'ruc' ? 'RUC' : 'Cédula';
+    final documentLabel = documentType == 'ruc' ? 'RUC' : 'CÃ©dula';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1840,7 +2078,7 @@ class _BillingDetailsForm extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Datos de facturación',
+                  'Datos de facturaciÃ³n',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w900,
@@ -1864,12 +2102,12 @@ class _BillingDetailsForm extends StatelessWidget {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: documentType == 'ruc'
-                  ? 'Razón social o nombre'
+                  ? 'RazÃ³n social o nombre'
                   : 'Nombre del cliente',
             ),
             validator: (value) {
               if ((value ?? '').trim().isEmpty) {
-                return 'Ingresa el nombre para facturación.';
+                return 'Ingresa el nombre para facturaciÃ³n.';
               }
               return null;
             },
@@ -1881,13 +2119,13 @@ class _BillingDetailsForm extends StatelessWidget {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
-              labelText: 'Correo electrónico',
+              labelText: 'Correo electrÃ³nico',
             ),
             validator: (value) {
               final text = (value ?? '').trim();
-              if (text.isEmpty) return 'Ingresa el correo electrónico.';
+              if (text.isEmpty) return 'Ingresa el correo electrÃ³nico.';
               if (!text.contains('@') || !text.contains('.')) {
-                return 'Ingresa un correo válido.';
+                return 'Ingresa un correo vÃ¡lido.';
               }
               return null;
             },
@@ -1899,11 +2137,11 @@ class _BillingDetailsForm extends StatelessWidget {
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
-              labelText: 'Número de teléfono',
+              labelText: 'NÃºmero de telÃ©fono',
             ),
             validator: (value) {
               final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
-              if (digits.length < 7) return 'Ingresa un teléfono válido.';
+              if (digits.length < 7) return 'Ingresa un telÃ©fono vÃ¡lido.';
               return null;
             },
           ),
@@ -1917,7 +2155,7 @@ class _BillingDetailsForm extends StatelessWidget {
             items: const [
               DropdownMenuItem(
                 value: 'cedula',
-                child: Text('Cédula'),
+                child: Text('CÃ©dula'),
               ),
               DropdownMenuItem(
                 value: 'ruc',
@@ -1934,7 +2172,7 @@ class _BillingDetailsForm extends StatelessWidget {
               labelText: documentLabel,
               helperText: documentType == 'ruc'
                   ? 'Selecciona RUC si la compra es para empresa.'
-                  : 'Por defecto se usa cédula para la compra.',
+                  : 'Por defecto se usa cÃ©dula para la compra.',
             ),
             validator: documentValidator,
           ),
@@ -2130,7 +2368,7 @@ class _ShippingAddressForm extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Datos de envío',
+            'Datos de envÃ­o',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w900,
@@ -2166,7 +2404,7 @@ class _ShippingAddressForm extends StatelessWidget {
                 : (cantons.isNotEmpty ? cantons.first : null),
             isExpanded: true,
             decoration: const InputDecoration(
-              labelText: 'Cantón',
+              labelText: 'CantÃ³n',
             ),
             items: cantons
                 .map(
@@ -2178,7 +2416,7 @@ class _ShippingAddressForm extends StatelessWidget {
                 .toList(),
             validator: (value) {
               if ((value ?? '').trim().isEmpty) {
-                return 'Selecciona el cantón.';
+                return 'Selecciona el cantÃ³n.';
               }
               return null;
             },
@@ -2189,12 +2427,12 @@ class _ShippingAddressForm extends StatelessWidget {
             controller: addressController,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
-              labelText: 'Dirección de entrega',
-              hintText: 'Calle principal, numeración, sector',
+              labelText: 'DirecciÃ³n de entrega',
+              hintText: 'Calle principal, numeraciÃ³n, sector',
             ),
             validator: (value) {
               if ((value ?? '').trim().isEmpty) {
-                return 'Ingresa la dirección de entrega.';
+                return 'Ingresa la direcciÃ³n de entrega.';
               }
               return null;
             },

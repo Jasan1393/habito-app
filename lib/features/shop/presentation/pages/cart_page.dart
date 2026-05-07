@@ -45,19 +45,7 @@ class _CartPageState extends State<CartPage> {
     });
 
     try {
-      final cached = await HabitoShopApi.getWarehouses();
-      if (mounted && cached.isNotEmpty) {
-        setState(() {
-          _pickupLocations = cached
-              .whereType<Map>()
-              .map(
-                  (item) => _normalizeLocation(Map<String, dynamic>.from(item)))
-              .where((item) => item['id'] != null)
-              .toList();
-        });
-      }
-
-      final fresh = await HabitoShopApi.getWarehouses(forceRefresh: true);
+      final fresh = await HabitoShopApi.getWarehouses();
       if (!mounted) return;
       setState(() {
         _pickupLocations = fresh
@@ -80,14 +68,12 @@ class _CartPageState extends State<CartPage> {
   Map<String, dynamic> _normalizeLocation(Map<String, dynamic> item) {
     return {
       'id': _parseInt(item['id']),
-      'external_id': (item['external_id'] ?? item['externalId'] ?? '')
-          .toString()
-          .trim(),
+      'external_id':
+          (item['external_id'] ?? item['externalId'] ?? '').toString().trim(),
       'code': (item['code'] ?? '').toString().trim(),
       'name': (item['name'] ?? 'Bodega').toString().trim(),
-      'address': (item['address'] ?? item['address_line_1'] ?? '')
-          .toString()
-          .trim(),
+      'address':
+          (item['address'] ?? item['address_line_1'] ?? '').toString().trim(),
       'city': (item['city'] ?? '').toString().trim(),
       'is_default': item['is_default'] == true,
     };
@@ -191,13 +177,12 @@ class _CartPageState extends State<CartPage> {
                               child: _CartItemCard(
                                 item: item,
                                 formatPrice: _formatPrice,
-                                onIncrement:
-                                    item.maxQuantity != null &&
-                                            item.quantity >= item.maxQuantity!
-                                        ? null
-                                        : () => shop.incrementQuantity(
-                                              item.productId,
-                                            ),
+                                onIncrement: item.maxQuantity != null &&
+                                        item.quantity >= item.maxQuantity!
+                                    ? null
+                                    : () => shop.incrementQuantity(
+                                          item.productId,
+                                        ),
                                 onDecrement: () =>
                                     shop.decrementQuantity(item.productId),
                                 onRemove: () =>
