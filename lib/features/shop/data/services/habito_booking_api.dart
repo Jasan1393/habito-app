@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../models/shop_payment_method.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/errors/friendly_errors.dart';
+import '../../../../core/utils/uuid.dart';
 
 class HabitoBookingApi {
   static const String baseUrl = AppConfig.apiBaseUrl;
@@ -14,6 +16,7 @@ class HabitoBookingApi {
   static const _myBookingsTimeout = AppConfig.myBookingsTimeout;
   static const _retryDelay = Duration(milliseconds: 650);
   static const _catalogRetryDelay = Duration(milliseconds: 450);
+  static const _availabilityCacheTtl = Duration(seconds: 45);
 
   // ── Caché en memoria ────────────────────────────────────────────────────────
   static const _cacheTtl = Duration(minutes: 10);
@@ -31,6 +34,7 @@ class HabitoBookingApi {
   static Future<void>? _servicesRefreshFuture;
   static Future<void>? _employeesRefreshFuture;
   static Future<void>? _locationsRefreshFuture;
+  static final Map<String, _AvailabilityCacheEntry> _availabilityCache = {};
 
   static bool _isCacheFresh(DateTime? cachedAt) {
     if (cachedAt == null) return false;
@@ -53,7 +57,12 @@ class HabitoBookingApi {
     _servicesRefreshFuture = null;
     _employeesRefreshFuture = null;
     _locationsRefreshFuture = null;
+    _clearAvailabilityCache();
     unawaited(_deleteCacheFile());
+  }
+
+  static void _clearAvailabilityCache() {
+    _availabilityCache.clear();
   }
 
   static Future<void> clearServicesCache() async {
@@ -61,6 +70,25 @@ class HabitoBookingApi {
     _cachedServices = null;
     _servicesCachedAt = null;
     _servicesRefreshFuture = null;
+    _clearAvailabilityCache();
+    await _persistCache();
+  }
+
+  static Future<void> clearEmployeesCache() async {
+    await _ensureLoaded();
+    _cachedEmployees = null;
+    _employeesCachedAt = null;
+    _employeesRefreshFuture = null;
+    _clearAvailabilityCache();
+    await _persistCache();
+  }
+
+  static Future<void> clearLocationsCache() async {
+    await _ensureLoaded();
+    _cachedLocations = null;
+    _locationsCachedAt = null;
+    _locationsRefreshFuture = null;
+    _clearAvailabilityCache();
     await _persistCache();
   }
 
@@ -362,6 +390,19 @@ class HabitoBookingApi {
     int persons = 1,
     List<Map<String, dynamic>> extras = const [],
   }) async {
+    final normalizedExtras = _normalizeAvailabilityExtras(extras);
+    final cacheKey = _availabilityCacheKey(
+      serviceId: serviceId,
+      employeeId: employeeId,
+      locationId: locationId,
+      date: _availabilityDateKey(startDateTime),
+      persons: persons,
+      extras: normalizedExtras,
+    );
+
+    final cached = _readAvailabilityCache(cacheKey);
+    if (cached != null) return cached;
+
     final queryParameters = <String, String>{
       'service_id': serviceId.toString(),
       'employee_id': employeeId.toString(),
@@ -369,26 +410,10 @@ class HabitoBookingApi {
       'persons': persons.toString(),
       'start_datetime': startDateTime,
       'end_datetime': endDateTime,
-      '_ts': DateTime.now().millisecondsSinceEpoch.toString(),
     };
 
-    if (extras.isNotEmpty) {
-      queryParameters['extras'] = jsonEncode(
-        extras
-            .map(
-              (e) => {
-                'id': _asInt(e['id']) ?? _asInt(e['extraId']) ?? 0,
-                'quantity': _asInt(e['quantity']) ?? 1,
-                if (e['persons'] != null) 'persons': _asInt(e['persons']) ?? 1,
-                if (e['duration'] != null)
-                  'duration': _asInt(e['duration']) ?? 0,
-                if (e['price'] != null) 'price': _asNum(e['price']) ?? 0,
-                if (e['name'] != null) 'name': e['name'].toString(),
-              },
-            )
-            .where((e) => (e['id'] as int) > 0)
-            .toList(),
-      );
+    if (normalizedExtras.isNotEmpty) {
+      queryParameters['extras'] = jsonEncode(normalizedExtras);
     }
 
     final uri = Uri.parse('$baseUrl/availability').replace(
@@ -397,11 +422,7 @@ class HabitoBookingApi {
 
     final data = await _getDecodedWithRetry(
       uri,
-      headers: {
-        ..._defaultHeaders(),
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
+      headers: _defaultHeaders(),
       timeout: _timeout,
       attempts: 3,
       retryDelay: _retryDelay,
@@ -412,10 +433,89 @@ class HabitoBookingApi {
     );
 
     if (data['success'] == true && data['data'] is Map<String, dynamic>) {
-      return Map<String, dynamic>.from(data['data']);
+      final availability = Map<String, dynamic>.from(data['data']);
+      _availabilityCache[cacheKey] = _AvailabilityCacheEntry(
+        data: _cloneAvailability(availability),
+        cachedAt: DateTime.now(),
+      );
+      return _cloneAvailability(availability);
     }
 
     throw Exception(_extractErrorMessage(data));
+  }
+
+  static String _availabilityDateKey(String value) {
+    final text = value.trim();
+    if (text.length >= 10) return text.substring(0, 10);
+    return text;
+  }
+
+  static String _availabilityCacheKey({
+    required int serviceId,
+    required int employeeId,
+    required int locationId,
+    required String date,
+    required int persons,
+    required List<Map<String, dynamic>> extras,
+  }) {
+    return [
+      serviceId,
+      employeeId,
+      locationId,
+      date,
+      persons,
+      _availabilityExtrasKey(extras),
+    ].join('|');
+  }
+
+  static String _availabilityExtrasKey(List<Map<String, dynamic>> extras) {
+    if (extras.isEmpty) return 'no-extras';
+    final sorted = extras.map(Map<String, dynamic>.from).toList()
+      ..sort((a, b) {
+        final aId = _asInt(a['id']) ?? 0;
+        final bId = _asInt(b['id']) ?? 0;
+        if (aId != bId) return aId.compareTo(bId);
+        final aQty = _asInt(a['quantity']) ?? 1;
+        final bQty = _asInt(b['quantity']) ?? 1;
+        return aQty.compareTo(bQty);
+      });
+    return jsonEncode(sorted);
+  }
+
+  static List<Map<String, dynamic>> _normalizeAvailabilityExtras(
+    List<Map<String, dynamic>> extras,
+  ) {
+    return extras
+        .map(
+          (e) => {
+            'id': _asInt(e['id']) ?? _asInt(e['extraId']) ?? 0,
+            'quantity': _asInt(e['quantity']) ?? 1,
+            if (e['persons'] != null) 'persons': _asInt(e['persons']) ?? 1,
+            if (e['duration'] != null) 'duration': _asInt(e['duration']) ?? 0,
+            if (e['price'] != null) 'price': _asNum(e['price']) ?? 0,
+            if (e['name'] != null) 'name': e['name'].toString(),
+          },
+        )
+        .where((e) => (e['id'] as int) > 0)
+        .toList();
+  }
+
+  static Map<String, dynamic>? _readAvailabilityCache(String key) {
+    final cached = _availabilityCache[key];
+    if (cached == null) return null;
+
+    if (DateTime.now().difference(cached.cachedAt) >= _availabilityCacheTtl) {
+      _availabilityCache.remove(key);
+      return null;
+    }
+
+    return _cloneAvailability(cached.data);
+  }
+
+  static Map<String, dynamic> _cloneAvailability(Map<String, dynamic> data) {
+    return Map<String, dynamic>.from(
+      jsonDecode(jsonEncode(data)) as Map<String, dynamic>,
+    );
   }
 
   static Future<Map<String, dynamic>> createBooking({
@@ -471,8 +571,8 @@ class HabitoBookingApi {
       'locale': locale,
       'notify_participants': notifyParticipants,
       'extras': normalizedExtras,
-      if (redeemPoints > 0) 'redeem_points': redeemPoints,
-      if (redeemAmount > 0) 'redeem_amount': redeemAmount,
+      if (redeemPoints > 0) 'redeem_points': _amountNumber(redeemPoints),
+      if (redeemAmount > 0) 'redeem_amount': _amountNumber(redeemAmount),
       if (paymentMethod != null) ...{
         'payment_method': paymentMethod.id,
         'payment_method_title': paymentMethod.title,
@@ -571,13 +671,16 @@ class HabitoBookingApi {
 
     final requestBody = jsonEncode(body);
 
-    final response = await http
-        .post(
-          uri,
-          headers: headers,
-          body: requestBody,
-        )
-        .timeout(_timeout);
+    final response = await _retryingPost(
+      uri,
+      headers: headers,
+      body: requestBody,
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-booking-create'),
+      timeoutMessage:
+          'No pudimos confirmar la reserva a tiempo. Revisa tus citas antes de intentarlo nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para crear la reserva. Revisa tu internet e intenta nuevamente.',
+    );
 
     final data = _decodeResponse(response);
 
@@ -587,6 +690,8 @@ class HabitoBookingApi {
 
     final payload = _extractBookingPayload(data);
     final normalized = _normalizeCreatedBookingResponse(payload, data);
+
+    _clearAvailabilityCache();
 
     return {
       'success': true,
@@ -602,16 +707,23 @@ class HabitoBookingApi {
   }) async {
     final uri = Uri.parse('$baseUrl/bookings/$bookingId/cancel');
 
-    final response =
-        await http.post(uri, headers: _jsonAuthHeaders(authToken)).timeout(
-              _timeout,
-            );
+    final response = await _retryingPost(
+      uri,
+      headers: _jsonAuthHeaders(authToken),
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-booking-cancel'),
+      timeoutMessage:
+          'No pudimos confirmar la cancelacion a tiempo. Revisa el estado de la cita antes de intentarlo nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para cancelar la cita. Revisa tu internet e intenta nuevamente.',
+    );
 
     final data = _decodeResponse(response);
 
     if (data['success'] != true) {
       throw Exception(_extractErrorMessage(data));
     }
+
+    _clearAvailabilityCache();
   }
 
   static Future<Map<String, dynamic>> rescheduleAppointment({
@@ -621,19 +733,24 @@ class HabitoBookingApi {
   }) async {
     final uri = Uri.parse('$baseUrl/appointments/$appointmentId/reschedule');
 
-    final response = await http
-        .post(
-          uri,
-          headers: _jsonAuthHeaders(authToken),
-          body: jsonEncode({'booking_start': newBookingStart}),
-        )
-        .timeout(_timeout);
+    final response = await _retryingPost(
+      uri,
+      headers: _jsonAuthHeaders(authToken),
+      body: jsonEncode({'booking_start': newBookingStart}),
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-booking-reschedule'),
+      timeoutMessage:
+          'No pudimos confirmar el cambio de horario a tiempo. Revisa la cita antes de intentarlo nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para reagendar la cita. Revisa tu internet e intenta nuevamente.',
+    );
 
     final data = _decodeResponse(response);
 
     if (data['success'] != true) {
       throw Exception(_extractErrorMessage(data));
     }
+
+    _clearAvailabilityCache();
 
     return data['data'] is Map<String, dynamic>
         ? Map<String, dynamic>.from(data['data'])
@@ -766,6 +883,57 @@ class HabitoBookingApi {
       throw Exception(timeoutMessage);
     }
 
+    throw Exception(connectionMessage);
+  }
+
+  static Future<http.Response> _retryingPost(
+    Uri uri, {
+    required Map<String, String> headers,
+    Object? body,
+    Duration timeout = _timeout,
+    int attempts = 3,
+    String? idempotencyKey,
+    String timeoutMessage =
+        'La operacion esta tomando mas tiempo de lo esperado. Revisa el estado antes de intentarlo nuevamente.',
+    String connectionMessage =
+        'No pudimos conectar con el servidor. Revisa tu internet e intenta nuevamente.',
+  }) async {
+    Object? lastError;
+    http.Response? lastResponse;
+    final requestHeaders = _withIdempotencyHeaders(
+      headers,
+      idempotencyKey ?? newIdempotencyKey(prefix: 'habito-booking'),
+    );
+
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      try {
+        final response = await http
+            .post(uri, headers: requestHeaders, body: body)
+            .timeout(timeout);
+
+        if (!_shouldRetryPostResponse(response.statusCode) ||
+            attempt == attempts - 1) {
+          return response;
+        }
+
+        lastResponse = response;
+      } on TimeoutException catch (e) {
+        lastError = e;
+      } on http.ClientException catch (e) {
+        lastError = e;
+      } on SocketException catch (e) {
+        lastError = e;
+      } on HandshakeException catch (e) {
+        lastError = e;
+      }
+
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(_postBackoffDelay(attempt));
+      }
+    }
+
+    if (lastResponse != null) return lastResponse;
+    if (lastError is TimeoutException) throw Exception(timeoutMessage);
     throw Exception(connectionMessage);
   }
 
@@ -1020,13 +1188,16 @@ class HabitoBookingApi {
       ],
     );
 
-    final booking = _findFirstMapByKeys(
+    final directBooking = _findFirstMapByKeys(
       payload,
       const [
         ['booking'],
         ['data', 'booking'],
       ],
     );
+    final booking = directBooking.isNotEmpty
+        ? directBooking
+        : _firstBookingFromAppointment(appointment);
 
     final customer = _findFirstMapByKeys(
       payload,
@@ -1219,6 +1390,24 @@ class HabitoBookingApi {
 
       if (valid && current is Map) {
         return Map<String, dynamic>.from(current);
+      }
+    }
+
+    return <String, dynamic>{};
+  }
+
+  static Map<String, dynamic> _firstBookingFromAppointment(
+    Map<String, dynamic> appointment,
+  ) {
+    final bookings = appointment['bookings'];
+    if (bookings is List) {
+      for (final booking in bookings) {
+        if (booking is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(booking);
+        }
+        if (booking is Map) {
+          return Map<String, dynamic>.from(booking);
+        }
       }
     }
 
@@ -1466,6 +1655,33 @@ class HabitoBookingApi {
     };
   }
 
+  static Map<String, String> _withIdempotencyHeaders(
+    Map<String, String> headers,
+    String key,
+  ) {
+    return {
+      ...headers,
+      'Idempotency-Key': key,
+      'X-Idempotency-Key': key,
+      'X-Habito-Idempotency-Key': key,
+    };
+  }
+
+  static bool _shouldRetryPostResponse(int statusCode) {
+    return statusCode == 408 ||
+        statusCode == 425 ||
+        statusCode == 429 ||
+        statusCode == 500 ||
+        statusCode == 502 ||
+        statusCode == 503 ||
+        statusCode == 504;
+  }
+
+  static Duration _postBackoffDelay(int attempt) {
+    final multiplier = 1 << attempt;
+    return Duration(milliseconds: 500 * multiplier);
+  }
+
   static Future<void> _ensureLoaded() {
     _loadFuture ??= _loadCache();
     return _loadFuture!;
@@ -1645,7 +1861,11 @@ class HabitoBookingApi {
       }
       if (response.statusCode >= 500) {
         throw Exception(
-          'Error 500 del servidor. Respuesta: ${response.body}',
+          FriendlyErrors.clean(
+            response.body,
+            statusCode: response.statusCode,
+            fallback: 'Error en el servidor. Intenta mas tarde.',
+          ),
         );
       }
 
@@ -1745,6 +1965,10 @@ class HabitoBookingApi {
     return null;
   }
 
+  static double _amountNumber(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   static bool? _asBool(dynamic value) {
     if (value == null) return null;
     if (value is bool) return value;
@@ -1761,4 +1985,14 @@ class HabitoBookingApi {
     }
     return null;
   }
+}
+
+class _AvailabilityCacheEntry {
+  final Map<String, dynamic> data;
+  final DateTime cachedAt;
+
+  const _AvailabilityCacheEntry({
+    required this.data,
+    required this.cachedAt,
+  });
 }

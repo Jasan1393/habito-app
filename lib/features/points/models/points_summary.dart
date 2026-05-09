@@ -36,8 +36,9 @@ class PointsSummary {
   });
 
   factory PointsSummary.fromJson(Map<String, dynamic> json) {
+    final enabled = _parseBool(json['enabled']) ?? false;
     return PointsSummary(
-      enabled: _parseBool(json['enabled']) ?? false,
+      enabled: enabled,
       mycredAvailable: _parseBool(
             json['mycred_available'] ?? json['mycredAvailable'],
           ) ??
@@ -45,52 +46,43 @@ class PointsSummary {
       balance: _parseDouble(json['balance']) ?? 0,
       totalEarned:
           _parseDouble(json['total_earned'] ?? json['totalEarned']) ?? 0,
-      pointType:
-          (json['point_type'] ?? json['pointType'] ?? 'mycred_default')
-              .toString(),
+      pointType: (json['point_type'] ?? json['pointType'] ?? 'mycred_default')
+          .toString(),
       label: (json['label'] ?? 'Puntos').toString(),
-      nextGoal:
-          _parseInt(json['next_goal'] ?? json['nextGoal']) ?? 0,
-      toNextGoal:
-          _parseDouble(json['to_next_goal'] ?? json['toNextGoal']) ?? 0,
+      nextGoal: _parseInt(json['next_goal'] ?? json['nextGoal']) ?? 0,
+      toNextGoal: _parseDouble(json['to_next_goal'] ?? json['toNextGoal']) ?? 0,
       redeemEnabled: _parseBool(
             json['redeem_enabled'] ?? json['redeemEnabled'],
           ) ??
           false,
       redeemProductsEnabled: _parseBool(
-            json['redeem_products_enabled'] ??
-                json['redeemProductsEnabled'],
+            json['redeem_products_enabled'] ?? json['redeemProductsEnabled'],
           ) ??
           false,
       redeemBookingsEnabled: _parseBool(
-            json['redeem_bookings_enabled'] ??
-                json['redeemBookingsEnabled'],
+            json['redeem_bookings_enabled'] ?? json['redeemBookingsEnabled'],
           ) ??
           false,
-      redeemPointsPerUsd:
-          _parseDouble(
-            json['redeem_points_per_usd'] ??
-                json['redeemPointsPerUsd'],
+      redeemPointsPerUsd: _parseDouble(
+            json['redeem_points_per_usd'] ?? json['redeemPointsPerUsd'],
           ) ??
           100,
-      redeemMinPoints:
-          _parseDouble(
+      redeemMinPoints: _parseDouble(
             json['redeem_min_points'] ?? json['redeemMinPoints'],
           ) ??
           1,
-      redeemMaxPercent:
-          _parseDouble(
+      redeemMaxPercent: _parseDouble(
             json['redeem_max_percent'] ?? json['redeemMaxPercent'],
           ) ??
-          100,
+          50,
       bookingPointsEnabled: _parseBool(
             json['booking_points_enabled'] ?? json['bookingPointsEnabled'],
           ) ??
-          false,
+          enabled,
       orderPointsEnabled: _parseBool(
             json['order_points_enabled'] ?? json['orderPointsEnabled'],
           ) ??
-          false,
+          enabled,
     );
   }
 

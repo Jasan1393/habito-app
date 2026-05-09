@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
@@ -226,9 +231,9 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF6F4F1),
+      backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: AppRadius.bottomSheet,
       ),
       builder: (_) => _BarberProfileModal(barber: barber),
     );
@@ -248,10 +253,10 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F4F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        elevation: 0,
+        elevation: AppSpacing.none,
         centerTitle: true,
         title: const Text(
           'Team Hábito',
@@ -267,26 +272,31 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
           : _barbers.isEmpty
               ? const _EmptyTeamView()
               : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
+                  ),
                   children: [
                     const Text(
                       'Nuestros Barberos',
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: AppTextSize.headlineMedium,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                     const Text(
                       'Conoce al equipo que hace posible la experiencia Hábito.',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: AppTextSize.base,
                         color: AppColors.textSecondary,
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                     GridView.builder(
                       itemCount: _barbers.length,
                       shrinkWrap: true,
@@ -341,41 +351,31 @@ class _BarberCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: AppRadius.hero,
       child: InkWell(
         onTap: onTapProfile,
-        borderRadius: BorderRadius.circular(26),
-        splashColor: const Color(0xFFD4AF37).withValues(alpha: 0.10),
-        highlightColor: const Color(0xFFD4AF37).withValues(alpha: 0.05),
+        borderRadius: AppRadius.hero,
+        splashColor: AppColors.secondary.withValues(alpha: 0.10),
+        highlightColor: AppColors.secondary.withValues(alpha: 0.05),
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: AppRadius.hero,
             border: Border.all(
-              color: isSelected
-                  ? const Color(0xFFD4AF37)
-                  : const Color(0xFFEAE3D8),
-              width: isSelected ? 2 : 1,
+              color: isSelected ? AppColors.secondary : AppColors.border,
+              width: isSelected ? AppSpacing.xxs : AppSpacing.xxs / 2,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: isSelected
-                    ? const Color(0xFFD4AF37).withValues(alpha: 0.14)
-                    : Colors.black.withValues(alpha: 0.055),
-                blurRadius: isSelected ? 20 : 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: isSelected ? AppShadows.goldGlow : AppShadows.medium,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            padding: AppSpacing.card,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: AppRadius.large,
                       child: SizedBox(
                         height: 136,
                         width: double.infinity,
@@ -394,36 +394,29 @@ class _BarberCard extends StatelessWidget {
                         top: 8,
                         right: 8,
                         child: Container(
-                          width: 28,
-                          height: 28,
+                          width: AppIconSize.lg,
+                          height: AppIconSize.lg,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFD4AF37),
-                            borderRadius: BorderRadius.circular(99),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFD4AF37)
-                                    .withValues(alpha: 0.35),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            color: AppColors.secondary,
+                            borderRadius: AppRadius.full,
+                            boxShadow: AppShadows.goldGlow,
                           ),
                           child: const Icon(
                             Icons.check_rounded,
-                            size: 18,
+                            size: AppIconSize.action,
                             color: AppColors.primary,
                           ),
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.cartItemGap),
                 SizedBox(
                   height: 46,
                   child: Text(
                     name,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: AppTextSize.titleMedium,
                       height: 1.12,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -432,17 +425,17 @@ class _BarberCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF7F1E2),
-                    borderRadius: BorderRadius.circular(30),
+                    color: AppColors.goldMuted,
+                    borderRadius: AppRadius.full,
                     border: Border.all(
-                      color: const Color(0xFFE7D7AE),
+                      color: AppColors.borderStrong,
                     ),
                   ),
                   child: Row(
@@ -451,15 +444,15 @@ class _BarberCard extends StatelessWidget {
                       const Icon(
                         Icons.location_on_outlined,
                         size: 15,
-                        color: Color(0xFF9C7732),
+                        color: AppColors.goldDeep,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.xs + AppSpacing.xxs),
                       Flexible(
                         child: Text(
                           locationName,
                           style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF7A5D25),
+                            fontSize: AppTextSize.bodySmall,
+                            color: AppColors.goldDeep,
                             fontWeight: FontWeight.w700,
                           ),
                           maxLines: 1,
@@ -469,11 +462,11 @@ class _BarberCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 const Text(
                   'Barbero profesional',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppTextSize.bodySmall,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -492,21 +485,23 @@ class _BarberCard extends StatelessWidget {
                       'Reservar',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 14,
+                        fontSize: AppTextSize.base,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: AppColors.primary,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      elevation: AppSpacing.none,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm + AppSpacing.xxs,
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 SizedBox(
                   width: double.infinity,
                   height: 42,
@@ -520,18 +515,18 @@ class _BarberCard extends StatelessWidget {
                       'Ver perfil',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppTextSize.base,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(
-                        color: Color(0xFFD9C9A0),
+                        color: AppColors.borderStrong,
                         width: 1.2,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                   ),
@@ -573,26 +568,31 @@ class _BarberProfileModal extends StatelessWidget {
         builder: (context, scrollController) {
           return Container(
             decoration: const BoxDecoration(
-              color: Color(0xFFF6F4F1),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              color: AppColors.background,
+              borderRadius: AppRadius.bottomSheet,
             ),
             child: ListView(
               controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
               children: [
                 Center(
                   child: Container(
-                    width: 54,
-                    height: 5,
+                    width: AppSpacing.actionHeight,
+                    height: AppSpacing.xs + AppSpacing.xxs / 2,
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadius.card,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: AppRadius.extraLarge,
                   child: SizedBox(
                     height: 260,
                     width: double.infinity,
@@ -606,17 +606,17 @@ class _BarberProfileModal extends StatelessWidget {
                         : _BarberImageFallback(name: name),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                 Text(
                   name,
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: AppTextSize.headlineMedium + AppSpacing.xxs,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     height: 1.12,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -627,13 +627,13 @@ class _BarberProfileModal extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.secondary.withValues(alpha: 0.16),
+                        borderRadius: AppRadius.medium,
                       ),
                       child: const Text(
                         'Barbero Hábito',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: AppTextSize.body,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                         ),
@@ -645,10 +645,10 @@ class _BarberProfileModal extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF7F1E2),
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.goldMuted,
+                        borderRadius: AppRadius.medium,
                         border: Border.all(
-                          color: const Color(0xFFE7D7AE),
+                          color: AppColors.borderStrong,
                         ),
                       ),
                       child: Row(
@@ -657,15 +657,15 @@ class _BarberProfileModal extends StatelessWidget {
                           const Icon(
                             Icons.location_on_outlined,
                             size: 15,
-                            color: Color(0xFF9C7732),
+                            color: AppColors.goldDeep,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: AppSpacing.xs + AppSpacing.xxs),
                           Text(
                             locationName,
                             style: const TextStyle(
-                              fontSize: 12.8,
+                              fontSize: AppTextSize.bodyCompact,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF7A5D25),
+                              color: AppColors.goldDeep,
                             ),
                           ),
                         ],
@@ -673,25 +673,25 @@ class _BarberProfileModal extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                 const Text(
                   'Perfil',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppTextSize.titleLarge,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   description,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: AppTextSize.titleSmall,
                     height: 1.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
@@ -708,23 +708,23 @@ class _BarberProfileModal extends StatelessWidget {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: AppColors.primary,
-                      elevation: 0,
+                      elevation: AppSpacing.none,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.tile,
                       ),
                     ),
                     child: const Text(
                       'Reservar con este barbero',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: AppTextSize.titleSmall,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 SizedBox(
                   height: 48,
                   child: OutlinedButton(
@@ -732,18 +732,18 @@ class _BarberProfileModal extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(
-                        color: Color(0xFFD4AF37),
+                        color: AppColors.secondary,
                         width: 1.4,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.tile,
                       ),
                     ),
                     child: const Text(
                       'Cerrar',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: AppTextSize.titleSmall,
                       ),
                     ),
                   ),
@@ -779,7 +779,7 @@ class _BarberImageFallback extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+          colors: [AppColors.primarySoft, AppColors.goldDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -790,7 +790,7 @@ class _BarberImageFallback extends StatelessWidget {
           height: 58,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: AppRadius.full,
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.18),
             ),
@@ -800,7 +800,7 @@ class _BarberImageFallback extends StatelessWidget {
               initial,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 26,
+                fontSize: AppTextSize.headlineMedium + AppSpacing.xxs,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -817,7 +817,12 @@ class _TeamLoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.xl,
+      ),
       itemCount: 4,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -829,7 +834,7 @@ class _TeamLoadingView extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: AppRadius.hero,
           ),
         );
       },
@@ -844,12 +849,12 @@ class _EmptyTeamView extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: AppSpacing.section,
         child: Text(
           'No hay barberos disponibles por el momento.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 16,
+            fontSize: AppTextSize.titleMedium,
             color: AppColors.textSecondary,
           ),
         ),

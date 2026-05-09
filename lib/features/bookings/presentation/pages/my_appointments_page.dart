@@ -5,14 +5,31 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
+import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/unread_notifications_button.dart';
 import '../../../auth/provider/auth_provider.dart';
-import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
+import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
 import 'appointment_detail_page.dart';
 import 'bookings_page.dart';
+
+enum _AppointmentDateFilter {
+  all,
+  today,
+  sevenDays,
+  fifteenDays,
+  oneMonth,
+}
 
 class MyAppointmentsPage extends StatefulWidget {
   final Map<String, dynamic>? initialArguments;
@@ -51,11 +68,12 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   bool _isLoadingHistory = false;
   bool _hasLoadedHistory = false;
   bool _didAutoFocusNonEmptyTab = false;
+  _AppointmentDateFilter _selectedDateFilter = _AppointmentDateFilter.all;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
     _tabController.addListener(_onTabChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -961,30 +979,38 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   }
 
   List<Map<String, dynamic>> _appointmentsByTab(int index) {
+    final List<Map<String, dynamic>> filteredByStatus;
+
     switch (index) {
       case 0:
-        return _allAppointments
+        filteredByStatus = _allAppointments
             .where(
               (a) => _appointmentStatusKey(a) == 'pending',
             )
             .toList();
+        break;
       case 1:
-        return _allAppointments.where(
+        filteredByStatus = _allAppointments.where(
           (a) {
             final statusKey = _appointmentStatusKey(a);
-            return statusKey == 'confirmed' || statusKey == 'completed';
+            return statusKey == 'confirmed' && !_isPastAppointment(a);
           },
         ).toList();
+        break;
       case 2:
-        return _allAppointments.where(
+        filteredByStatus = _allAppointments.where(
           (a) {
-            final statusKey = _appointmentStatusKey(a);
-            return statusKey == 'canceled' || statusKey == 'rejected';
+            return _isHistoricalAppointment(a);
           },
         ).toList();
+        break;
       default:
-        return _allAppointments;
+        filteredByStatus = _allAppointments;
     }
+
+    return filteredByStatus
+        .where((appointment) => _matchesSelectedDateFilter(appointment, index))
+        .toList(growable: false);
   }
 
   int _tabCount(int index) => _appointmentsByTab(index).length;
@@ -996,7 +1022,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
       case 1:
         return 'Confirmadas';
       case 2:
-        return 'Canceladas';
+        return 'Historico';
       default:
         return 'Citas';
     }
@@ -1007,12 +1033,85 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
       case 0:
         return 'Por aprobar';
       case 1:
-        return 'Listas para asistir';
+        return 'Vigentes';
       case 2:
-        return 'Historial cerrado';
+        return 'Pasadas o cerradas';
       default:
         return 'Tus reservas';
     }
+  }
+
+  String _dateFilterLabel(_AppointmentDateFilter filter) {
+    switch (filter) {
+      case _AppointmentDateFilter.all:
+        return 'Todo';
+      case _AppointmentDateFilter.today:
+        return 'Hoy';
+      case _AppointmentDateFilter.sevenDays:
+        return '7 días';
+      case _AppointmentDateFilter.fifteenDays:
+        return '15 días';
+      case _AppointmentDateFilter.oneMonth:
+        return '1 mes';
+    }
+  }
+
+  int? _dateFilterWindowDays(_AppointmentDateFilter filter) {
+    switch (filter) {
+      case _AppointmentDateFilter.all:
+        return null;
+      case _AppointmentDateFilter.today:
+        return 0;
+      case _AppointmentDateFilter.sevenDays:
+        return 7;
+      case _AppointmentDateFilter.fifteenDays:
+        return 15;
+      case _AppointmentDateFilter.oneMonth:
+        return 30;
+    }
+  }
+
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  bool _matchesSelectedDateFilter(
+    Map<String, dynamic> appointment,
+    int tabIndex,
+  ) {
+    final windowDays = _dateFilterWindowDays(_selectedDateFilter);
+    if (windowDays == null) return true;
+
+    final date = _resolveAppointmentDate(appointment);
+    if (date == null) return false;
+
+    final today = _dateOnly(DateTime.now());
+    final appointmentDate = _dateOnly(date);
+    final diffDays = appointmentDate.difference(today).inDays;
+
+    if (windowDays == 0) return diffDays == 0;
+
+    final statusKey = _appointmentStatusKey(appointment);
+    final isHistorical = tabIndex == 2 ||
+        statusKey == 'completed' ||
+        statusKey == 'canceled' ||
+        statusKey == 'rejected' ||
+        diffDays < 0;
+
+    if (isHistorical) {
+      return diffDays <= 0 && diffDays >= -windowDays;
+    }
+
+    return diffDays >= 0 && diffDays <= windowDays;
+  }
+
+  bool _isHistoricalAppointment(Map<String, dynamic> appointment) {
+    final statusKey = _appointmentStatusKey(appointment);
+    return statusKey == 'completed' ||
+        statusKey == 'canceled' ||
+        statusKey == 'rejected' ||
+        statusKey == 'expired_pending' ||
+        _isPastAppointment(appointment);
   }
 
   IconData _tabIcon(int index) {
@@ -1031,11 +1130,11 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   Color _tabColor(int index) {
     switch (index) {
       case 0:
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 1:
-        return const Color(0xFF2E7D32);
+        return AppColors.success;
       case 2:
-        return const Color(0xFFC62828);
+        return AppColors.danger;
       default:
         return AppColors.primary;
     }
@@ -1062,11 +1161,12 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
     _didAutoFocusNonEmptyTab = true;
 
-    if (_tabController.index != 0 || _tabCount(0) > 0) {
+    final currentIndex = _tabController.index;
+    if (_tabCount(currentIndex) > 0) {
       return;
     }
 
-    final suggested = _suggestedTabForEmpty(0);
+    final suggested = _suggestedTabForEmpty(currentIndex);
     if (suggested != null && suggested != _tabController.index) {
       if (suggested == 2) {
         unawaited(_loadHistoryAppointments());
@@ -1084,19 +1184,19 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   Color _statusColorByKey(String statusKey) {
     switch (statusKey) {
       case 'confirmed':
-        return const Color(0xFF2E7D32);
+        return AppColors.success;
       case 'pending':
-        return const Color(0xFFF9A825);
+        return AppColors.warning;
       case 'expired_pending':
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
       case 'completed':
-        return const Color(0xFF1565C0);
+        return AppColors.info;
       case 'rejected':
-        return const Color(0xFFB91C1C);
+        return AppColors.dangerDeep;
       case 'canceled':
-        return const Color(0xFFC62828);
+        return AppColors.danger;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
     }
   }
 
@@ -1121,10 +1221,20 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   }
 
   Color _appointmentStatusColor(Map<String, dynamic> appointment) {
+    if (_isHistoricalAppointment(appointment) &&
+        _appointmentStatusKey(appointment) == 'confirmed') {
+      return AppColors.textSecondary;
+    }
+
     return _statusColorByKey(_appointmentStatusKey(appointment));
   }
 
   String _appointmentStatusLabel(Map<String, dynamic> appointment) {
+    if (_isHistoricalAppointment(appointment) &&
+        _appointmentStatusKey(appointment) == 'confirmed') {
+      return 'Historico';
+    }
+
     final explicitDisplay = _firstNonEmpty([
       appointment['status_display']?.toString(),
       appointment['statusDisplay']?.toString(),
@@ -1230,31 +1340,17 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   }) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 54, color: Colors.black26),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.center,
+            HabitoEmptyState(
+              icon: icon,
+              title: title,
+              message: subtitle,
+              compact: true,
             ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 10,
@@ -1274,13 +1370,13 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: Color(0xFFD4AF37)),
+                      side: const BorderSide(color: AppColors.secondary),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                   ),
@@ -1291,14 +1387,14 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                     await _loadAppointments();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
+                    backgroundColor: AppColors.secondary,
                     foregroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
                       vertical: 12,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.medium,
                     ),
                   ),
                   child: const Text(
@@ -1332,19 +1428,13 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
         }
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppSpacing.md + AppSpacing.xxs),
+        padding: AppSpacing.card,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE7DFD4)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          borderRadius: AppRadius.large,
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.panel,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,7 +1446,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                     _displayServiceName(appointment),
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 17,
+                      fontSize: AppTextSize.title,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -1368,26 +1458,26 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.full,
                   ),
                   child: Text(
                     _appointmentStatusLabel(appointment),
                     style: TextStyle(
                       color: statusColor,
-                      fontSize: 12,
+                      fontSize: AppTextSize.label,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
             _infoRow(Icons.person_outline, _displayBarberName(appointment)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             _infoRow(Icons.calendar_today_outlined, _displayDate(appointment)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             _infoRow(Icons.access_time_outlined, _displayTime(appointment)),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Row(
               children: [
                 Expanded(
@@ -1406,11 +1496,11 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                       }
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF9C7732),
-                      side: const BorderSide(color: Color(0xFFD4AF37)),
+                      foregroundColor: AppColors.goldDeep,
+                      side: const BorderSide(color: AppColors.secondary),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                     child: const Text(
@@ -1419,19 +1509,19 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                 Expanded(
                   child: ElevatedButton(
                     onPressed:
                         canRebook ? () => _goToRebook(appointment) : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
-                      disabledBackgroundColor: const Color(0xFFE7DFD4),
+                      backgroundColor: AppColors.secondary,
+                      disabledBackgroundColor: AppColors.border,
                       foregroundColor: AppColors.primary,
-                      disabledForegroundColor: const Color(0xFF9E9E9E),
+                      disabledForegroundColor: AppColors.textMuted,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                     child: const Text(
@@ -1439,7 +1529,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
+                        fontSize: AppTextSize.bodySmall,
                       ),
                     ),
                   ),
@@ -1455,14 +1545,14 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   Widget _infoRow(IconData icon, String value) {
     return Row(
       children: [
-        Icon(icon, size: 17, color: const Color(0xFFD4AF37)),
-        const SizedBox(width: 8),
+        Icon(icon, size: AppIconSize.quantityIcon, color: AppColors.secondary),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
             value,
             style: const TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 14,
+              fontSize: AppTextSize.base,
             ),
           ),
         ),
@@ -1472,111 +1562,128 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
   Widget _buildAppointmentsOverview() {
     final selectedIndex = _tabController.index;
-    final total = _tabCount(0) + _tabCount(1) + _tabCount(2);
-    final selectedCount = _tabCount(selectedIndex);
+    const orderedTabs = [1, 0, 2];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
-            Color(0xFF2D3F7F),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.20),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.14),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.calendar_month_rounded,
-                  color: Color(0xFFD4AF37),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Mis citas',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      total == 0
-                          ? 'Aqui veras tus reservas y su estado.'
-                          : '$selectedCount en ${_tabTitle(selectedIndex).toLowerCase()} - $total en total',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.78),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 420;
-              final itemWidth = compact
-                  ? constraints.maxWidth
-                  : (constraints.maxWidth - 16) / 3;
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: AppRadius.large,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.panel,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth >= 560
+              ? (constraints.maxWidth - 16) / 3
+              : 158.0;
 
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: List.generate(3, (index) {
-                  return _AppointmentStatusSummaryCard(
-                    width: itemWidth,
-                    icon: _tabIcon(index),
-                    title: _tabTitle(index),
-                    description: _tabDescription(index),
-                    count: _tabCount(index),
-                    color: _tabColor(index),
-                    selected: selectedIndex == index,
-                    loading: index == 2 && _isLoadingHistory,
-                    onTap: () {
-                      if (index == 2) {
+          return SizedBox(
+            height: 74,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: orderedTabs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (_, position) {
+                final index = orderedTabs[position];
+                return _AppointmentStatusSummaryCard(
+                  width: itemWidth,
+                  title: _tabTitle(index),
+                  description: _tabDescription(index),
+                  count: _tabCount(index),
+                  color: _tabColor(index),
+                  selected: selectedIndex == index,
+                  loading: index == 2 && _isLoadingHistory,
+                  onTap: () {
+                    if (index == 2) {
+                      unawaited(_loadHistoryAppointments());
+                    }
+                    _tabController.animateTo(index);
+                  },
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateFilterBar() {
+    final filters = _AppointmentDateFilter.values;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: AppRadius.large,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: AppSpacing.xs, right: AppSpacing.sm),
+            child: Text(
+              'Periodo',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: AppTextSize.labelSmall,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: filters.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.xs),
+                itemBuilder: (context, index) {
+                  final filter = filters[index];
+                  final selected = filter == _selectedDateFilter;
+
+                  return ChoiceChip(
+                    showCheckmark: false,
+                    selected: selected,
+                    label: Text(_dateFilterLabel(filter)),
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : AppColors.textPrimary,
+                      fontSize: AppTextSize.labelSmall,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: AppColors.surface,
+                    side: BorderSide(
+                      color: selected ? AppColors.primary : AppColors.border,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.full,
+                    ),
+                    onSelected: (_) {
+                      setState(() {
+                        _selectedDateFilter = filter;
+                      });
+
+                      if (_tabController.index == 2) {
                         unawaited(_loadHistoryAppointments());
                       }
-                      _tabController.animateTo(index);
                     },
                   );
-                }),
-              );
-            },
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -1586,8 +1693,13 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
   Widget _buildTabContent(int tabIndex) {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFD4AF37),
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.xl),
+          child: HabitoLoadingShimmer(
+            itemCount: 3,
+            itemHeight: 136,
+            shrinkWrap: true,
+          ),
         ),
       );
     }
@@ -1595,54 +1707,19 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 54,
-                color: Colors.redAccent,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'No se pudieron cargar tus citas',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 18),
-              ElevatedButton.icon(
-                onPressed: _loadAppointments,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: HabitoErrorState(
+            title: 'No se pudieron cargar tus citas',
+            message: _error!,
+            onRetry: _loadAppointments,
           ),
         ),
       );
     }
 
     final items = _appointmentsByTab(tabIndex);
+    final isFiltered = _selectedDateFilter != _AppointmentDateFilter.all;
+    final filterLabel = _dateFilterLabel(_selectedDateFilter).toLowerCase();
 
     if (items.isEmpty) {
       final suggestedTabIndex = _suggestedTabForEmpty(tabIndex);
@@ -1653,7 +1730,9 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
             title: 'No tienes citas pendientes',
             subtitle: suggestedTabIndex != null
                 ? 'No hay citas pendientes, pero si tienes reservas en otra categoria.'
-                : 'Cuando hagas una nueva reserva, aparecera aqui.',
+                : isFiltered
+                    ? 'No hay citas pendientes para $filterLabel.'
+                    : 'Cuando hagas una nueva reserva, aparecera aqui.',
             suggestedTabIndex: suggestedTabIndex,
           );
         case 1:
@@ -1662,16 +1741,20 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
             title: 'No tienes citas confirmadas',
             subtitle: suggestedTabIndex != null
                 ? 'No hay citas confirmadas ahora. Puedes revisar otra categoria.'
-                : 'Tus proximas citas confirmadas apareceran aqui.',
+                : isFiltered
+                    ? 'No hay citas confirmadas para $filterLabel.'
+                    : 'Tus proximas citas confirmadas apareceran aqui.',
             suggestedTabIndex: suggestedTabIndex,
           );
         case 2:
           return _buildEmptyState(
             icon: Icons.cancel_outlined,
-            title: 'No tienes citas canceladas',
+            title: 'No tienes citas en historial',
             subtitle: suggestedTabIndex != null
-                ? 'No hay citas canceladas. Tus citas activas estan en otra categoria.'
-                : 'Las citas canceladas se mostraran aqui.',
+                ? 'No hay citas historicas. Tus citas activas estan en otra categoria.'
+                : isFiltered
+                    ? 'No hay citas historicas para $filterLabel.'
+                    : 'Las citas pasadas o cerradas se mostraran aqui.',
             suggestedTabIndex: suggestedTabIndex,
           );
         default:
@@ -1680,7 +1763,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     }
 
     return RefreshIndicator(
-      color: const Color(0xFFD4AF37),
+      color: AppColors.secondary,
       backgroundColor: Colors.white,
       onRefresh: _loadAppointments,
       child: ListView.builder(
@@ -1696,131 +1779,72 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
+
+    Future<void> openBooking() async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BookingsPage()),
+      );
+      if (!context.mounted) return;
+      await _loadAppointments();
+    }
+
+    void openProducts() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProductsArchivePage()),
+      );
+    }
+
+    void openCart() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CartPage()),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F4F1),
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        toolbarHeight: 64,
+      backgroundColor: AppColors.background,
+      appBar: AppTopHeader(
         automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Row(
-            children: [
-              _HeaderSquareAction(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProductsArchivePage(),
-                    ),
-                  );
-                },
-                child: const SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Icon(
-                    Icons.search_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const BookingsPage()),
-                      );
-                      if (!context.mounted) return;
-                      await _loadAppointments();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: const Icon(Icons.edit_calendar_rounded, size: 20),
-                    label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Nueva reserva',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const UnreadNotificationsButton(),
-              const SizedBox(width: 10),
-              _HeaderSquareAction(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CartPage()),
-                  );
-                },
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(
-                        Icons.shopping_bag_outlined,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    if (cartCount > 0)
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFD4AF37),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '$cartCount',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+        titleSpacingOverride: AppSpacing.md,
+        searchHint: 'Buscar productos',
+        cartCount: cartCount,
+        onSearchTap: openProducts,
+        onCartTap: openCart,
+        titleOverride: _AppointmentReserveButton(onTap: openBooking),
+        actionsOverride: [
+          const Padding(
+            padding: EdgeInsets.only(right: AppSpacing.xs),
+            child: UnreadNotificationsButton(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: _AppointmentHeaderIconButton(
+              icon: Icons.search_rounded,
+              tooltip: 'Buscar productos',
+              onTap: openProducts,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
+            child: _AppointmentCartIconButton(
+              cartCount: cartCount,
+              onTap: openCart,
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
           _buildAppointmentsOverview(),
+          _buildDateFilterBar(),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -1839,7 +1863,6 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
 class _AppointmentStatusSummaryCard extends StatelessWidget {
   final double width;
-  final IconData icon;
   final String title;
   final String description;
   final int count;
@@ -1850,7 +1873,6 @@ class _AppointmentStatusSummaryCard extends StatelessWidget {
 
   const _AppointmentStatusSummaryCard({
     required this.width,
-    required this.icon,
     required this.title,
     required this.description,
     required this.count,
@@ -1862,101 +1884,83 @@ class _AppointmentStatusSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background =
-        selected ? Colors.white : Colors.white.withValues(alpha: 0.10);
-    final foreground = selected ? AppColors.primary : Colors.white;
-    final secondary = selected
-        ? AppColors.textSecondary
-        : Colors.white.withValues(alpha: 0.72);
+    final background = selected ? AppColors.primary : AppColors.surfaceElevated;
+    final foreground = selected ? Colors.white : AppColors.textPrimary;
+    final secondary =
+        selected ? AppColors.textOnDarkMuted : AppColors.textSecondary;
+    final accent = selected ? AppColors.secondary : color;
 
     return SizedBox(
       width: width,
       child: Material(
         color: background,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.medium,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.medium,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm + AppSpacing.xs,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: AppRadius.medium,
               border: Border.all(
-                color: selected
-                    ? const Color(0xFFD4AF37)
-                    : Colors.white.withValues(alpha: 0.14),
+                color: selected ? AppColors.secondary : AppColors.border,
                 width: selected ? 1.4 : 1,
               ),
+              boxShadow: selected ? AppShadows.cardSoft : null,
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? color.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: selected ? color : const Color(0xFFD4AF37),
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: foreground,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          if (loading)
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: selected ? color : Colors.white,
-                              ),
-                            )
-                          else
-                            Text(
-                              '$count',
-                              style: TextStyle(
-                                color: selected ? color : Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        description,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: secondary,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
+                          color: foreground,
+                          fontSize: AppTextSize.bodyStrong,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    if (loading)
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth:
+                              AppSpacing.progressStroke - AppSpacing.xxs / 10,
+                          color: accent,
+                        ),
+                      )
+                    else
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: AppTextSize.titleLarge,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: secondary,
+                    fontSize: AppTextSize.labelSmall,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -1968,24 +1972,139 @@ class _AppointmentStatusSummaryCard extends StatelessWidget {
   }
 }
 
-class _HeaderSquareAction extends StatelessWidget {
-  final Widget child;
+class _AppointmentReserveButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _HeaderSquareAction({
-    required this.child,
+  const _AppointmentReserveButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AppIconSize.headerAction,
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.medium,
+          ),
+        ),
+        icon: const Icon(
+          Icons.edit_calendar_rounded,
+          size: AppIconSize.headerActionIcon,
+        ),
+        label: const Text(
+          'Reservar cita',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: AppTextSize.bodyStrong,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppointmentHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _AppointmentHeaderIconButton({
+    required this.icon,
+    required this.tooltip,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primary,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: child,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.primary,
+        borderRadius: AppRadius.tile,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.tile,
+          child: SizedBox(
+            width: AppIconSize.headerAction,
+            height: AppIconSize.headerAction,
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: AppIconSize.headerActionIcon,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppointmentCartIconButton extends StatelessWidget {
+  final int cartCount;
+  final VoidCallback onTap;
+
+  const _AppointmentCartIconButton({
+    required this.cartCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Carrito',
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: AppColors.primary,
+            borderRadius: AppRadius.tile,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: AppRadius.tile,
+              child: SizedBox(
+                width: AppIconSize.headerAction,
+                height: AppIconSize.headerAction,
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: Colors.white,
+                  size: AppIconSize.headerActionIcon,
+                ),
+              ),
+            ),
+          ),
+          if (cartCount > 0)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                constraints: const BoxConstraints(
+                  minWidth: AppIconSize.notificationBadge,
+                  minHeight: AppIconSize.notificationBadge,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: AppRadius.full,
+                ),
+                child: Text(
+                  cartCount > 9 ? '9+' : '$cartCount',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: AppTextSize.captionXs,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

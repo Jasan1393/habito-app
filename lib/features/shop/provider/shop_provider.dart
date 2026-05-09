@@ -1,12 +1,68 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/errors/friendly_errors.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/habito_shop_api.dart';
+import '../models/cart_validation.dart';
 import '../models/shop_payment_method.dart';
 
 enum ShopFulfillmentMethod {
   delivery,
   pickup,
+}
+
+int _shopParseInt(dynamic value) {
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+double _shopParseDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+bool _shopParseBool(dynamic value, {bool fallback = false}) {
+  if (value is bool) return value;
+  final normalized = value?.toString().toLowerCase().trim();
+  if (normalized == null || normalized.isEmpty) return fallback;
+  if (['1', 'true', 'yes', 'si'].contains(normalized)) return true;
+  if (['0', 'false', 'no'].contains(normalized)) return false;
+  return fallback;
+}
+
+dynamic _shopJsonSafeValue(dynamic value) {
+  if (value == null || value is num || value is String || value is bool) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map<String, dynamic>(
+      (key, item) => MapEntry(key.toString(), _shopJsonSafeValue(item)),
+    );
+  }
+  if (value is Iterable) {
+    return value.map(_shopJsonSafeValue).toList();
+  }
+  return value.toString();
+}
+
+Map<String, dynamic> _shopMapFrom(dynamic value) {
+  if (value is Map<String, dynamic>) return Map<String, dynamic>.from(value);
+  if (value is Map) {
+    return value.map<String, dynamic>(
+      (key, item) => MapEntry(key.toString(), _shopJsonSafeValue(item)),
+    );
+  }
+  return const <String, dynamic>{};
+}
+
+List<Map<String, dynamic>> _shopMapListFrom(dynamic value) {
+  if (value is! Iterable) return const <Map<String, dynamic>>[];
+  return value.map(_shopMapFrom).where((item) => item.isNotEmpty).toList();
 }
 
 class ShopCartActionResult {
@@ -113,34 +169,105 @@ class ShopCartItem {
   double get additionalTaxTotal => pricesIncludeTax ? 0 : taxTotal;
 
   ShopCartItem copyWith({
+    String? name,
+    String? imageUrl,
+    String? category,
+    double? unitPrice,
     int? quantity,
     bool? inStock,
+    bool? taxable,
+    double? taxRatePercent,
+    String? taxType,
+    String? taxLabel,
+    bool? pricesIncludeTax,
     int? globalMaxQuantity,
     List<Map<String, dynamic>>? warehouseStock,
     int? maxQuantity,
   }) {
     return ShopCartItem(
       productId: productId,
-      name: name,
-      imageUrl: imageUrl,
-      category: category,
-      unitPrice: unitPrice,
+      name: name ?? this.name,
+      imageUrl: imageUrl ?? this.imageUrl,
+      category: category ?? this.category,
+      unitPrice: unitPrice ?? this.unitPrice,
       quantity: quantity ?? this.quantity,
       inStock: inStock ?? this.inStock,
-      taxable: taxable,
-      taxRatePercent: taxRatePercent,
-      taxType: taxType,
-      taxLabel: taxLabel,
-      pricesIncludeTax: pricesIncludeTax,
+      taxable: taxable ?? this.taxable,
+      taxRatePercent: taxRatePercent ?? this.taxRatePercent,
+      taxType: taxType ?? this.taxType,
+      taxLabel: taxLabel ?? this.taxLabel,
+      pricesIncludeTax: pricesIncludeTax ?? this.pricesIncludeTax,
       globalMaxQuantity: globalMaxQuantity ?? this.globalMaxQuantity,
       warehouseStock: warehouseStock ?? this.warehouseStock,
       maxQuantity: maxQuantity ?? this.maxQuantity,
+    );
+  }
+
+  Map<String, dynamic> toStorageJson() {
+    return {
+      'product_id': productId,
+      'name': name,
+      'image_url': imageUrl,
+      'category': category,
+      'unit_price': unitPrice,
+      'quantity': quantity,
+      'in_stock': inStock,
+      'taxable': taxable,
+      'tax_rate_percent': taxRatePercent,
+      'tax_type': taxType,
+      'tax_label': taxLabel,
+      'prices_include_tax': pricesIncludeTax,
+      'global_max_quantity': globalMaxQuantity,
+      'warehouse_stock': warehouseStock.map(_shopJsonSafeValue).toList(),
+      'max_quantity': maxQuantity,
+    };
+  }
+
+  static ShopCartItem? fromStorageJson(Map<String, dynamic> json) {
+    final productId = _shopParseInt(json['product_id'] ?? json['productId']);
+    final quantity = _shopParseInt(json['quantity']);
+    if (productId <= 0 || quantity <= 0) return null;
+
+    return ShopCartItem(
+      productId: productId,
+      name: (json['name'] ?? 'Producto').toString(),
+      imageUrl: (json['image_url'] ?? json['imageUrl'] ?? '').toString(),
+      category: (json['category'] ?? 'Producto').toString(),
+      unitPrice: _shopParseDouble(json['unit_price'] ?? json['unitPrice']),
+      quantity: quantity,
+      inStock: _shopParseBool(json['in_stock'] ?? json['inStock']),
+      taxable: _shopParseBool(json['taxable']),
+      taxRatePercent: _shopParseDouble(
+        json['tax_rate_percent'] ?? json['taxRatePercent'],
+      ),
+      taxType:
+          (json['tax_type'] ?? json['taxType'] ?? 'no_iva').toString().trim(),
+      taxLabel:
+          (json['tax_label'] ?? json['taxLabel'] ?? 'No grava IVA').toString(),
+      pricesIncludeTax: _shopParseBool(
+        json['prices_include_tax'] ?? json['pricesIncludeTax'],
+        fallback: true,
+      ),
+      globalMaxQuantity: json['global_max_quantity'] == null &&
+              json['globalMaxQuantity'] == null
+          ? null
+          : _shopParseInt(
+              json['global_max_quantity'] ?? json['globalMaxQuantity'],
+            ),
+      warehouseStock: _shopMapListFrom(
+        json['warehouse_stock'] ?? json['warehouseStock'],
+      ),
+      maxQuantity: json['max_quantity'] == null && json['maxQuantity'] == null
+          ? null
+          : _shopParseInt(json['max_quantity'] ?? json['maxQuantity']),
     );
   }
 }
 
 class ShopProvider extends ChangeNotifier {
   static const double fixedShippingTotal = 3.50;
+  static const String _cartStorageKey = 'habito_shop_cart_v1';
+  static const Duration _cartPersistDebounce = Duration(seconds: 1);
 
   final List<ShopCartItem> _cartItems = [];
   final List<Map<String, dynamic>> _orders = [];
@@ -160,6 +287,10 @@ class ShopProvider extends ChangeNotifier {
   String? _paymentProofError;
   ShopFulfillmentMethod _fulfillmentMethod = ShopFulfillmentMethod.delivery;
   Map<String, dynamic>? _pickupLocation;
+  Timer? _persistDebounce;
+  Future<void>? _hydrateFuture;
+  bool _isHydratingCart = false;
+  bool _wasLoggedIn = false;
 
   List<ShopCartItem> get cartItems => List.unmodifiable(_cartItems);
   List<Map<String, dynamic>> get orders => List.unmodifiable(_orders);
@@ -232,6 +363,19 @@ class ShopProvider extends ChangeNotifier {
 
   double orderTotalFor(ShopFulfillmentMethod method) {
     return subtotal + shippingTotalFor(method) + additionalTaxTotal;
+  }
+
+  Future<void> hydrate() {
+    _hydrateFuture ??= _hydrateCart();
+    return _hydrateFuture!;
+  }
+
+  void updateAuthState({required bool isLoggedIn}) {
+    final shouldClearCart = _wasLoggedIn && !isLoggedIn;
+    _wasLoggedIn = isLoggedIn;
+    if (shouldClearCart) {
+      Future<void>.microtask(clearCart);
+    }
   }
 
   void setFulfillmentMethod(ShopFulfillmentMethod method) {
@@ -370,6 +514,7 @@ class ShopProvider extends ChangeNotifier {
       );
     }
 
+    _scheduleCartPersist();
     notifyListeners();
     if (addedQuantity < quantity) {
       return ShopCartActionResult(
@@ -416,6 +561,7 @@ class ShopProvider extends ChangeNotifier {
 
     _applyCartContext(fulfillmentMethod, normalizedPickupLocation);
     final adjustedItemsCount = _recalculateCartItemLimits();
+    _scheduleCartPersist();
     notifyListeners();
     if (adjustedItemsCount > 0) {
       return ShopCartActionResult(
@@ -439,6 +585,7 @@ class ShopProvider extends ChangeNotifier {
       return;
     }
     _cartItems[index] = item.copyWith(quantity: item.quantity + 1);
+    _scheduleCartPersist();
     notifyListeners();
   }
 
@@ -453,12 +600,22 @@ class ShopProvider extends ChangeNotifier {
       _cartItems[index] = item.copyWith(quantity: item.quantity - 1);
     }
     _resetCartContextIfEmpty();
+    _scheduleCartPersist();
     notifyListeners();
   }
 
   void removeProduct(int productId) {
     _cartItems.removeWhere((item) => item.productId == productId);
     _resetCartContextIfEmpty();
+    _scheduleCartPersist();
+    notifyListeners();
+  }
+
+  void restoreCartItem(ShopCartItem item, {int? index}) {
+    _cartItems.removeWhere((current) => current.productId == item.productId);
+    final insertIndex = index ?? _cartItems.length;
+    _cartItems.insert(insertIndex.clamp(0, _cartItems.length).toInt(), item);
+    _scheduleCartPersist();
     notifyListeners();
   }
 
@@ -466,10 +623,12 @@ class ShopProvider extends ChangeNotifier {
     if (_cartItems.isEmpty &&
         _fulfillmentMethod == ShopFulfillmentMethod.delivery &&
         _pickupLocation == null) {
+      unawaited(_clearPersistedCart());
       return;
     }
     _cartItems.clear();
     _resetCartContextIfEmpty();
+    unawaited(_clearPersistedCart());
     notifyListeners();
   }
 
@@ -500,7 +659,10 @@ class ShopProvider extends ChangeNotifier {
           ..addAll(mergedOrders);
       }
     } catch (e) {
-      _ordersError = e.toString().replaceFirst('Exception: ', '');
+      _ordersError = FriendlyErrors.loadData(
+        e,
+        fallback: 'No pudimos cargar tus pedidos. Intenta nuevamente.',
+      );
     } finally {
       _isLoadingOrders = false;
       notifyListeners();
@@ -524,7 +686,10 @@ class ShopProvider extends ChangeNotifier {
         ..addAll(
             result.isEmpty ? const [ShopPaymentMethod.bankTransfer] : result);
     } catch (e) {
-      _paymentMethodsError = e.toString().replaceFirst('Exception: ', '');
+      _paymentMethodsError = FriendlyErrors.loadData(
+        e,
+        fallback: 'No pudimos cargar los métodos de pago.',
+      );
       _paymentMethods
         ..clear()
         ..add(ShopPaymentMethod.bankTransfer);
@@ -533,6 +698,64 @@ class ShopProvider extends ChangeNotifier {
       _isLoadingPaymentMethods = false;
       notifyListeners();
     }
+  }
+
+  Future<ShopCartValidationResult> validateCartForCheckout({
+    required String token,
+    required ShopFulfillmentMethod fulfillmentMethod,
+  }) async {
+    if (_cartItems.isEmpty) {
+      return const ShopCartValidationResult(
+        canCheckout: false,
+        cartChanged: false,
+        endpointAvailable: true,
+        message: 'Tu carrito esta vacio.',
+        items: [],
+      );
+    }
+
+    final selectedPickupLocation =
+        fulfillmentMethod == ShopFulfillmentMethod.pickup
+            ? _normalizePickupLocation(_pickupLocation)
+            : null;
+    final result = await HabitoShopApi.validateCart(
+      token: token,
+      lineItems: _cartItems
+          .map(
+            (item) => {
+              'product_id': item.productId,
+              'quantity': item.quantity,
+              'unit_price': item.unitPrice,
+            },
+          )
+          .toList(),
+      fulfillmentMethod: fulfillmentMethod.payloadValue,
+      pickupLocationId: fulfillmentMethod == ShopFulfillmentMethod.pickup
+          ? _parseInt(selectedPickupLocation?['id'])
+          : 0,
+      pickupLocationName: fulfillmentMethod == ShopFulfillmentMethod.pickup
+          ? (selectedPickupLocation?['name'] ?? '').toString()
+          : '',
+      pickupWarehouseExternalId:
+          fulfillmentMethod == ShopFulfillmentMethod.pickup
+              ? (selectedPickupLocation?['external_id'] ?? '').toString()
+              : '',
+      subtotal: subtotal,
+      taxTotal: taxTotal,
+      shippingTotal: shippingTotalFor(fulfillmentMethod),
+      orderTotal: orderTotalFor(fulfillmentMethod),
+      pricesIncludeTax: taxIsIncluded,
+    );
+
+    if (!result.endpointAvailable) return result;
+
+    final appliedChanges = _applyCartValidationResult(result);
+    if (appliedChanges) {
+      _scheduleCartPersist();
+      notifyListeners();
+    }
+
+    return appliedChanges ? result.copyWith(cartChanged: true) : result;
   }
 
   Future<Map<String, dynamic>?> checkout({
@@ -553,6 +776,7 @@ class ShopProvider extends ChangeNotifier {
     required ShopPaymentMethod paymentMethod,
     required ShopFulfillmentMethod fulfillmentMethod,
     double redeemPoints = 0,
+    double redeemAmount = 0,
   }) async {
     if (_cartItems.isEmpty) {
       _checkoutError = 'Tu carrito esta vacio.';
@@ -626,6 +850,7 @@ class ShopProvider extends ChangeNotifier {
                 : '',
         status: paymentMethod.orderStatus,
         redeemPoints: redeemPoints,
+        redeemAmount: redeemAmount,
       );
 
       _orders
@@ -634,9 +859,10 @@ class ShopProvider extends ChangeNotifier {
       _ordersError = null;
       _cartItems.clear();
       _resetCartContextIfEmpty();
+      unawaited(_clearPersistedCart());
       return order;
     } catch (e) {
-      _checkoutError = e.toString().replaceFirst('Exception: ', '');
+      _checkoutError = FriendlyErrors.checkout(e);
       return null;
     } finally {
       _isCreatingOrder = false;
@@ -677,7 +903,7 @@ class ShopProvider extends ChangeNotifier {
       _paymentProofError = null;
       return true;
     } catch (e) {
-      _paymentProofError = e.toString().replaceFirst('Exception: ', '');
+      _paymentProofError = FriendlyErrors.paymentProof(e);
       return false;
     } finally {
       _uploadingProofOrderIds.remove(orderId);
@@ -724,6 +950,110 @@ class ShopProvider extends ChangeNotifier {
     _pickupLocation = null;
   }
 
+  Future<void> _hydrateCart() async {
+    _isHydratingCart = true;
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final rawPayload = preferences.getString(_cartStorageKey);
+      if (rawPayload == null || rawPayload.trim().isEmpty) return;
+
+      final decoded = jsonDecode(rawPayload);
+      if (decoded is! Map) {
+        await _clearPersistedCart();
+        return;
+      }
+
+      final payload = _shopMapFrom(decoded);
+      final storedItems = payload['items'];
+      final hydratedItems = storedItems is Iterable
+          ? storedItems
+              .map(_shopMapFrom)
+              .map(ShopCartItem.fromStorageJson)
+              .whereType<ShopCartItem>()
+              .toList()
+          : <ShopCartItem>[];
+
+      final fulfillmentMethod = _fulfillmentMethodFromStorage(
+        payload['fulfillment_method'] ?? payload['fulfillmentMethod'],
+      );
+      final pickupLocation = fulfillmentMethod == ShopFulfillmentMethod.pickup
+          ? _normalizePickupLocation(
+              _shopMapFrom(
+                  payload['pickup_location'] ?? payload['pickupLocation']),
+            )
+          : null;
+
+      _cartItems
+        ..clear()
+        ..addAll(hydratedItems);
+      _applyCartContext(fulfillmentMethod, pickupLocation);
+      _recalculateCartItemLimits();
+    } catch (_) {
+      await _clearPersistedCart();
+    } finally {
+      _isHydratingCart = false;
+      notifyListeners();
+    }
+  }
+
+  void _scheduleCartPersist() {
+    if (_isHydratingCart) return;
+    _persistDebounce?.cancel();
+    _persistDebounce = Timer(_cartPersistDebounce, () {
+      unawaited(_persistCart());
+    });
+  }
+
+  Future<void> _persistCart() async {
+    if (_isHydratingCart) return;
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final shouldRemovePayload = _cartItems.isEmpty &&
+          _fulfillmentMethod == ShopFulfillmentMethod.delivery &&
+          _pickupLocation == null;
+
+      if (shouldRemovePayload) {
+        await preferences.remove(_cartStorageKey);
+        return;
+      }
+
+      final payload = {
+        'version': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+        'fulfillment_method': _fulfillmentMethod.payloadValue,
+        'pickup_location': _pickupLocation == null
+            ? null
+            : _shopJsonSafeValue(_pickupLocation),
+        'items': _cartItems.map((item) => item.toStorageJson()).toList(),
+      };
+
+      await preferences.setString(_cartStorageKey, jsonEncode(payload));
+    } catch (_) {
+      // La persistencia del carrito no debe bloquear la compra.
+    }
+  }
+
+  Future<void> _clearPersistedCart() async {
+    _persistDebounce?.cancel();
+    _persistDebounce = null;
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove(_cartStorageKey);
+    } catch (_) {
+      // Si falla el storage local, el estado en memoria ya queda limpio.
+    }
+  }
+
+  static ShopFulfillmentMethod _fulfillmentMethodFromStorage(dynamic value) {
+    final normalized = value?.toString().toLowerCase().trim();
+    return normalized == ShopFulfillmentMethod.pickup.payloadValue
+        ? ShopFulfillmentMethod.pickup
+        : ShopFulfillmentMethod.delivery;
+  }
+
   int _recalculateCartItemLimits() {
     if (_cartItems.isEmpty) return 0;
 
@@ -765,6 +1095,59 @@ class ShopProvider extends ChangeNotifier {
       ..addAll(updatedItems);
     _resetCartContextIfEmpty();
     return adjustedItemsCount;
+  }
+
+  bool _applyCartValidationResult(ShopCartValidationResult result) {
+    if (result.items.isEmpty || _cartItems.isEmpty) return false;
+
+    final updatesByProduct = <int, ShopCartValidationItem>{
+      for (final item in result.items)
+        if (item.productId > 0) item.productId: item,
+    };
+
+    var changed = false;
+    final updatedItems = <ShopCartItem>[];
+
+    for (final cartItem in _cartItems) {
+      final validation = updatesByProduct[cartItem.productId];
+      if (validation == null) {
+        updatedItems.add(cartItem);
+        continue;
+      }
+
+      if (validation.removed || validation.finalQuantity <= 0) {
+        changed = true;
+        continue;
+      }
+
+      final nextQuantity = validation.finalQuantity;
+      final nextUnitPrice = validation.newUnitPrice ?? cartItem.unitPrice;
+      final nextMaxQuantity =
+          validation.availableQuantity ?? cartItem.maxQuantity;
+      final nextItem = cartItem.copyWith(
+        quantity: nextQuantity,
+        unitPrice: nextUnitPrice,
+        inStock: validation.inStock,
+        maxQuantity: nextMaxQuantity,
+      );
+
+      if (nextItem.quantity != cartItem.quantity ||
+          (nextItem.unitPrice - cartItem.unitPrice).abs() > 0.009 ||
+          nextItem.inStock != cartItem.inStock ||
+          nextItem.maxQuantity != cartItem.maxQuantity) {
+        changed = true;
+      }
+
+      updatedItems.add(nextItem);
+    }
+
+    if (!changed) return false;
+
+    _cartItems
+      ..clear()
+      ..addAll(updatedItems);
+    _resetCartContextIfEmpty();
+    return true;
   }
 
   static String _extractImageUrl(Map<String, dynamic> product) {
@@ -1053,5 +1436,11 @@ class ShopProvider extends ChangeNotifier {
   static double _parseDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  @override
+  void dispose() {
+    _persistDebounce?.cancel();
+    super.dispose();
   }
 }

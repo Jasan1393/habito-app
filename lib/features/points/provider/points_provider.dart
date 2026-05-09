@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/errors/friendly_errors.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/points_api.dart';
 import '../models/points_history_entry.dart';
@@ -18,16 +19,32 @@ class PointsProvider extends ChangeNotifier {
   PointsSummary? _summary;
   List<PointsHistoryEntry> _history = const [];
   bool _isLoading = false;
+  bool _isLoadingMoreHistory = false;
   String? _error;
   int _historyTotal = 0;
+  int _historyPage = 1;
+  bool _hasMoreHistory = false;
   DateTime? _lastLoadedAt;
+  String? _reservationId;
+  String? _reservationContext;
+  double _reservedPoints = 0;
 
   PointsSummary? get summary => _summary;
   List<PointsHistoryEntry> get history => List.unmodifiable(_history);
   bool get isLoading => _isLoading;
+  bool get isLoadingMoreHistory => _isLoadingMoreHistory;
   String? get error => _error;
   int get historyTotal => _historyTotal;
+  bool get hasMoreHistory => _hasMoreHistory;
   bool get hasSummary => _summary != null;
+  double get reservedPoints => _reservedPoints;
+  String? get reservationContext => _reservationContext;
+  bool get hasPointsReservation =>
+      _reservationId != null && _reservedPoints > 0;
+  double get availableBalance =>
+      ((_summary?.balance ?? _authUser?.pointsBalance ?? 0) - _reservedPoints)
+          .clamp(0, double.infinity)
+          .toDouble();
   bool get isLoggedIn =>
       _token != null && _token!.isNotEmpty && _authUser != null;
 
@@ -43,8 +60,11 @@ class PointsProvider extends ChangeNotifier {
       _summary = null;
       _history = const [];
       _historyTotal = 0;
+      _historyPage = 1;
+      _hasMoreHistory = false;
       _error = null;
       _lastLoadedAt = null;
+      _clearReservation(notify: false);
       notifyListeners();
       return;
     }
@@ -52,7 +72,10 @@ class PointsProvider extends ChangeNotifier {
     if (previousUserId != user.id) {
       _history = const [];
       _historyTotal = 0;
+      _historyPage = 1;
+      _hasMoreHistory = false;
       _lastLoadedAt = null;
+      _clearReservation(notify: false);
     }
 
     _summary = PointsSummary(
@@ -102,9 +125,12 @@ class PointsProvider extends ChangeNotifier {
       _summary = overview.summary;
       _history = overview.history;
       _historyTotal = overview.historyTotal;
+      _historyPage = 1;
+      _hasMoreHistory =
+          _history.length < _historyTotal && overview.history.isNotEmpty;
       _lastLoadedAt = DateTime.now();
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = FriendlyErrors.points(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -112,6 +138,77 @@ class PointsProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() => load(forceRefresh: true);
+
+  Future<void> loadMoreHistory() async {
+    final token = _token;
+    if (token == null ||
+        token.isEmpty ||
+        _isLoading ||
+        _isLoadingMoreHistory ||
+        !_hasMoreHistory) {
+      return;
+    }
+
+    _isLoadingMoreHistory = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final nextPage = _historyPage + 1;
+      final more = await _api.getHistory(
+        token: token,
+        page: nextPage,
+        limit: 20,
+      );
+
+      if (more.isNotEmpty) {
+        _history = [..._history, ...more];
+        _historyPage = nextPage;
+      }
+
+      _hasMoreHistory = more.isNotEmpty &&
+          (_historyTotal <= 0 || _history.length < _historyTotal);
+    } catch (e) {
+      _error = FriendlyErrors.points(e);
+    } finally {
+      _isLoadingMoreHistory = false;
+      notifyListeners();
+    }
+  }
+
+  bool reserveRedemption({
+    required String id,
+    required String context,
+    required double points,
+  }) {
+    if (points <= 0) return true;
+
+    if (_reservationId != null && _reservationId != id) {
+      return false;
+    }
+
+    if (points > availableBalance + 0.0001) {
+      return false;
+    }
+
+    _reservationId = id;
+    _reservationContext = context;
+    _reservedPoints = double.parse(points.toStringAsFixed(2));
+    notifyListeners();
+    return true;
+  }
+
+  void releaseReservation(String id) {
+    if (_reservationId != id) return;
+    _clearReservation();
+  }
+
+  void _clearReservation({bool notify = true}) {
+    _reservationId = null;
+    _reservationContext = null;
+    _reservedPoints = 0;
+    if (notify) notifyListeners();
+  }
 
   Future<PointsQuote> quoteRedemption({
     required String context,

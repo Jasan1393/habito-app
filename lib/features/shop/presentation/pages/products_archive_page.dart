@@ -3,7 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../data/services/habito_shop_api.dart';
 import 'product_detail_page.dart';
 
@@ -282,7 +289,7 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        color: const Color(0xFFD4AF37),
+        color: AppColors.secondary,
         onRefresh: () => _loadProducts(reset: true, forceRefresh: true),
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 28),
@@ -296,13 +303,13 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
                 setState(() {});
               },
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
             if (_isRefreshing)
               const Padding(
                 padding: EdgeInsets.only(bottom: 10),
                 child: LinearProgressIndicator(
                   minHeight: 3,
-                  color: Color(0xFFD4AF37),
+                  color: AppColors.secondary,
                 ),
               ),
             if (_error != null && _products.isEmpty)
@@ -328,7 +335,7 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
                         ? 'Filtro activo por categoria. Puedes buscar dentro de esta seleccion.'
                         : 'Descubre productos premium para cabello, barba y cuidado personal.',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md + AppSpacing.xs),
               GridView.builder(
                 itemCount: _products.length,
                 shrinkWrap: true,
@@ -351,13 +358,13 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
                   );
                 },
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
               if (_isLoadingMore)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: CircularProgressIndicator(
-                      color: Color(0xFFD4AF37),
+                      color: AppColors.secondary,
                     ),
                   ),
                 )
@@ -368,9 +375,9 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
                     onPressed: () => _loadProducts(reset: false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: Color(0xFFD4AF37)),
+                      side: const BorderSide(color: AppColors.secondary),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                     child: const Text(
@@ -409,21 +416,22 @@ class _ArchiveSearchField extends StatelessWidget {
         suffixIcon: controller.text.trim().isEmpty
             ? null
             : IconButton(
+                tooltip: 'Limpiar busqueda',
                 onPressed: onClear,
                 icon: const Icon(Icons.close),
               ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.card,
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.card,
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.card,
           borderSide: const BorderSide(
-            color: Color(0xFFD4AF37),
+            color: AppColors.secondary,
             width: 1.2,
           ),
         ),
@@ -450,19 +458,18 @@ class _ArchiveSectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           subtitle,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.35,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.35,
+              ),
         ),
       ],
     );
@@ -492,98 +499,94 @@ class _ArchiveProductCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.extraLarge,
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: AppRadius.extraLarge,
             border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 14,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: AppShadows.light,
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadius.medium,
                   child: SizedBox(
                     height: 122,
                     width: double.infinity,
                     child: Container(
                       color: Colors.white,
                       child: imageUrl.isEmpty
-                          ? const Center(
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                size: 40,
-                                color: AppColors.primary,
+                          ? Semantics(
+                              label: 'Imagen del producto $name',
+                              image: true,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: AppIconSize.xl + AppSpacing.xs,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             )
                           : HabitoCachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.contain,
+                              semanticLabel: 'Imagen del producto $name',
                             ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   category,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF9C7732),
-                  ),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.goldDeep,
+                      ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        height: 1.15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   price,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF9C7732),
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.goldDeep,
+                      ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm + AppSpacing.xxs,
+                    vertical: AppSpacing.xs,
+                  ),
                   decoration: BoxDecoration(
-                    color: inStock
-                        ? const Color(0xFFE7F4EA)
-                        : const Color(0xFFF4E7E7),
-                    borderRadius: BorderRadius.circular(999),
+                    color:
+                        inStock ? AppColors.successSoft : AppColors.dangerSoft,
+                    borderRadius: AppRadius.full,
                   ),
                   child: Text(
                     inStock ? 'En stock' : 'Sin stock',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: inStock
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFA33A3A),
-                    ),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: inStock
+                              ? AppColors.success
+                              : AppColors.dangerDeep,
+                        ),
                   ),
                 ),
                 const Spacer(),
@@ -594,19 +597,18 @@ class _ArchiveProductCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: onTap,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
+                        backgroundColor: AppColors.secondary,
                         foregroundColor: Colors.black,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: AppRadius.medium,
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Ver producto',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
                     ),
                   ),
@@ -633,25 +635,12 @@ class _ArchiveInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFF9C7732)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
-          const SizedBox(width: 12),
-          TextButton(
-            onPressed: onTap,
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
+    return HabitoErrorState(
+      title: 'No pudimos cargar el catálogo',
+      message: message,
+      actionLabel: actionLabel,
+      onRetry: onTap,
+      compact: true,
     );
   }
 }
@@ -661,35 +650,11 @@ class _ArchiveEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: const Column(
-        children: [
-          Icon(
-            Icons.store_mall_directory_outlined,
-            size: 40,
-            color: Color(0xFF9C7732),
-          ),
-          SizedBox(height: 12),
-          Text(
-            'No encontramos productos',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Prueba con otra busqueda o vuelve a intentarlo en unos segundos.',
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const HabitoEmptyState(
+      icon: Icons.store_mall_directory_outlined,
+      title: 'No encontramos productos',
+      message:
+          'Prueba con otra búsqueda o vuelve a intentarlo en unos segundos.',
     );
   }
 }
@@ -699,23 +664,12 @@ class _ArchiveProductGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
+    return const HabitoLoadingShimmer.grid(
       itemCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        mainAxisExtent: 342,
-      ),
-      itemBuilder: (_, __) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
-        ),
-      ),
+      itemHeight: 342,
+      columns: 2,
+      spacing: AppSpacing.formNotice,
+      borderRadius: AppRadius.extraLarge,
     );
   }
 }

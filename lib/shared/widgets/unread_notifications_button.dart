@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/notification_inbox_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_icon_size.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_size.dart';
 
 class UnreadNotificationsButton extends StatefulWidget {
   final double size;
@@ -15,13 +19,13 @@ class UnreadNotificationsButton extends StatefulWidget {
 
   const UnreadNotificationsButton({
     super.key,
-    this.size = 44,
+    this.size = AppIconSize.headerAction,
     this.backgroundColor = AppColors.primary,
     this.foregroundColor = Colors.white,
-    this.badgeBackgroundColor = const Color(0xFFD4AF37),
+    this.badgeBackgroundColor = AppColors.secondary,
     this.badgeForegroundColor = Colors.black,
     this.tooltip = 'Notificaciones',
-    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+    this.borderRadius = AppRadius.tile,
   });
 
   @override
@@ -63,6 +67,7 @@ class _UnreadNotificationsButtonState extends State<UnreadNotificationsButton> {
                     child: Icon(
                       Icons.notifications_none_rounded,
                       color: widget.foregroundColor,
+                      size: AppIconSize.headerActionIcon,
                     ),
                   ),
                 ),
@@ -73,20 +78,22 @@ class _UnreadNotificationsButtonState extends State<UnreadNotificationsButton> {
                   right: -4,
                   child: Container(
                     constraints: const BoxConstraints(
-                      minWidth: 20,
-                      minHeight: 20,
+                      minWidth: AppIconSize.notificationBadge,
+                      minHeight: AppIconSize.notificationBadge,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                    ),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: widget.badgeBackgroundColor,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: AppRadius.full,
                     ),
                     child: Text(
                       unreadCount > 9 ? '9+' : '$unreadCount',
                       style: TextStyle(
                         color: widget.badgeForegroundColor,
-                        fontSize: 10.5,
+                        fontSize: AppTextSize.captionXs,
                         fontWeight: FontWeight.w900,
                       ),
                     ),

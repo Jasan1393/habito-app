@@ -6,6 +6,11 @@ import 'package:habito/features/shop/presentation/pages/product_detail_page.dart
 import 'package:habito/features/shop/presentation/pages/products_archive_page.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_icon_size.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_size.dart';
 import 'habito_cached_network_image.dart';
 import 'unread_notifications_button.dart';
 
@@ -21,6 +26,10 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget? bottom;
   final bool compactSearch;
   final bool emphasizeLeading;
+  final bool automaticallyImplyLeading;
+  final Widget? titleOverride;
+  final List<Widget>? actionsOverride;
+  final double? titleSpacingOverride;
 
   const AppTopHeader({
     super.key,
@@ -35,6 +44,10 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
     this.bottom,
     this.compactSearch = false,
     this.emphasizeLeading = false,
+    this.automaticallyImplyLeading = true,
+    this.titleOverride,
+    this.actionsOverride,
+    this.titleSpacingOverride,
   });
 
   @override
@@ -48,6 +61,7 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
         leadingIcon != null && leadingLabel != null && leadingLabel!.isNotEmpty;
 
     return AppBar(
+      automaticallyImplyLeading: automaticallyImplyLeading,
       backgroundColor: AppColors.background,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
@@ -56,7 +70,7 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
       leading:
           leadingIcon != null && (leadingLabel == null || leadingLabel!.isEmpty)
               ? Padding(
-                  padding: const EdgeInsets.only(left: 12),
+                  padding: const EdgeInsets.only(left: AppSpacing.md),
                   child: _HeaderIconButton(
                     icon: leadingIcon!,
                     tooltip: leadingTooltip,
@@ -65,7 +79,7 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
                 )
               : leadingIcon != null
                   ? Padding(
-                      padding: const EdgeInsets.only(left: 12),
+                      padding: const EdgeInsets.only(left: AppSpacing.md),
                       child: _HeaderActionChip(
                         icon: leadingIcon!,
                         label: leadingLabel!,
@@ -75,32 +89,34 @@ class AppTopHeader extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     )
                   : null,
-      titleSpacing: leadingIcon != null ? 10 : 16,
-      title: compactSearch
-          ? Align(
-              alignment: Alignment.centerLeft,
-              child: _HeaderIconButton(
-                icon: Icons.search_rounded,
-                tooltip: searchHint,
-                onTap: onSearchTap,
-              ),
-            )
-          : _HeaderSearch(
-              hint: searchHint,
+      titleSpacing: titleSpacingOverride ?? (leadingIcon != null ? 10 : 16),
+      title: titleOverride ??
+          (compactSearch
+              ? Align(
+                  alignment: Alignment.centerLeft,
+                  child: _HeaderIconButton(
+                    icon: Icons.search_rounded,
+                    tooltip: searchHint,
+                    onTap: onSearchTap,
+                  ),
+                )
+              : _HeaderSearch(
+                  hint: searchHint,
+                )),
+      actions: actionsOverride ??
+          [
+            const Padding(
+              padding: EdgeInsets.only(right: AppSpacing.gutter),
+              child: UnreadNotificationsButton(),
             ),
-      actions: [
-        const Padding(
-          padding: EdgeInsets.only(right: 10),
-          child: UnreadNotificationsButton(),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: _CartAction(
-            cartCount: cartCount,
-            onTap: onCartTap,
-          ),
-        ),
-      ],
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.md),
+              child: _CartAction(
+                cartCount: cartCount,
+                onTap: onCartTap,
+              ),
+            ),
+          ],
       bottom: bottom,
     );
   }
@@ -290,10 +306,10 @@ class _HeaderSearchState extends State<_HeaderSearch> {
         return CompositedTransformTarget(
           link: _layerLink,
           child: Container(
-            height: 44,
+            height: AppIconSize.headerAction,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: AppRadius.large,
               border: Border.all(color: AppColors.border),
             ),
             child: TextField(
@@ -304,19 +320,19 @@ class _HeaderSearchState extends State<_HeaderSearch> {
               onSubmitted: (_) => _submitSearch(),
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 14,
+                fontSize: AppTextSize.base,
                 fontWeight: FontWeight.w700,
               ),
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: const TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 14,
+                  fontSize: AppTextSize.base,
                   fontWeight: FontWeight.w500,
                 ),
                 prefixIcon: const Icon(
                   Icons.search_rounded,
-                  size: 20,
+                  size: AppIconSize.compact,
                   color: AppColors.textSecondary,
                 ),
                 suffixIcon: _controller.text.isEmpty
@@ -325,7 +341,7 @@ class _HeaderSearchState extends State<_HeaderSearch> {
                         tooltip: 'Limpiar busqueda',
                         icon: const Icon(
                           Icons.close_rounded,
-                          size: 18,
+                          size: AppIconSize.sm,
                           color: AppColors.textSecondary,
                         ),
                         onPressed: () {
@@ -335,7 +351,9 @@ class _HeaderSearchState extends State<_HeaderSearch> {
                         },
                       ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: AppSpacing.md,
+                ),
               ),
             ),
           ),
@@ -362,14 +380,18 @@ class _HeaderIconButton extends StatelessWidget {
       message: tooltip ?? '',
       child: Material(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.tile,
           child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, color: Colors.white),
+            width: AppIconSize.headerAction,
+            height: AppIconSize.headerAction,
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: AppIconSize.headerActionIcon,
+            ),
           ),
         ),
       ),
@@ -453,18 +475,12 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
                 constraints: const BoxConstraints(maxHeight: 360),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: AppRadius.card,
                   border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 24,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
+                  boxShadow: AppShadows.strong,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: AppRadius.card,
                   child: _buildContent(),
                 ),
               ),
@@ -478,18 +494,18 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
   Widget _buildContent() {
     if (isSearching) {
       return const Padding(
-        padding: EdgeInsets.all(18),
+        padding: EdgeInsets.all(AppSpacing.inputVertical),
         child: Row(
           children: [
             SizedBox(
-              width: 18,
-              height: 18,
+              width: AppIconSize.sm,
+              height: AppIconSize.sm,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Color(0xFFD4AF37),
+                strokeWidth: AppSpacing.xxs,
+                color: AppColors.secondary,
               ),
             ),
-            SizedBox(width: 12),
+            SizedBox(width: AppSpacing.md),
             Text(
               'Buscando productos y categorias...',
               style: TextStyle(
@@ -504,7 +520,7 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
 
     if (query.length >= 2 && _totalItems == 0) {
       return Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppSpacing.inputVertical),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,15 +532,15 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppIconSize.actionDot),
             const Text(
               'Puedes ver todos los resultados del catalogo.',
               style: TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 13,
+                fontSize: AppTextSize.body,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             _SeeAllButton(query: query, onTap: onSeeAll),
           ],
         ),
@@ -545,7 +561,7 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
           ),
         ],
         if (categorySuggestions.isNotEmpty && suggestions.isNotEmpty)
-          const Divider(height: 1, color: AppColors.border),
+          const Divider(height: AppSpacing.xs, color: AppColors.border),
         if (suggestions.isNotEmpty) ...[
           const _SuggestionSectionHeader(title: 'Productos'),
           ...suggestions.map(
@@ -560,7 +576,12 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
         ],
         if (query.length >= 2)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
             child: _SeeAllButton(query: query, onTap: onSeeAll),
           ),
       ],
@@ -579,13 +600,18 @@ class _SuggestionSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-      color: const Color(0xFFF8F5EE),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.formNotice,
+        AppSpacing.md,
+        AppSpacing.formNotice,
+        AppSpacing.sm,
+      ),
+      color: AppColors.surfaceElevated,
       child: Text(
         title,
         style: const TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 11.5,
+          fontSize: AppTextSize.labelSmall,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
         ),
@@ -612,22 +638,27 @@ class _CategorySuggestionTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.formNotice,
+          AppSpacing.md,
+          AppSpacing.formNotice,
+          AppSpacing.md,
+        ),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: AppIconSize.authBadge,
+              height: AppIconSize.authBadge,
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E8C9),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.goldMuted,
+                borderRadius: AppRadius.compact,
               ),
               child: const Icon(
                 Icons.category_rounded,
-                color: Color(0xFF9C7732),
+                color: AppColors.goldDeep,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,26 +669,26 @@ class _CategorySuggestionTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 13.5,
+                      fontSize: AppTextSize.bodyStrong,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     countLabel,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppTextSize.label,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             const Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 14,
+              size: AppSpacing.formNotice,
               color: AppColors.textSecondary,
             ),
           ],
@@ -687,15 +718,20 @@ class _SuggestionTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.gutter,
+          AppSpacing.md,
+          AppSpacing.gutter,
+        ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.compact,
               child: Container(
-                width: 48,
-                height: 48,
-                color: const Color(0xFFF5F2EC),
+                width: AppIconSize.suggestionImage,
+                height: AppIconSize.suggestionImage,
+                color: AppColors.surfaceMuted,
                 child: imageUrl.isEmpty
                     ? const Icon(
                         Icons.inventory_2_outlined,
@@ -707,7 +743,7 @@ class _SuggestionTile extends StatelessWidget {
                       ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -718,30 +754,29 @@ class _SuggestionTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 13.5,
+                      fontSize: AppTextSize.bodyStrong,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     inStock ? 'Disponible' : 'Sin stock',
                     style: TextStyle(
-                      color: inStock
-                          ? const Color(0xFF2E7D32)
-                          : AppColors.textSecondary,
-                      fontSize: 12,
+                      color:
+                          inStock ? AppColors.success : AppColors.textSecondary,
+                      fontSize: AppTextSize.label,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Text(
               price,
               style: const TextStyle(
-                color: Color(0xFF9C7732),
-                fontSize: 13,
+                color: AppColors.goldDeep,
+                fontSize: AppTextSize.body,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -765,14 +800,14 @@ class _SeeAllButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 42,
+      height: AppIconSize.authBadge,
       child: FilledButton(
         onPressed: onTap,
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadius.medium,
           ),
         ),
         child: Text(
@@ -807,12 +842,15 @@ class _HeaderActionChip extends StatelessWidget {
       message: tooltip ?? '',
       child: Material(
         color: emphasized ? AppColors.primary : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.tile,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.gutter,
+              vertical: AppSpacing.sm + AppSpacing.xs,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -822,17 +860,17 @@ class _HeaderActionChip extends StatelessWidget {
                     Icon(
                       icon,
                       color: emphasized ? Colors.white : AppColors.primary,
-                      size: 18,
+                      size: AppIconSize.sm,
                     ),
                     const Positioned(
                       top: -1,
                       right: -1,
                       child: SizedBox(
-                        width: 6,
-                        height: 6,
+                        width: AppIconSize.actionDot,
+                        height: AppIconSize.actionDot,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: Color(0xFFD4AF37),
+                            color: AppColors.secondary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -840,12 +878,12 @@ class _HeaderActionChip extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   label,
                   style: TextStyle(
                     color: emphasized ? Colors.white : AppColors.textPrimary,
-                    fontSize: 12,
+                    fontSize: AppTextSize.label,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -874,14 +912,18 @@ class _CartAction extends StatelessWidget {
       children: [
         Material(
           color: AppColors.primary,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.tile,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.tile,
             child: const SizedBox(
-              width: 44,
-              height: 44,
-              child: Icon(Icons.shopping_bag_outlined, color: Colors.white),
+              width: AppIconSize.headerAction,
+              height: AppIconSize.headerAction,
+              child: Icon(
+                Icons.shopping_bag_outlined,
+                color: Colors.white,
+                size: AppIconSize.headerActionIcon,
+              ),
             ),
           ),
         ),
@@ -890,18 +932,18 @@ class _CartAction extends StatelessWidget {
             top: -4,
             right: -4,
             child: Container(
-              width: 20,
-              height: 20,
+              width: AppIconSize.notificationBadge,
+              height: AppIconSize.notificationBadge,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFD4AF37),
+                color: AppColors.secondary,
                 shape: BoxShape.circle,
               ),
               child: Text(
                 '$cartCount',
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 11,
+                  fontSize: AppTextSize.captionSm,
                   fontWeight: FontWeight.w800,
                 ),
               ),

@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
 import '../../data/services/habito_booking_api.dart';
 import '../../data/services/habito_shop_api.dart';
@@ -239,7 +246,7 @@ class _ShopPageState extends State<ShopPage> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          color: const Color(0xFFD4AF37),
+          color: AppColors.secondary,
           onRefresh: () => _loadHome(forceRefresh: true),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
@@ -249,7 +256,7 @@ class _ShopPageState extends State<ShopPage> {
                 action: 'Ver todos',
                 onTap: _openServicesArchive,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               if (_servicesError != null && _services.isEmpty)
                 _InfoCard(
                   message: _servicesError!,
@@ -266,7 +273,8 @@ class _ShopPageState extends State<ShopPage> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _services.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: AppSpacing.md + AppSpacing.xs),
                     itemBuilder: (context, index) => _CatalogReveal(
                       index: index,
                       child: _ServiceCard(
@@ -276,13 +284,13 @@ class _ShopPageState extends State<ShopPage> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 28),
+              const SizedBox(height: AppSpacing.xxl - AppSpacing.xs),
               _BlockHeader(
                 title: 'Productos destacados',
                 action: 'Ver mas',
                 onTap: _openArchive,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               if (_productsError != null && _products.isEmpty)
                 _InfoCard(
                   message: _productsError!,
@@ -299,7 +307,8 @@ class _ShopPageState extends State<ShopPage> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _products.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: AppSpacing.md + AppSpacing.xs),
                     itemBuilder: (context, index) {
                       final product = _products[index];
                       return _CatalogReveal(
@@ -316,11 +325,11 @@ class _ShopPageState extends State<ShopPage> {
                     },
                   ),
                 ),
-              const SizedBox(height: 28),
+              const SizedBox(height: AppSpacing.xxl - AppSpacing.xs),
               _BlockHeader(
                 title: 'Categorias',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               if (_productsError != null && _categories.isEmpty)
                 _InfoCard(
                   message: _productsError!,
@@ -337,7 +346,8 @@ class _ShopPageState extends State<ShopPage> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _categories.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                     itemBuilder: (context, index) => _CatalogReveal(
                       index: index,
                       child: _CategoryChip(
@@ -383,17 +393,16 @@ class _BlockHeader extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
           ),
         ),
         if (action != null && onTap != null)
           InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: AppRadius.full,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Row(
@@ -401,16 +410,16 @@ class _BlockHeader extends StatelessWidget {
                 children: [
                   Text(
                     action!,
-                    style: const TextStyle(
-                      color: Color(0xFF8B6A28),
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: AppColors.goldDeep,
+                          fontWeight: FontWeight.w900,
+                        ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xs),
                   const Icon(
                     Icons.chevron_right_rounded,
                     size: 20,
-                    color: Color(0xFF8B6A28),
+                    color: AppColors.goldDeep,
                   ),
                 ],
               ),
@@ -458,24 +467,32 @@ class _ServiceCard extends StatelessWidget {
                       ? HabitoCachedNetworkImage(
                           imageUrl: imageUrl,
                           fit: BoxFit.cover,
+                          semanticLabel: 'Imagen del servicio $title',
                           errorWidget: Image.asset(
                             placeholderImage,
                             fit: BoxFit.cover,
                           ),
                         )
-                      : Image.asset(
-                          placeholderImage,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+                      : Semantics(
+                          label: 'Imagen del servicio $title',
+                          image: true,
+                          child: Image.asset(
+                            placeholderImage,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.primarySoft,
+                                    AppColors.goldDeep
+                                  ],
+                                ),
                               ),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.content_cut,
-                                color: Colors.white,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.content_cut,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -499,24 +516,22 @@ class _ServiceCard extends StatelessWidget {
                     title,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.12,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          height: 1.12,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
                     'Reserva tu espacio',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12.5,
-                      height: 1.15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.15,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                   const Spacer(),
                   Row(
@@ -526,11 +541,11 @@ class _ServiceCard extends StatelessWidget {
                           price,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF9C7732),
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppColors.goldDeep,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                         ),
                       ),
                       const _ActionBubble(icon: Icons.arrow_forward_rounded),
@@ -564,21 +579,18 @@ class _CategoryChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.large,
         child: Ink(
           width: 172,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md + AppSpacing.xs,
+            vertical: AppSpacing.sm + AppSpacing.xxs,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadius.large,
             border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.035),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            boxShadow: AppShadows.light,
           ),
           child: Row(
             children: [
@@ -587,15 +599,15 @@ class _CategoryChip extends StatelessWidget {
                 height: 30,
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.small,
                 ),
                 child: const Icon(
                   Icons.category_outlined,
-                  size: 16,
-                  color: Color(0xFFE9D07A),
+                  size: AppIconSize.xs + AppSpacing.xxs,
+                  color: AppColors.goldSoft,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -605,25 +617,23 @@ class _CategoryChip extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 13.5,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
                     if (count > 0) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         '$count productos',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                     ],
                   ],
@@ -631,7 +641,7 @@ class _CategoryChip extends StatelessWidget {
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFF9C7732),
+                color: AppColors.goldDeep,
                 size: 20,
               ),
             ],
@@ -678,31 +688,36 @@ class _ProductCard extends StatelessWidget {
                   ),
                 ),
                 if (!inStock) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   const _OverlayPill(label: 'Sin stock', dark: true),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.medium,
             child: SizedBox(
               height: 116,
               width: double.infinity,
               child: Container(
                 color: Colors.white,
                 child: imageUrl.isEmpty
-                    ? const Center(
-                        child: Icon(
-                          Icons.inventory_2_outlined,
-                          size: 38,
-                          color: AppColors.textSecondary,
+                    ? Semantics(
+                        label: 'Imagen del producto $name',
+                        image: true,
+                        child: const Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 38,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       )
                     : HabitoCachedNetworkImage(
                         imageUrl: imageUrl,
                         fit: BoxFit.contain,
+                        semanticLabel: 'Imagen del producto $name',
                       ),
               ),
             ),
@@ -717,26 +732,24 @@ class _ProductCard extends StatelessWidget {
                     name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.13,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          height: 1.13,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                   Text(
                     inStock
                         ? 'Disponible para comprar'
                         : 'Consulta disponibilidad',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12.5,
-                      height: 1.15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.15,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                   const Spacer(),
                   Row(
@@ -746,16 +759,16 @@ class _ProductCard extends StatelessWidget {
                           price,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF9C7732),
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.goldDeep,
+                                  ),
                         ),
                       ),
                       const _ActionBubble(
                         icon: Icons.add_shopping_cart_rounded,
-                        background: Color(0xFFE9D07A),
+                        background: AppColors.goldSoft,
                         foreground: AppColors.textPrimary,
                       ),
                     ],
@@ -808,22 +821,16 @@ class _PressableCardState extends State<_PressableCard> {
             onTapDown: (_) => _setPressed(true),
             onTapCancel: () => _setPressed(false),
             onTapUp: (_) => _setPressed(false),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: AppRadius.panel,
             child: Ink(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: AppRadius.panel,
                 border: Border.all(color: AppColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.055),
-                    blurRadius: 18,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                boxShadow: AppShadows.medium,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: AppRadius.panel,
                 child: widget.child,
               ),
             ),
@@ -849,26 +856,19 @@ class _OverlayPill extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 132),
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: dark ? AppColors.primary : const Color(0xFFE9D07A),
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: dark ? AppColors.primary : AppColors.goldSoft,
+        borderRadius: AppRadius.full,
+        boxShadow: AppShadows.light,
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: dark ? Colors.white : AppColors.textPrimary,
-          fontSize: 11,
-          height: 1,
-          fontWeight: FontWeight.w900,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: dark ? Colors.white : AppColors.textPrimary,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
       ),
     );
   }
@@ -892,7 +892,7 @@ class _ActionBubble extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.compact,
       ),
       child: Icon(icon, color: foreground, size: 18),
     );
@@ -937,28 +937,11 @@ class _EmptyStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFF9C7732), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return HabitoEmptyState(
+      icon: Icons.info_outline_rounded,
+      title: 'Nada para mostrar por ahora',
+      message: message,
+      compact: true,
     );
   }
 }
@@ -976,21 +959,12 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFF9C7732)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
-          TextButton(onPressed: onTap, child: Text(label)),
-        ],
-      ),
+    return HabitoErrorState(
+      title: 'No pudimos cargar esta sección',
+      message: message,
+      actionLabel: label,
+      onRetry: onTap,
+      compact: true,
     );
   }
 }
@@ -1000,21 +974,11 @@ class _ServiceSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 292,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (_, __) => Container(
-          width: 220,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.border),
-          ),
-        ),
-      ),
+    return const HabitoLoadingShimmer.horizontal(
+      itemCount: 3,
+      itemHeight: 292,
+      itemWidth: 220,
+      spacing: AppSpacing.md + AppSpacing.xs,
     );
   }
 }
@@ -1024,21 +988,12 @@ class _CategorySkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 58,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 5,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, __) => Container(
-          width: 172,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.border),
-          ),
-        ),
-      ),
+    return const HabitoLoadingShimmer.horizontal(
+      itemCount: 5,
+      itemHeight: 58,
+      itemWidth: 172,
+      spacing: AppSpacing.sm + AppSpacing.xxs,
+      borderRadius: AppRadius.large,
     );
   }
 }
@@ -1048,21 +1003,11 @@ class _ProductSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 264,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (_, __) => Container(
-          width: 210,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.border),
-          ),
-        ),
-      ),
+    return const HabitoLoadingShimmer.horizontal(
+      itemCount: 3,
+      itemHeight: 264,
+      itemWidth: 210,
+      spacing: AppSpacing.md + AppSpacing.xs,
     );
   }
 }

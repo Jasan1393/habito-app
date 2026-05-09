@@ -7,25 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:577447468142:android:77f55080e60f9104191a7f",
-        "android_client_info": {
-          "package_name": "com.example.habito"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCGFPcisKm2JqWSiWbGxuP-PZlqkPZRZ4g"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:577447468142:android:c345ebf81c8d700a191a7f",
         "android_client_info": {
           "package_name": "com.habitobarberia.app"

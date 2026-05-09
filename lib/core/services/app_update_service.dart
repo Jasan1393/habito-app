@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_size.dart';
 
 class AppUpdateInfo {
   final String currentVersion;
@@ -230,7 +231,7 @@ class AppUpdateService {
                   'La descarga se abrirá en el navegador o gestor de archivos del dispositivo.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 12.5,
+                    fontSize: AppTextSize.bodySmall,
                     height: 1.4,
                   ),
                 ),
@@ -332,14 +333,10 @@ class AppUpdateService {
   }
 
   static int _compareVersions(String a, String b) {
-    final left = a
-        .split('.')
-        .map((part) => int.tryParse(part.trim()) ?? 0)
-        .toList();
-    final right = b
-        .split('.')
-        .map((part) => int.tryParse(part.trim()) ?? 0)
-        .toList();
+    final left =
+        a.split('.').map((part) => int.tryParse(part.trim()) ?? 0).toList();
+    final right =
+        b.split('.').map((part) => int.tryParse(part.trim()) ?? 0).toList();
     final maxLength = left.length > right.length ? left.length : right.length;
 
     for (var i = 0; i < maxLength; i++) {

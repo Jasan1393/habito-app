@@ -4,6 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/app_update_service.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/main_navigation_scope.dart';
 import '../../../auth/presentation/pages/register_page.dart';
 import '../../../auth/provider/auth_provider.dart';
@@ -13,45 +18,43 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
-    const bg = Color(0xFF111111);
-    const card = Color(0xFF1A1A1A);
-
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         final user = auth.user;
         final isLoggedIn = auth.isLoggedIn;
 
         return Scaffold(
-          backgroundColor: bg,
+          backgroundColor: AppColors.primary,
           appBar: AppBar(
             title: const Text('Perfil'),
-            backgroundColor: bg,
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            elevation: 0,
+            elevation: AppSpacing.none,
           ),
           body: isLoggedIn
               ? ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppSpacing.screen,
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: card,
-                        borderRadius: BorderRadius.circular(20),
+                        color: AppColors.cardDark,
+                        borderRadius: AppRadius.card,
                       ),
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(
+                        AppSpacing.lg + AppSpacing.xxs,
+                      ),
                       child: Row(
                         children: [
                           const CircleAvatar(
-                            radius: 30,
-                            backgroundColor: gold,
+                            radius: AppIconSize.successIcon,
+                            backgroundColor: AppColors.secondary,
                             child: Icon(
                               Icons.person,
                               color: Colors.black,
-                              size: 30,
+                              size: AppIconSize.successIcon,
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: AppSpacing.cartItemGap),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -62,11 +65,11 @@ class ProfilePage extends StatelessWidget {
                                       : 'Usuario',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 18,
+                                    fontSize: AppTextSize.titleLarge,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xs),
                                 Text(
                                   user?.email ?? '',
                                   style: const TextStyle(
@@ -74,7 +77,7 @@ class ProfilePage extends StatelessWidget {
                                   ),
                                 ),
                                 if ((user?.phone ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: AppSpacing.xs),
                                   Text(
                                     user!.phone,
                                     style: const TextStyle(
@@ -88,7 +91,7 @@ class ProfilePage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _ProfileOptionCard(
                       icon: Icons.person_outline_rounded,
                       title: 'Mis datos personales',
@@ -199,13 +202,13 @@ class ProfilePage extends StatelessWidget {
                       onTap: () {
                         Navigator.pushNamed(context, AppRoutes.deleteAccount);
                       },
-                      iconColor: const Color(0xFFFF8A80),
+                      iconColor: AppColors.dangerSoft,
                     ),
                     _BiometricOptionCard(auth: auth),
                     const _AppVersionCard(),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: AppIconSize.lg),
                     SizedBox(
-                      height: 52,
+                      height: AppIconSize.successBadge,
                       child: ElevatedButton.icon(
                         onPressed: auth.isLoading
                             ? null
@@ -221,18 +224,18 @@ class ProfilePage extends StatelessWidget {
                                 );
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: gold,
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: AppRadius.medium,
                           ),
                         ),
                         icon: auth.isLoading
                             ? const SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: AppIconSize.action,
+                                height: AppIconSize.action,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
+                                  strokeWidth: AppSpacing.progressStroke,
                                   color: Colors.black,
                                 ),
                               )
@@ -250,48 +253,49 @@ class ProfilePage extends StatelessWidget {
                   ],
                 )
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppSpacing.screen,
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: card,
-                        borderRadius: BorderRadius.circular(24),
+                        color: AppColors.cardDark,
+                        borderRadius: AppRadius.extraLarge,
                       ),
-                      padding: const EdgeInsets.all(24),
+                      padding: AppSpacing.section,
                       child: Column(
                         children: [
                           const CircleAvatar(
-                            radius: 34,
-                            backgroundColor: gold,
+                            radius: AppIconSize.quantityButton,
+                            backgroundColor: AppColors.secondary,
                             child: Icon(
                               Icons.person_outline,
-                              size: 34,
+                              size: AppIconSize.quantityButton,
                               color: Colors.black,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           const Text(
                             'Tu perfil Hábito',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: AppTextSize.headlineSmall,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(
+                              height: AppSpacing.sm + AppSpacing.xxs),
                           const Text(
                             'Inicia sesión para ver tus citas, tus puntos y acceder más rápido a tus reservas.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white70,
-                              fontSize: 14,
+                              fontSize: AppTextSize.base,
                               height: 1.4,
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.xl),
                           SizedBox(
                             width: double.infinity,
-                            height: 52,
+                            height: AppIconSize.successBadge,
                             child: ElevatedButton(
                               onPressed: () async {
                                 await Navigator.pushNamed(
@@ -300,25 +304,25 @@ class ProfilePage extends StatelessWidget {
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: gold,
+                                backgroundColor: AppColors.secondary,
                                 foregroundColor: Colors.black,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: AppRadius.medium,
                                 ),
                               ),
                               child: const Text(
                                 'Iniciar sesión',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: AppTextSize.titleMedium,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.md),
                           SizedBox(
                             width: double.infinity,
-                            height: 52,
+                            height: AppIconSize.successBadge,
                             child: OutlinedButton(
                               onPressed: () async {
                                 await Navigator.push<bool>(
@@ -329,17 +333,19 @@ class ProfilePage extends StatelessWidget {
                                 );
                               },
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: gold,
-                                side: const BorderSide(color: gold),
+                                foregroundColor: AppColors.secondary,
+                                side: const BorderSide(
+                                  color: AppColors.secondary,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: AppRadius.medium,
                                 ),
                               ),
                               child: const Text(
                                 'Crear cuenta',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: AppTextSize.titleMedium,
                                 ),
                               ),
                             ),
@@ -347,7 +353,7 @@ class ProfilePage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     const _AppVersionCard(),
                   ],
                 ),
@@ -383,15 +389,15 @@ class _AppVersionCardState extends State<_AppVersionCard> {
                 : 'Version $version ($build)';
 
         return Card(
-          color: const Color(0xFF1A1A1A),
-          margin: const EdgeInsets.only(bottom: 12),
+          color: AppColors.cardDark,
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.tile,
           ),
           child: ListTile(
             leading: const Icon(
               Icons.info_outline_rounded,
-              color: Color(0xFFD4AF37),
+              color: AppColors.secondary,
             ),
             title: const Text(
               'Version de la app',
@@ -418,16 +424,16 @@ class _ProfileOptionCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
-    this.iconColor = const Color(0xFFD4AF37),
+    this.iconColor = AppColors.secondary,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF1A1A1A),
-      margin: const EdgeInsets.only(bottom: 12),
+      color: AppColors.cardDark,
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
       ),
       child: ListTile(
         leading: Icon(icon, color: iconColor),
@@ -452,10 +458,10 @@ class _BiometricOptionCard extends StatelessWidget {
     final available = auth.biometricAvailable;
 
     return Card(
-      color: const Color(0xFF1A1A1A),
-      margin: const EdgeInsets.only(bottom: 12),
+      color: AppColors.cardDark,
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
       ),
       child: SwitchListTile(
         value: available && auth.biometricEnabled,
@@ -466,10 +472,10 @@ class _BiometricOptionCard extends StatelessWidget {
               },
         secondary: const Icon(
           Icons.fingerprint_rounded,
-          color: Color(0xFFD4AF37),
+          color: AppColors.secondary,
         ),
-        activeThumbColor: const Color(0xFFD4AF37),
-        activeTrackColor: const Color(0xFFD4AF37).withValues(alpha: 0.35),
+        activeThumbColor: AppColors.secondary,
+        activeTrackColor: AppColors.secondary.withValues(alpha: 0.35),
         title: const Text(
           'Huella digital',
           style: TextStyle(color: Colors.white),
@@ -482,7 +488,7 @@ class _BiometricOptionCard extends StatelessWidget {
             color: available ? Colors.white70 : Colors.white54,
           ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       ),
     );
   }
@@ -496,10 +502,10 @@ class _PushNotificationsOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF1A1A1A),
-      margin: const EdgeInsets.only(bottom: 12),
+      color: AppColors.cardDark,
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
       ),
       child: SwitchListTile(
         value: auth.user?.pushNotificationsEnabled ?? true,
@@ -520,16 +526,16 @@ class _PushNotificationsOptionCard extends StatelessWidget {
                   ..showSnackBar(
                     SnackBar(
                       content: Text(error),
-                      backgroundColor: const Color(0xFF1E1E1E),
+                      backgroundColor: AppColors.primaryMuted,
                     ),
                   );
               },
         secondary: const Icon(
           Icons.notifications_active_outlined,
-          color: Color(0xFFD4AF37),
+          color: AppColors.secondary,
         ),
-        activeThumbColor: const Color(0xFFD4AF37),
-        activeTrackColor: const Color(0xFFD4AF37).withValues(alpha: 0.35),
+        activeThumbColor: AppColors.secondary,
+        activeTrackColor: AppColors.secondary.withValues(alpha: 0.35),
         title: const Text(
           'Notificaciones push',
           style: TextStyle(color: Colors.white),
@@ -540,7 +546,7 @@ class _PushNotificationsOptionCard extends StatelessWidget {
               : 'Notificaciones silenciadas en este perfil.',
           style: const TextStyle(color: Colors.white70),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       ),
     );
   }

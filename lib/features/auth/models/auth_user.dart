@@ -64,7 +64,7 @@ class AuthUser {
     this.pointsRedeemBookingsEnabled = false,
     this.pointsRedeemPointsPerUsd = 100,
     this.pointsRedeemMinPoints = 1,
-    this.pointsRedeemMaxPercent = 100,
+    this.pointsRedeemMaxPercent = 50,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
@@ -210,7 +210,7 @@ class AuthUser {
       pointsRedeemMaxPercent: _parseDouble(
             json['points_redeem_max_percent'] ?? json['pointsRedeemMaxPercent'],
           ) ??
-          100,
+          50,
     );
   }
 

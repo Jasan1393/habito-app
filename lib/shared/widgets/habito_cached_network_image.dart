@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
+
 const Map<String, String> habitoImageHeaders = {
   'Accept': 'image/avif,image/webp,image/*,*/*',
 };
@@ -12,6 +14,7 @@ class HabitoCachedNetworkImage extends StatelessWidget {
   final Widget? placeholder;
   final Widget? errorWidget;
   final FilterQuality filterQuality;
+  final String? semanticLabel;
 
   const HabitoCachedNetworkImage({
     super.key,
@@ -21,6 +24,7 @@ class HabitoCachedNetworkImage extends StatelessWidget {
     this.placeholder,
     this.errorWidget,
     this.filterQuality = FilterQuality.medium,
+    this.semanticLabel,
   });
 
   @override
@@ -31,7 +35,7 @@ class HabitoCachedNetworkImage extends StatelessWidget {
       return errorWidget ?? const SizedBox.shrink();
     }
 
-    return CachedNetworkImage(
+    final image = CachedNetworkImage(
       imageUrl: url,
       httpHeaders: habitoImageHeaders,
       fit: fit,
@@ -40,10 +44,22 @@ class HabitoCachedNetworkImage extends StatelessWidget {
       fadeInDuration: const Duration(milliseconds: 140),
       fadeOutDuration: const Duration(milliseconds: 80),
       placeholder: (_, __) =>
-          placeholder ?? const ColoredBox(color: Color(0xFFF3EFE9)),
+          placeholder ?? const ColoredBox(color: AppColors.surfaceMuted),
       errorWidget: (_, __, ___) =>
           errorWidget ??
           const Center(child: Icon(Icons.image_not_supported_outlined)),
+    );
+
+    final label = semanticLabel?.trim() ?? '';
+
+    if (label.isEmpty) {
+      return image;
+    }
+
+    return Semantics(
+      label: label,
+      image: true,
+      child: image,
     );
   }
 }

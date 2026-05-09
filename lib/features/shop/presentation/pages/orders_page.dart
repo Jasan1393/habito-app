@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/app_top_header.dart';
+import '../../../../shared/widgets/habito_bottom_navigation_bar.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
+import '../../../../shared/widgets/habito_payment_proof_picker.dart';
+import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../provider/shop_provider.dart';
-import '../../../../shared/widgets/habito_bottom_navigation_bar.dart';
-import '../../../../shared/widgets/main_navigation_page.dart';
+import 'cart_page.dart';
+import 'products_archive_page.dart';
 
 class OrdersPage extends StatefulWidget {
   final int selectedNavIndex;
@@ -80,19 +92,18 @@ class _OrdersPageState extends State<OrdersPage> {
       return;
     }
 
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 82,
-      maxWidth: 1800,
+    final selectedProof = await HabitoPaymentProofPicker.pickAndConfirm(
+      context,
+      showMessage: _showSnack,
     );
 
-    if (picked == null) return;
+    if (selectedProof == null) return;
     if (!mounted) return;
 
     final ok = await context.read<ShopProvider>().uploadPaymentProof(
           token: token,
           orderId: orderId,
-          filePath: picked.path,
+          filePath: selectedProof.path,
         );
 
     if (!mounted) return;
@@ -103,8 +114,10 @@ class _OrdersPageState extends State<OrdersPage> {
     }
 
     _showSnack(
-      context.read<ShopProvider>().paymentProofError ??
-          'No pudimos subir el comprobante.',
+      FriendlyErrors.paymentProof(
+        context.read<ShopProvider>().paymentProofError ??
+            'No pudimos subir el comprobante.',
+      ),
     );
   }
 
@@ -211,20 +224,20 @@ class _OrdersPageState extends State<OrdersPage> {
   Color _statusColor(Map<String, dynamic> order) {
     switch (_statusKey(order)) {
       case 'completed':
-        return const Color(0xFF2E7D32);
+        return AppColors.success;
       case 'processing':
-        return const Color(0xFF205C46);
+        return AppColors.successDeep;
       case 'cancelled':
-        return const Color(0xFFA33A3A);
+        return AppColors.danger;
       case 'failed':
-        return const Color(0xFFB24A2C);
+        return AppColors.warningDeep;
       case 'refunded':
-        return const Color(0xFF5C6670);
+        return AppColors.textSecondary;
       case 'on-hold':
       case 'pending':
-        return const Color(0xFF9C7732);
+        return AppColors.goldDeep;
       default:
-        return const Color(0xFF9C7732);
+        return AppColors.goldDeep;
     }
   }
 
@@ -236,7 +249,7 @@ class _OrdersPageState extends State<OrdersPage> {
       case 'pending':
         return 'Pendiente de pago';
       case 'on-hold':
-        return 'En validacion';
+        return 'En validación';
       case 'processing':
         return 'Preparando pedido';
       case 'completed':
@@ -260,11 +273,11 @@ class _OrdersPageState extends State<OrdersPage> {
 
     switch (_statusKey(order)) {
       case 'pending':
-        return 'Tu pedido esta pendiente de pago o confirmacion inicial.';
+        return 'Tu pedido está pendiente de pago o confirmación inicial.';
       case 'on-hold':
         return 'Estamos validando el pago o revisando los datos del pedido.';
       case 'processing':
-        return 'Tu compra ya entro en preparacion.';
+        return 'Tu compra ya entró en preparación.';
       case 'completed':
         return 'El pedido ya fue completado.';
       case 'cancelled':
@@ -359,11 +372,23 @@ class _OrdersPageState extends State<OrdersPage> {
         if (!auth.isLoggedIn) {
           return Scaffold(
             backgroundColor: AppColors.background,
-            appBar: AppBar(
-              backgroundColor: AppColors.background,
-              foregroundColor: AppColors.textPrimary,
-              elevation: 0,
-              title: const Text('Mis pedidos'),
+            appBar: AppTopHeader(
+              searchHint: 'Buscar productos',
+              cartCount: shop.cartCount,
+              onSearchTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProductsArchivePage(),
+                  ),
+                );
+              },
+              onCartTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartPage()),
+                );
+              },
             ),
             bottomNavigationBar: HabitoBottomNavigationBar(
               selectedIndex: widget.selectedNavIndex,
@@ -376,7 +401,7 @@ class _OrdersPageState extends State<OrdersPage> {
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: AppRadius.display,
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
@@ -385,19 +410,19 @@ class _OrdersPageState extends State<OrdersPage> {
                       const Icon(
                         Icons.receipt_long_outlined,
                         size: 52,
-                        color: Color(0xFF9C7732),
+                        color: AppColors.goldDeep,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                       const Text(
                         'Inicia sesion para ver tus pedidos',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: AppTextSize.headlineMedium,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                       const Text(
                         'Aqui veras el historial completo de compras realizadas en la tienda.',
                         textAlign: TextAlign.center,
@@ -406,7 +431,7 @@ class _OrdersPageState extends State<OrdersPage> {
                           height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -425,10 +450,10 @@ class _OrdersPageState extends State<OrdersPage> {
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD4AF37),
+                            backgroundColor: AppColors.secondary,
                             foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: AppRadius.tile,
                             ),
                           ),
                           child: const Text(
@@ -447,70 +472,65 @@ class _OrdersPageState extends State<OrdersPage> {
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: AppColors.background,
-            foregroundColor: AppColors.textPrimary,
-            elevation: 0,
-            title: const Text('Mis pedidos'),
+          appBar: AppTopHeader(
+            searchHint: 'Buscar productos',
+            cartCount: shop.cartCount,
+            onSearchTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ProductsArchivePage(),
+                ),
+              );
+            },
+            onCartTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartPage()),
+              );
+            },
           ),
           bottomNavigationBar: HabitoBottomNavigationBar(
             selectedIndex: widget.selectedNavIndex,
             onDestinationSelected: _goToMainTab,
           ),
           body: RefreshIndicator(
-            color: const Color(0xFFD4AF37),
+            color: AppColors.secondary,
             onRefresh: () => _loadOrders(forceRefresh: true),
             child: shop.isLoadingOrders && shop.orders.isEmpty
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFFD4AF37),
-                    ),
+                ? ListView(
+                    padding: EdgeInsets.all(AppSpacing.xl),
+                    children: const [
+                      HabitoLoadingShimmer(
+                        itemCount: 4,
+                        itemHeight: 138,
+                      ),
+                    ],
                   )
                 : shop.ordersError != null && shop.orders.isEmpty
-                    ? _OrdersErrorView(
-                        message: shop.ordersError!,
-                        onRetry: () => _loadOrders(forceRefresh: true),
+                    ? ListView(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        children: [
+                          HabitoErrorState(
+                            title: 'No pudimos cargar tus pedidos',
+                            message: shop.ordersError!,
+                            onRetry: () => _loadOrders(forceRefresh: true),
+                          ),
+                        ],
                       )
                     : shop.orders.isEmpty
                         ? ListView(
-                            padding: const EdgeInsets.all(24),
-                            children: [
-                              const SizedBox(height: 60),
-                              Container(
-                                padding: const EdgeInsets.all(28),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(28),
-                                  border: Border.all(color: AppColors.border),
-                                ),
-                                child: const Column(
-                                  children: [
-                                    Icon(
-                                      Icons.inventory_2_outlined,
-                                      size: 52,
-                                      color: Color(0xFF9C7732),
-                                    ),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Todavia no tienes pedidos',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      'Cuando completes una compra en la tienda, apareceran aqui todos los detalles.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            padding: EdgeInsets.all(AppSpacing.xl),
+                            children: const [
+                              SizedBox(
+                                  height: AppSpacing.xxxl +
+                                      AppSpacing.xl -
+                                      AppSpacing.xs),
+                              HabitoEmptyState(
+                                icon: Icons.inventory_2_outlined,
+                                title: 'Todavía no tienes pedidos',
+                                message:
+                                    'Cuando completes una compra en la tienda, aparecerán aquí todos los detalles.',
                               ),
                             ],
                           )
@@ -520,18 +540,19 @@ class _OrdersPageState extends State<OrdersPage> {
                             children: [
                               _OrdersHero(totalOrders: shop.orders.length),
                               if (_highlightedOrderId != null) ...[
-                                const SizedBox(height: 16),
+                                const SizedBox(height: AppSpacing.lg),
                                 _FocusedOrderBanner(
                                   orderId: _highlightedOrderId!,
                                   openedFromPush: widget.openFromPush,
                                 ),
                               ],
-                              const SizedBox(height: 22),
+                              const SizedBox(
+                                  height: AppSpacing.xl - AppSpacing.xxs),
                               _OrdersHeader(
                                 visibleCount: visibleOrders.length,
                                 totalCount: shop.orders.length,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               _OrdersFiltersRow(
                                 selectedFilter: _selectedFilter,
                                 counts: {
@@ -545,7 +566,8 @@ class _OrdersPageState extends State<OrdersPage> {
                                   });
                                 },
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(
+                                  height: AppSpacing.md + AppSpacing.xxs),
                               if (visibleOrders.isEmpty)
                                 _FilteredOrdersEmptyView(
                                   filter: _selectedFilter,
@@ -627,7 +649,7 @@ extension _OrdersFilterInfo on _OrdersFilter {
       case _OrdersFilter.all:
         return 'Cuando completes una compra en la tienda, la veras aqui con todo su detalle.';
       case _OrdersFilter.active:
-        return 'Aqui apareceran los pedidos pendientes, en validacion o en preparacion.';
+        return 'Aquí aparecerán los pedidos pendientes, en validación o en preparación.';
       case _OrdersFilter.completed:
         return 'Aqui se guardan las compras que ya terminaron correctamente.';
       case _OrdersFilter.closed:
@@ -647,7 +669,7 @@ class _OrdersHero extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: AppRadius.display,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,41 +678,41 @@ class _OrdersHero extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppRadius.full,
             ),
             child: const Text(
               'Historial Habito',
               style: TextStyle(
-                color: Color(0xFFE7D6AC),
-                fontSize: 12,
+                color: AppColors.borderStrong,
+                fontSize: AppTextSize.label,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           const Text(
             'Tu historial de compras en una vista clara y elegante.',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: AppTextSize.headlineSmall,
               height: 1.15,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           const Text(
             'Sigue el estado de cada pedido y revisa rapidamente los productos comprados.',
             style: TextStyle(
-              color: Color(0xFFD9D4CC),
+              color: AppColors.border,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppRadius.card,
             ),
             child: Row(
               children: [
@@ -698,7 +720,7 @@ class _OrdersHero extends StatelessWidget {
                   child: Text(
                     'Pedidos registrados',
                     style: TextStyle(
-                      color: Color(0xFFD9D4CC),
+                      color: AppColors.border,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -707,7 +729,7 @@ class _OrdersHero extends StatelessWidget {
                   '$totalOrders',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: AppTextSize.headlineMedium,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -737,12 +759,12 @@ class _OrdersHeader extends StatelessWidget {
         const Text(
           'Pedidos recientes',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: AppTextSize.headlineSmall,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           totalCount == 0
               ? 'Desliza hacia abajo para actualizar el estado en tiempo real.'
@@ -775,7 +797,8 @@ class _OrdersFiltersRow extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _OrdersFilter.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
         itemBuilder: (context, index) {
           final filter = _OrdersFilter.values[index];
           final isSelected = filter == selectedFilter;
@@ -797,7 +820,7 @@ class _OrdersFiltersRow extends StatelessWidget {
             showCheckmark: false,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppRadius.full,
             ),
           );
         },
@@ -819,7 +842,7 @@ class _FilteredOrdersEmptyView extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: AppRadius.hero,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -827,19 +850,19 @@ class _FilteredOrdersEmptyView extends StatelessWidget {
           const Icon(
             Icons.inventory_2_outlined,
             size: 46,
-            color: Color(0xFF9C7732),
+            color: AppColors.goldDeep,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
           Text(
             filter.emptyTitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: AppTextSize.section,
               fontWeight: FontWeight.w900,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             filter.emptyMessage,
             textAlign: TextAlign.center,
@@ -984,21 +1007,13 @@ class _OrderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: highlighted ? const Color(0xFFFFF9EB) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: highlighted ? AppColors.goldSurface : Colors.white,
+        borderRadius: AppRadius.extraLarge,
         border: Border.all(
-          color: highlighted ? const Color(0xFFD4AF37) : AppColors.border,
+          color: highlighted ? AppColors.secondary : AppColors.border,
           width: highlighted ? 1.6 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: highlighted
-                ? const Color(0xFFD4AF37).withValues(alpha: 0.18)
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: highlighted ? 22 : 16,
-            offset: Offset(0, highlighted ? 10 : 8),
-          ),
-        ],
+        boxShadow: highlighted ? AppShadows.goldGlow : AppShadows.cardSoft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1007,19 +1022,19 @@ class _OrderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37).withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
+                color: AppColors.secondary.withValues(alpha: 0.14),
+                borderRadius: AppRadius.full,
               ),
               child: const Text(
                 'Pedido destacado',
                 style: TextStyle(
-                  color: Color(0xFF7A5B1B),
-                  fontSize: 11.5,
+                  color: AppColors.goldDeep,
+                  fontSize: AppTextSize.labelSmall,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
           ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1031,12 +1046,12 @@ class _OrderCard extends StatelessWidget {
                     Text(
                       'Pedido #${order['number'] ?? order['id'] ?? ''}',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: AppTextSize.titleLarge,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: AppSpacing.xs + AppSpacing.xxs / 2),
                     Text(
                       formatDate(order),
                       style: const TextStyle(
@@ -1044,7 +1059,7 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                     if (currentStatusDescription.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                       Text(
                         currentStatusDescription,
                         style: const TextStyle(
@@ -1061,7 +1076,7 @@ class _OrderCard extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
                   color: currentStatusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadius.full,
                 ),
                 child: Text(
                   currentStatusLabel,
@@ -1073,7 +1088,7 @@ class _OrderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1085,13 +1100,13 @@ class _OrderCard extends StatelessWidget {
               ),
               _OrderMetaBadge(
                 label: fulfillmentDisplay,
-                background: const Color(0xFFF5F1E8),
-                foreground: const Color(0xFF7A5B1B),
+                background: AppColors.goldMuted,
+                foreground: AppColors.goldDeep,
               ),
               if (totalItemsCount > 0)
                 _OrderMetaBadge(
                   label: '$totalItemsCount item(s)',
-                  background: const Color(0xFFF4F4F4),
+                  background: AppColors.surfaceMuted,
                   foreground: AppColors.textPrimary,
                 ),
               if (dispatchLabel.isNotEmpty)
@@ -1102,7 +1117,7 @@ class _OrderCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           ...lineItems.take(3).map(
                 (line) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -1117,7 +1132,7 @@ class _OrderCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       Text(
                         formatMoney(line['total']),
                         style: const TextStyle(
@@ -1130,7 +1145,7 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
           if (lineItems.length > 3) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               '+ ${lineItems.length - 3} producto(s) mas',
               style: const TextStyle(
@@ -1139,78 +1154,78 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
           ],
-          const Divider(height: 24),
+          const Divider(height: AppSpacing.divider),
           _OrderInfoRow(
             label: 'Entrega',
             value: fulfillmentDisplay,
           ),
           if (pickupLocationName.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Sucursal',
               value: pickupLocationName,
             ),
           ],
           if (assignedWarehouseLabel.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: fulfillmentMethod == 'pickup' ? 'Bodega retiro' : 'Bodega',
               value: assignedWarehouseLabel,
             ),
           ],
           if (dispatchLabel.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Despacho',
               value: dispatchLabel,
             ),
           ],
           if (dispatchPendingReason.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Observacion',
               value: dispatchPendingReason,
             ),
           ],
           if (shippingTitle.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Metodo',
               value: shippingTitle,
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           _OrderInfoRow(
             label: 'Costo de entrega',
             value: formatMoney(shippingTotal),
           ),
           if (hasTax) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'IVA',
               value: formatMoney(totalTax),
             ),
           ],
           if (paymentTitle.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Pago',
               value: paymentSummary,
             ),
           ] else ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             _OrderInfoRow(
               label: 'Pago',
               value: paymentSummary,
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           _OrderInfoRow(
             label: 'Comprobante',
             value: proofStatusLabel,
           ),
           if (isBankTransfer) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
             _PaymentProofPanel(
               uploaded: proofUploaded,
               uploadedAt: (paymentProof['uploaded_at'] ?? '').toString(),
@@ -1219,7 +1234,7 @@ class _OrderCard extends StatelessWidget {
               onUpload: onUploadProof,
             ),
           ],
-          const Divider(height: 24),
+          const Divider(height: AppSpacing.divider),
           _OrderInfoRow(
             label: 'Total',
             value: formatMoney(order['total']),
@@ -1257,11 +1272,11 @@ class _OrderCard extends StatelessWidget {
   }) {
     switch (lifecycle) {
       case 'active':
-        return const Color(0xFF205C46);
+        return AppColors.successDeep;
       case 'completed':
-        return const Color(0xFF2E7D32);
+        return AppColors.success;
       case 'closed':
-        return const Color(0xFF5C6670);
+        return AppColors.textSecondary;
       default:
         return fallback;
     }
@@ -1285,7 +1300,8 @@ class _OrderCard extends StatelessWidget {
             ? 'Bodega asignada'
             : 'Despacho asignado';
       default:
-        if (fulfillmentMethod == 'pickup' && assignedWarehouseLabel.isNotEmpty) {
+        if (fulfillmentMethod == 'pickup' &&
+            assignedWarehouseLabel.isNotEmpty) {
           return 'Bodega retiro lista';
         }
         if (assignedWarehouseLabel.isNotEmpty) {
@@ -1301,15 +1317,15 @@ class _OrderCard extends StatelessWidget {
   }) {
     switch (status) {
       case 'pending':
-        return const Color(0xFF9C7732);
+        return AppColors.goldDeep;
       case 'assigned':
         return fulfillmentMethod == 'pickup'
-            ? const Color(0xFF205C46)
-            : const Color(0xFF2E7D32);
+            ? AppColors.successDeep
+            : AppColors.success;
       default:
         return fulfillmentMethod == 'pickup'
-            ? const Color(0xFF205C46)
-            : const Color(0xFF5C6670);
+            ? AppColors.successDeep
+            : AppColors.textSecondary;
     }
   }
 
@@ -1320,10 +1336,10 @@ class _OrderCard extends StatelessWidget {
     final lower = normalized.toLowerCase();
     if (lower.contains('shipping warehouse without enough stock') ||
         lower.contains('waiting for dispatch assignment')) {
-      return 'La bodega principal de despacho no tiene stock suficiente. El pedido quedo pendiente para asignar otra bodega.';
+      return 'La bodega principal de despacho no tiene stock suficiente. El pedido quedó pendiente para asignar otra bodega.';
     }
     if (lower.contains('awaiting dispatch warehouse assignment')) {
-      return 'Estamos esperando asignar la bodega que preparara este pedido.';
+      return 'Estamos esperando asignar la bodega que preparará este pedido.';
     }
     return normalized;
   }
@@ -1368,13 +1384,13 @@ class _OrderMetaBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.full,
       ),
       child: Text(
         label,
         style: TextStyle(
           color: foreground,
-          fontSize: 11.5,
+          fontSize: AppTextSize.labelSmall,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1396,9 +1412,9 @@ class _FocusedOrderBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7E3),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE8D08A)),
+        color: AppColors.goldSurface,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.borderStrong),
       ),
       child: Row(
         children: [
@@ -1406,22 +1422,22 @@ class _FocusedOrderBanner extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFD4AF37).withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(14),
+              color: AppColors.secondary.withValues(alpha: 0.16),
+              borderRadius: AppRadius.medium,
             ),
             child: const Icon(
               Icons.inventory_2_outlined,
-              color: Color(0xFF7A5B1B),
+              color: AppColors.goldDeep,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   openedFromPush
-                      ? 'Abrimos tu pedido #$orderId desde la notificacion.'
+                      ? 'Abrimos tu pedido #$orderId desde la notificación.'
                       : 'Pedido #$orderId listo para revisar.',
                   style: const TextStyle(
                     color: AppColors.textPrimary,
@@ -1429,9 +1445,9 @@ class _FocusedOrderBanner extends StatelessWidget {
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 const Text(
-                  'Lo dejamos resaltado unos segundos para ubicarlo mas rapido.',
+                  'Lo dejamos resaltado unos segundos para ubicarlo más rápido.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
@@ -1463,12 +1479,11 @@ class _PaymentProofPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor =
-        uploaded ? const Color(0xFF2E7D32) : const Color(0xFF9C7732);
+    final statusColor = uploaded ? AppColors.success : AppColors.goldDeep;
     final title =
         uploaded ? 'Comprobante recibido' : 'Comprobante de transferencia';
     final description = uploaded
-        ? 'Tu comprobante quedo adjunto al pedido para validacion.'
+        ? 'Tu comprobante quedó adjunto al pedido para validación.'
         : 'Sube una foto clara del pago para que podamos confirmar tu compra.';
 
     return Container(
@@ -1476,7 +1491,7 @@ class _PaymentProofPanel extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: statusColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.large,
         border: Border.all(color: statusColor.withValues(alpha: 0.18)),
       ),
       child: Column(
@@ -1491,7 +1506,7 @@ class _PaymentProofPanel extends StatelessWidget {
                     : Icons.upload_file_rounded,
                 color: statusColor,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1503,7 +1518,7 @@ class _PaymentProofPanel extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       description,
                       style: const TextStyle(
@@ -1512,7 +1527,7 @@ class _PaymentProofPanel extends StatelessWidget {
                       ),
                     ),
                     if (uploaded && uploadedAt.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         uploadedAt.split(' ').first,
                         style: const TextStyle(
@@ -1527,10 +1542,10 @@ class _PaymentProofPanel extends StatelessWidget {
             ],
           ),
           if (!uploaded) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
-              height: 46,
+              height: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
               child: ElevatedButton.icon(
                 onPressed: canUpload && !isUploading ? onUpload : null,
                 style: ElevatedButton.styleFrom(
@@ -1539,19 +1554,23 @@ class _PaymentProofPanel extends StatelessWidget {
                   disabledBackgroundColor:
                       AppColors.primary.withValues(alpha: 0.35),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: AppRadius.medium,
                   ),
                 ),
                 icon: isUploading
                     ? const SizedBox(
-                        width: 17,
-                        height: 17,
+                        width: AppIconSize.quantityIcon,
+                        height: AppIconSize.quantityIcon,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
+                          strokeWidth:
+                              AppSpacing.progressStroke - AppSpacing.xxs / 10,
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.add_photo_alternate_outlined, size: 19),
+                    : const Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: AppIconSize.sm + AppSpacing.xxs / 2,
+                      ),
                 label: Text(
                   isUploading ? 'Subiendo...' : 'Subir comprobante',
                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -1565,11 +1584,12 @@ class _PaymentProofPanel extends StatelessWidget {
   }
 }
 
-class _OrdersErrorView extends StatelessWidget {
+class OrdersErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _OrdersErrorView({
+  const OrdersErrorView({
+    super.key,
     required this.message,
     required this.onRetry,
   });
@@ -1579,12 +1599,12 @@ class _OrdersErrorView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const SizedBox(height: 56),
+        const SizedBox(height: AppSpacing.xxxl + AppSpacing.lg),
         Container(
           padding: const EdgeInsets.all(26),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: AppRadius.display,
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
@@ -1592,19 +1612,19 @@ class _OrdersErrorView extends StatelessWidget {
               const Icon(
                 Icons.receipt_long_outlined,
                 size: 48,
-                color: Color(0xFFA33A3A),
+                color: AppColors.danger,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               const Text(
                 'No pudimos cargar tus pedidos',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: AppTextSize.headlineSmall,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
               Text(
                 message,
                 textAlign: TextAlign.center,
@@ -1613,17 +1633,17 @@ class _OrdersErrorView extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton.icon(
                   onPressed: onRetry,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
+                    backgroundColor: AppColors.secondary,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: AppRadius.tile,
                     ),
                   ),
                   icon: const Icon(Icons.refresh_rounded, size: 18),

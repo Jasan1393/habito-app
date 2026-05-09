@@ -36,8 +36,7 @@ class PointsQuote {
       balance: _parseDouble(json['balance']) ?? 0,
       rate: _parseDouble(json['rate']) ?? 100,
       minPoints: _parseDouble(json['min_points'] ?? json['minPoints']) ?? 1,
-      maxPercent:
-          _parseDouble(json['max_percent'] ?? json['maxPercent']) ?? 100,
+      maxPercent: _parseDouble(json['max_percent'] ?? json['maxPercent']) ?? 50,
       remainingBalance: _parseDouble(
             json['remaining_balance'] ?? json['remainingBalance'],
           ) ??

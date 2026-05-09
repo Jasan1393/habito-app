@@ -68,3 +68,8 @@ analyze*.txt
 pubspec.yaml.bak-*
 *.bak
 *.bak-*
+*.bak.*
+*.backup
+*.orig
+*.rej
+*~

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
@@ -188,9 +193,9 @@ class _TeamHabitoHomeSectionState extends State<TeamHabitoHomeSection> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF6F4F1),
+      backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: AppRadius.bottomSheet,
       ),
       builder: (_) => _BarberProfileModal(barber: barber),
     );
@@ -209,19 +214,20 @@ class _TeamHabitoHomeSectionState extends State<TeamHabitoHomeSection> {
             );
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         SizedBox(
           height: 256,
           child: _isLoading
               ? ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: 3,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.md),
                   itemBuilder: (_, __) => Container(
                     width: 184,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: AppRadius.extraLarge,
                       border: Border.all(color: AppColors.border),
                     ),
                   ),
@@ -229,7 +235,8 @@ class _TeamHabitoHomeSectionState extends State<TeamHabitoHomeSection> {
               : ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _barbers.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.md),
                   itemBuilder: (context, index) {
                     final barber = _barbers[index];
                     return _MiniBarberCard(
@@ -257,7 +264,7 @@ class _TeamSectionHeader extends StatelessWidget {
           child: Text(
             'Team Hábito',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: AppTextSize.headlineSmall,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
@@ -265,24 +272,27 @@ class _TeamSectionHeader extends StatelessWidget {
         ),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: AppRadius.full,
           child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xs + AppSpacing.xxs,
+            ),
             child: Row(
               children: [
                 Text(
                   'Ver todos',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: AppTextSize.base,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF9C7732),
+                    color: AppColors.goldDeep,
                   ),
                 ),
-                SizedBox(width: 4),
+                SizedBox(width: AppSpacing.xs),
                 Icon(
                   Icons.chevron_right,
-                  color: Color(0xFF9C7732),
-                  size: 18,
+                  color: AppColors.goldDeep,
+                  size: AppIconSize.action,
                 ),
               ],
             ),
@@ -310,29 +320,23 @@ class _MiniBarberCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.extraLarge,
         onTap: onTap,
         child: Ink(
           width: 184,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: AppRadius.extraLarge,
             border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: AppShadows.cardSoft,
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: AppSpacing.card,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.large,
                   child: SizedBox(
                     height: 128,
                     width: double.infinity,
@@ -346,29 +350,31 @@ class _MiniBarberCard extends StatelessWidget {
                         : const _MiniBarberFallback(),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.goldMuted,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.full,
                   ),
                   child: const Text(
                     'Team Hábito',
                     style: TextStyle(
-                      color: Color(0xFF8B6A28),
-                      fontSize: 10.5,
+                      color: AppColors.goldDeep,
+                      fontSize: AppTextSize.captionXs,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     fullName,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: AppTextSize.titleSmall,
                       height: 1.18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -394,7 +400,7 @@ class _MiniBarberFallback extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+          colors: [AppColors.primarySoft, AppColors.goldDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -403,7 +409,7 @@ class _MiniBarberFallback extends StatelessWidget {
         child: Icon(
           Icons.content_cut,
           color: Colors.white,
-          size: 28,
+          size: AppIconSize.lg,
         ),
       ),
     );
@@ -434,26 +440,31 @@ class _BarberProfileModal extends StatelessWidget {
         builder: (context, scrollController) {
           return Container(
             decoration: const BoxDecoration(
-              color: Color(0xFFF6F4F1),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              color: AppColors.background,
+              borderRadius: AppRadius.bottomSheet,
             ),
             child: ListView(
               controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
               children: [
                 Center(
                   child: Container(
-                    width: 54,
-                    height: 5,
+                    width: AppSpacing.actionHeight,
+                    height: AppSpacing.xs + AppSpacing.xxs / 2,
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadius.card,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: AppRadius.extraLarge,
                   child: SizedBox(
                     height: 260,
                     width: double.infinity,
@@ -467,52 +478,54 @@ class _BarberProfileModal extends StatelessWidget {
                         : const _BarberImageFallback(),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                 Text(
                   name,
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: AppTextSize.headlineMedium + AppSpacing.xxs,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                     height: 1.12,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD4AF37).withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppColors.secondary.withValues(alpha: 0.16),
+                    borderRadius: AppRadius.medium,
                   ),
                   child: const Text(
                     'Barbero Hábito',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: AppTextSize.body,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                 const Text(
                   'Perfil',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppTextSize.titleLarge,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   description,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: AppTextSize.titleSmall,
                     height: 1.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
@@ -529,23 +542,23 @@ class _BarberProfileModal extends StatelessWidget {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: AppColors.primary,
-                      elevation: 0,
+                      elevation: AppSpacing.none,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.tile,
                       ),
                     ),
                     child: const Text(
                       'Reservar con este barbero',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: AppTextSize.titleSmall,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 SizedBox(
                   height: 48,
                   child: OutlinedButton(
@@ -553,18 +566,18 @@ class _BarberProfileModal extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(
-                        color: Color(0xFFD4AF37),
+                        color: AppColors.secondary,
                         width: 1.4,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.tile,
                       ),
                     ),
                     child: const Text(
                       'Cerrar',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: AppTextSize.titleSmall,
                       ),
                     ),
                   ),
@@ -596,7 +609,7 @@ class _BarberImageFallback extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+          colors: [AppColors.primarySoft, AppColors.goldDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -605,7 +618,7 @@ class _BarberImageFallback extends StatelessWidget {
         child: Icon(
           Icons.content_cut,
           color: Colors.white,
-          size: 36,
+          size: AppIconSize.xl,
         ),
       ),
     );

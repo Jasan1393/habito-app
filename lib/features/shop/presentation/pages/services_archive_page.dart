@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/habito_bottom_navigation_bar.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
 import '../../data/services/habito_booking_api.dart';
 
@@ -108,6 +116,19 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
     );
   }
 
+  Future<void> _goToMainTab(int index) async {
+    if (!mounted) return;
+
+    await Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: AppRoutes.main),
+        builder: (_) => MainNavigationPage(initialIndex: index),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,16 +139,27 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
         elevation: 0,
         title: const Text('Servicios'),
       ),
+      bottomNavigationBar: HabitoBottomNavigationBar(
+        selectedIndex: 1,
+        onDestinationSelected: _goToMainTab,
+      ),
       body: RefreshIndicator(
-        color: const Color(0xFFD4AF37),
+        color: AppColors.secondary,
         onRefresh: () => _loadServices(forceRefresh: true),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.xs,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
           children: [
-            const _ServicesHero(),
-            const SizedBox(height: 22),
-            const _ServicesHeader(),
-            const SizedBox(height: 14),
+            _ServicesHeader(
+              count: _services.length,
+              isLoading: _isLoading,
+              hasError: _error != null && _services.isEmpty,
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (_error != null && _services.isEmpty)
               _ServicesInfoCard(
                 message: _error!,
@@ -138,14 +170,14 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
               ...List.generate(
                 4,
                 (_) => const Padding(
-                  padding: EdgeInsets.only(bottom: 14),
+                  padding: EdgeInsets.only(bottom: AppSpacing.md),
                   child: _ServiceArchiveSkeleton(),
                 ),
               )
             else
               ..._services.map(
                 (service) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: _ServiceArchiveCard(
                     service: service,
                     onTap: () => _openBooking(service),
@@ -159,84 +191,101 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
   }
 }
 
-class _ServicesHero extends StatelessWidget {
-  const _ServicesHero();
+class _ServicesHeader extends StatelessWidget {
+  final int count;
+  final bool isLoading;
+  final bool hasError;
+
+  const _ServicesHeader({
+    required this.count,
+    required this.isLoading,
+    required this.hasError,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final statusText = hasError
+        ? 'No pudimos cargar'
+        : isLoading
+            ? 'Cargando'
+            : '$count disponibles';
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: AppRadius.large,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.cardSoft,
+      ),
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            width: AppIconSize.pointsBadge,
+            height: AppIconSize.pointsBadge,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
+              color: AppColors.goldMuted,
+              borderRadius: AppRadius.medium,
             ),
-            child: const Text(
-              'Catálogo Hábito',
+            child: const Icon(
+              Icons.content_cut_rounded,
+              color: AppColors.goldDeep,
+              size: AppIconSize.md,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Servicios disponibles',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppTextSize.title,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: AppSpacing.progress),
+                Text(
+                  'Elige un servicio para reservar.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: AppTextSize.body,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: hasError ? AppColors.dangerSoft : AppColors.goldSurface,
+              borderRadius: AppRadius.full,
+            ),
+            child: Text(
+              statusText,
               style: TextStyle(
-                color: Color(0xFFE7D6AC),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+                color: hasError ? AppColors.danger : AppColors.goldDeep,
+                fontSize: AppTextSize.label,
+                fontWeight: FontWeight.w900,
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Todos los servicios en un solo lugar antes de reservar.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              height: 1.15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Revisa opciones, duración y valor estimado para elegir la experiencia que mejor va contigo.',
-            style: TextStyle(
-              color: Color(0xFFD9D4CC),
-              height: 1.35,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ServicesHeader extends StatelessWidget {
-  const _ServicesHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Explora servicios',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'Cada tarjeta resume lo más importante antes de pasar al flujo de reserva.',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.35,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -253,6 +302,7 @@ class _ServiceArchiveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final extrasCount = service['extrasCount'] as int? ?? 0;
+    final title = (service['title'] ?? 'Servicio').toString();
     final imageUrl =
         (service['image'] ?? service['imageUrl'] ?? '').toString().trim();
     final placeholderImage = (service['placeholderImage'] ??
@@ -260,53 +310,55 @@ class _ServiceArchiveCard extends StatelessWidget {
         .toString();
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppShadows.cardSoft,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadius.medium,
             child: SizedBox(
-              width: 104,
-              height: 104,
+              width: 96,
+              height: 96,
               child: imageUrl.isNotEmpty
                   ? HabitoCachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
+                      semanticLabel: 'Imagen del servicio $title',
                       errorWidget: Image.asset(
                         placeholderImage,
                         fit: BoxFit.cover,
                       ),
                     )
-                  : Image.asset(
-                      placeholderImage,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+                  : Semantics(
+                      label: 'Imagen del servicio $title',
+                      image: true,
+                      child: Image.asset(
+                        placeholderImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primarySoft,
+                                AppColors.goldDeep,
+                              ],
+                            ),
                           ),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.content_cut, color: Colors.white),
+                          child: const Center(
+                            child: Icon(Icons.content_cut, color: Colors.white),
+                          ),
                         ),
                       ),
                     ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,28 +368,28 @@ class _ServiceArchiveCard extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.goldMuted,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.full,
                   ),
                   child: const Text(
                     'Servicio',
                     style: TextStyle(
-                      color: Color(0xFF8B6A28),
-                      fontSize: 11,
+                      color: AppColors.goldDeep,
+                      fontSize: AppTextSize.captionSm,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
-                  (service['title'] ?? 'Servicio').toString(),
+                  title,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     height: 1.15,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -351,18 +403,18 @@ class _ServiceArchiveCard extends StatelessWidget {
                       _MiniPill(label: '$extrasCount extras disponibles'),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton(
                     onPressed: onTap,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: Colors.black,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.medium,
                       ),
                     ),
                     child: const Text(
@@ -390,14 +442,14 @@ class _MiniPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F3EA),
-        borderRadius: BorderRadius.circular(999),
+        color: AppColors.goldMuted,
+        borderRadius: AppRadius.full,
       ),
       child: Text(
         label,
         style: const TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 12,
+          fontSize: AppTextSize.label,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -419,16 +471,16 @@ class _ServicesInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFF9C7732)),
-          const SizedBox(width: 12),
+          const Icon(Icons.info_outline, color: AppColors.goldDeep),
+          const SizedBox(width: AppSpacing.md),
           Expanded(child: Text(message)),
           TextButton(onPressed: onTap, child: Text(label)),
         ],
@@ -446,7 +498,7 @@ class _ServiceArchiveSkeleton extends StatelessWidget {
       height: 150,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
     );

@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/app_top_header.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
@@ -18,7 +25,14 @@ class PointsPage extends StatefulWidget {
 }
 
 class _PointsPageState extends State<PointsPage> {
+  final ScrollController _scrollController = ScrollController();
   bool _didLoad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleHistoryScroll);
+  }
 
   @override
   void didChangeDependencies() {
@@ -31,6 +45,23 @@ class _PointsPageState extends State<PointsPage> {
       if (!mounted) return;
       context.read<PointsProvider>().load();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_handleHistoryScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleHistoryScroll() {
+    if (!mounted || !_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 280) {
+      context.read<PointsProvider>().loadMoreHistory();
+    }
   }
 
   @override
@@ -85,25 +116,33 @@ class _PointsPageState extends State<PointsPage> {
             color: AppColors.primary,
             onRefresh: points.refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md + AppSpacing.xxs,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
               children: [
                 Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(
+                    AppSpacing.xl - AppSpacing.xxs,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: AppRadius.display,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm - AppSpacing.xxs / 2,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.secondary.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: AppRadius.full,
                         ),
                         child: Text(
                           moduleEnabled ? 'Saldo actual' : 'Programa de puntos',
@@ -113,16 +152,16 @@ class _PointsPageState extends State<PointsPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                       Text(
                         '$balanceText $label',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 34,
+                          fontSize: AppTextSize.headlineLarge + AppSpacing.xxs,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         _buildHeroMessage(
                           moduleEnabled: moduleEnabled,
@@ -138,12 +177,14 @@ class _PointsPageState extends State<PointsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(
+                    AppSpacing.lg + AppSpacing.xxs,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: AppRadius.extraLarge,
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
@@ -152,17 +193,17 @@ class _PointsPageState extends State<PointsPage> {
                         label: 'Total acumulado',
                         value: '$totalEarnedText $label',
                       ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
+                      const Divider(height: AppSpacing.xxs / 2),
+                      const SizedBox(height: AppSpacing.md),
                       _MetricRow(
                         label: nextGoal > 0 ? 'Meta siguiente' : 'Estado',
                         value: nextGoal > 0 ? '$nextGoal $label' : 'Activo',
                       ),
                       if (nextGoal > 0) ...[
-                        const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: AppSpacing.xxs / 2),
+                        const SizedBox(height: AppSpacing.md),
                         _MetricRow(
                           label: 'Te faltan',
                           value: '$toNextGoal $label',
@@ -171,13 +212,13 @@ class _PointsPageState extends State<PointsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                 Row(
                   children: [
                     const Text(
                       'Historial',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: AppTextSize.section,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
@@ -185,14 +226,21 @@ class _PointsPageState extends State<PointsPage> {
                     const Spacer(),
                     if (points.isLoading)
                       const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        width: AppIconSize.action,
+                        height: AppIconSize.action,
+                        child: CircularProgressIndicator(
+                          strokeWidth: AppSpacing.xxs,
+                        ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (!moduleEnabled)
+                const SizedBox(height: AppSpacing.md),
+                if (points.isLoading && history.isEmpty)
+                  const HabitoLoadingShimmer(
+                    itemCount: 3,
+                    itemHeight: 86,
+                  )
+                else if (!moduleEnabled)
                   _EmptyStateCard(
                     title: 'Aún no activamos tus puntos',
                     subtitle:
@@ -212,10 +260,21 @@ class _PointsPageState extends State<PointsPage> {
                 else
                   ...history.map(
                     (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
                       child: _HistoryCard(item: item, pointsLabel: label),
                     ),
                   ),
+                if (points.isLoadingMoreHistory)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: AppSpacing.xxs,
+                      ),
+                    ),
+                  )
+                else if (points.hasMoreHistory)
+                  const SizedBox(height: AppSpacing.xl),
               ],
             ),
           );
@@ -275,7 +334,7 @@ class _MetricRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Text(
           value,
           textAlign: TextAlign.right,
@@ -303,27 +362,27 @@ class _HistoryCard extends StatelessWidget {
     final isGain = item.amount >= 0;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.card,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: AppRadius.panel,
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
+            height: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
             decoration: BoxDecoration(
               color: isGain ? AppColors.goldSoft : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppRadius.medium,
             ),
             child: Icon(
               isGain ? Icons.stars_rounded : Icons.sync_alt_rounded,
               color: AppColors.primary,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,37 +395,37 @@ class _HistoryCard extends StatelessWidget {
                   ),
                 ),
                 if (item.subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     item.subtitle,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 12.5,
+                      fontSize: AppTextSize.bodySmall,
                       height: 1.35,
                     ),
                   ),
                 ],
                 if (item.dateDisplay.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                   Text(
                     item.dateDisplay,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppTextSize.label,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Text(
             '${item.amountFormatted} $pointsLabel',
             textAlign: TextAlign.right,
             style: TextStyle(
-              color: isGain ? const Color(0xFF9C7732) : const Color(0xFFA33A3A),
+              color: isGain ? AppColors.goldDeep : AppColors.danger,
               fontWeight: FontWeight.w800,
-              fontSize: 15,
+              fontSize: AppTextSize.titleSmall,
             ),
           ),
         ],
@@ -386,34 +445,19 @@ class _EmptyStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
+    if (title.toLowerCase().contains('no pudimos')) {
+      return HabitoErrorState(
+        title: title,
+        message: subtitle,
+        compact: true,
+      );
+    }
+
+    return HabitoEmptyState(
+      icon: Icons.stars_rounded,
+      title: title,
+      message: subtitle,
+      compact: true,
     );
   }
 }

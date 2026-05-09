@@ -6,7 +6,10 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/shop_payment_method.dart';
+import '../../models/cart_validation.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/errors/friendly_errors.dart';
+import '../../../../core/utils/uuid.dart';
 
 class HabitoShopApi {
   static const String _customBase = AppConfig.apiBaseUrl;
@@ -588,6 +591,7 @@ class HabitoShopApi {
     String status = 'pending',
     bool setPaid = false,
     double redeemPoints = 0,
+    double redeemAmount = 0,
   }) async {
     final billing = _removeEmpty({
       'first_name': firstName.trim(),
@@ -644,7 +648,8 @@ class HabitoShopApi {
       'currency': currency,
       'status': status,
       'set_paid': setPaid,
-      if (redeemPoints > 0) 'redeem_points': _formatAmount(redeemPoints),
+      if (redeemPoints > 0) 'redeem_points': _amountNumber(redeemPoints),
+      if (redeemAmount > 0) 'redeem_amount': _amountNumber(redeemAmount),
       'payment_method': paymentMethod,
       'payment_method_title': paymentTitle,
       'payment_title': paymentTitle,
@@ -665,6 +670,16 @@ class HabitoShopApi {
         {'key': '_habito_app_tax_total', 'value': formattedTaxTotal},
         {'key': '_habito_app_shipping_total', 'value': formattedShipping},
         {'key': '_habito_app_total', 'value': formattedTotal},
+        if (redeemPoints > 0)
+          {
+            'key': '_habito_app_redeem_points',
+            'value': _amountNumber(redeemPoints),
+          },
+        if (redeemAmount > 0)
+          {
+            'key': '_habito_app_redeem_amount',
+            'value': _amountNumber(redeemAmount),
+          },
         {
           'key': '_habito_app_prices_include_tax',
           'value': pricesIncludeTax ? '1' : '0',
@@ -731,16 +746,21 @@ class HabitoShopApi {
         'total': formattedTotal,
         'prices_include_tax': pricesIncludeTax,
         'fulfillment_method': normalizedFulfillmentMethod,
+        if (redeemPoints > 0) 'redeem_points': _amountNumber(redeemPoints),
+        if (redeemAmount > 0) 'redeem_amount': _amountNumber(redeemAmount),
       },
     });
 
-    final response = await _client
-        .post(
-          Uri.parse('$_customBase/shop/orders'),
-          headers: _jsonAuthHeaders(token),
-          body: jsonEncode(body),
-        )
-        .timeout(_timeout);
+    final response = await _retryingPost(
+      Uri.parse('$_customBase/shop/orders'),
+      headers: _jsonAuthHeaders(token),
+      body: jsonEncode(body),
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-shop-order'),
+      timeoutMessage:
+          'No pudimos confirmar el pedido a tiempo. Revisa tus pedidos antes de intentarlo nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para crear el pedido. Revisa tu internet e intenta nuevamente.',
+    );
 
     final data = _decodeMap(response);
     if (data['success'] != true) {
@@ -749,18 +769,79 @@ class HabitoShopApi {
     return _normalizeOrder(_extractCreatedOrder(data));
   }
 
+  static Future<ShopCartValidationResult> validateCart({
+    required String token,
+    required List<Map<String, dynamic>> lineItems,
+    required String fulfillmentMethod,
+    int pickupLocationId = 0,
+    String pickupLocationName = '',
+    String pickupWarehouseExternalId = '',
+    double subtotal = 0,
+    double taxTotal = 0,
+    double shippingTotal = 0,
+    double orderTotal = 0,
+    bool pricesIncludeTax = false,
+  }) async {
+    final normalizedLineItems =
+        lineItems.map(_normalizeLineItemPayload).toList();
+    final body = _removeNulls({
+      'line_items': normalizedLineItems,
+      'fulfillment_method': fulfillmentMethod,
+      if (pickupLocationId > 0) 'pickup_location_id': pickupLocationId,
+      if (pickupLocationName.trim().isNotEmpty)
+        'pickup_location_name': pickupLocationName.trim(),
+      if (pickupWarehouseExternalId.trim().isNotEmpty)
+        'pickup_warehouse_external_id': pickupWarehouseExternalId.trim(),
+      'app_totals': {
+        'subtotal': _formatAmount(subtotal),
+        'tax_total': _formatAmount(taxTotal),
+        'shipping_total': _formatAmount(shippingTotal),
+        'total': _formatAmount(orderTotal),
+        'prices_include_tax': pricesIncludeTax,
+      },
+    });
+
+    final response = await _retryingPost(
+      Uri.parse('$_customBase/shop/cart/validate'),
+      headers: _jsonAuthHeaders(token),
+      body: jsonEncode(body),
+      attempts: 1,
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-cart-validate'),
+      timeoutMessage:
+          'No pudimos validar tu carrito a tiempo. Revisa tu conexion e intenta nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para validar el carrito. Revisa tu internet e intenta nuevamente.',
+    );
+
+    if (response.statusCode == 404) {
+      return ShopCartValidationResult.unavailable();
+    }
+
+    final data = _decodeMap(response);
+    if (data['success'] != true) {
+      throw Exception(_extractMessage(data));
+    }
+
+    return ShopCartValidationResult.fromJson(data);
+  }
+
   static Future<Map<String, dynamic>> uploadPaymentProof({
     required String token,
     required int orderId,
     required String filePath,
   }) async {
     final uri = Uri.parse('$_customBase/shop/orders/$orderId/payment-proof');
-    final request = http.MultipartRequest('POST', uri)
-      ..headers.addAll(_authHeaders(token))
-      ..files.add(await http.MultipartFile.fromPath('proof', filePath));
-
-    final streamed = await _client.send(request).timeout(_timeout);
-    final response = await http.Response.fromStream(streamed);
+    final response = await _retryingMultipartPost(
+      uri,
+      headers: _authHeaders(token),
+      fileField: 'proof',
+      filePath: filePath,
+      idempotencyKey: newIdempotencyKey(prefix: 'habito-payment-proof'),
+      timeoutMessage:
+          'No pudimos confirmar la carga del comprobante a tiempo. Revisa el pedido antes de intentarlo nuevamente.',
+      connectionMessage:
+          'No pudimos conectar para subir el comprobante. Revisa tu internet e intenta nuevamente.',
+    );
     final data = _decodeMap(response);
 
     if (data['success'] != true) {
@@ -846,6 +927,112 @@ class HabitoShopApi {
       throw Exception(_extractMessage(data));
     }
     return data;
+  }
+
+  static Future<http.Response> _retryingPost(
+    Uri uri, {
+    required Map<String, String> headers,
+    Object? body,
+    Duration timeout = _timeout,
+    int attempts = 3,
+    String? idempotencyKey,
+    String timeoutMessage =
+        'La operacion esta tomando mas tiempo de lo esperado. Revisa el estado antes de intentarlo nuevamente.',
+    String connectionMessage =
+        'No pudimos conectar con la tienda. Revisa tu internet e intenta nuevamente.',
+  }) async {
+    Object? lastError;
+    http.Response? lastResponse;
+    final requestHeaders = _withIdempotencyHeaders(
+      headers,
+      idempotencyKey ?? newIdempotencyKey(prefix: 'habito-shop'),
+    );
+
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      try {
+        final response = await _client
+            .post(uri, headers: requestHeaders, body: body)
+            .timeout(timeout);
+
+        if (!_shouldRetryPostResponse(response.statusCode) ||
+            attempt == attempts - 1) {
+          return response;
+        }
+
+        lastResponse = response;
+      } on TimeoutException catch (e) {
+        lastError = e;
+      } on http.ClientException catch (e) {
+        lastError = e;
+      } on SocketException catch (e) {
+        lastError = e;
+      } on HandshakeException catch (e) {
+        lastError = e;
+      }
+
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(_postBackoffDelay(attempt));
+      }
+    }
+
+    if (lastResponse != null) return lastResponse;
+    if (lastError is TimeoutException) throw Exception(timeoutMessage);
+    throw Exception(connectionMessage);
+  }
+
+  static Future<http.Response> _retryingMultipartPost(
+    Uri uri, {
+    required Map<String, String> headers,
+    required String fileField,
+    required String filePath,
+    Duration timeout = _timeout,
+    int attempts = 3,
+    String? idempotencyKey,
+    String timeoutMessage =
+        'La operacion esta tomando mas tiempo de lo esperado. Revisa el estado antes de intentarlo nuevamente.',
+    String connectionMessage =
+        'No pudimos conectar con la tienda. Revisa tu internet e intenta nuevamente.',
+  }) async {
+    Object? lastError;
+    http.Response? lastResponse;
+    final requestHeaders = _withIdempotencyHeaders(
+      headers,
+      idempotencyKey ?? newIdempotencyKey(prefix: 'habito-shop-upload'),
+    );
+
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      try {
+        final request = http.MultipartRequest('POST', uri)
+          ..headers.addAll(requestHeaders)
+          ..files.add(await http.MultipartFile.fromPath(fileField, filePath));
+
+        final streamed = await _client.send(request).timeout(timeout);
+        final response = await http.Response.fromStream(streamed);
+
+        if (!_shouldRetryPostResponse(response.statusCode) ||
+            attempt == attempts - 1) {
+          return response;
+        }
+
+        lastResponse = response;
+      } on TimeoutException catch (e) {
+        lastError = e;
+      } on http.ClientException catch (e) {
+        lastError = e;
+      } on SocketException catch (e) {
+        lastError = e;
+      } on HandshakeException catch (e) {
+        lastError = e;
+      }
+
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(_postBackoffDelay(attempt));
+      }
+    }
+
+    if (lastResponse != null) return lastResponse;
+    if (lastError is TimeoutException) throw Exception(timeoutMessage);
+    throw Exception(connectionMessage);
   }
 
   static Map<String, dynamic> _normalizeWooProduct(
@@ -1560,7 +1747,7 @@ class HabitoShopApi {
       case 'pending':
         return 'Pendiente de pago';
       case 'on-hold':
-        return 'En validacion';
+        return 'En validación';
       case 'processing':
         return 'Preparando pedido';
       case 'completed':
@@ -1580,11 +1767,11 @@ class HabitoShopApi {
   static String _orderStatusDescription(String status) {
     switch (status) {
       case 'pending':
-        return 'Tu pedido ya fue recibido y esta pendiente de pago o confirmacion inicial.';
+        return 'Tu pedido ya fue recibido y está pendiente de pago o confirmación inicial.';
       case 'on-hold':
         return 'Estamos validando el pago o revisando los datos de esta compra.';
       case 'processing':
-        return 'Tu pedido ya entro en preparacion y avanza correctamente.';
+        return 'Tu pedido ya entró en preparación y avanza correctamente.';
       case 'completed':
         return 'Tu pedido fue completado con exito.';
       case 'cancelled':
@@ -1701,6 +1888,10 @@ class HabitoShopApi {
   }
 
   static String _formatAmount(double value) => value.toStringAsFixed(2);
+
+  static double _amountNumber(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
 
   static int? _firstPositiveInt(List<int?> values) {
     for (final value in values) {
@@ -2035,15 +2226,26 @@ class HabitoShopApi {
   }
 
   static Map<String, dynamic> _decodeMap(http.Response response) {
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map<String, dynamic>) return decoded;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {
+      throw Exception(
+        FriendlyErrors.clean(
+          response.body,
+          statusCode: response.statusCode,
+          fallback: 'Respuesta inesperada de la tienda.',
+        ),
+      );
+    }
     throw Exception('Respuesta inesperada de la tienda.');
   }
 
   static String _extractMessage(Map<String, dynamic> data) {
-    return data['message']?.toString() ??
+    final message = data['message']?.toString() ??
         _asMap(data['error'])['message']?.toString() ??
         'No pudimos completar la operacion en la tienda.';
+    return FriendlyErrors.checkout(message);
   }
 
   static Map<String, dynamic> _asMap(dynamic value) {
@@ -2134,6 +2336,33 @@ class HabitoShopApi {
         'Accept': 'application/json',
         'Authorization': 'Bearer $token',
       };
+
+  static Map<String, String> _withIdempotencyHeaders(
+    Map<String, String> headers,
+    String key,
+  ) {
+    return {
+      ...headers,
+      'Idempotency-Key': key,
+      'X-Idempotency-Key': key,
+      'X-Habito-Idempotency-Key': key,
+    };
+  }
+
+  static bool _shouldRetryPostResponse(int statusCode) {
+    return statusCode == 408 ||
+        statusCode == 425 ||
+        statusCode == 429 ||
+        statusCode == 500 ||
+        statusCode == 502 ||
+        statusCode == 503 ||
+        statusCode == 504;
+  }
+
+  static Duration _postBackoffDelay(int attempt) {
+    final multiplier = 1 << attempt;
+    return Duration(milliseconds: 500 * multiplier);
+  }
 }
 
 class _CacheEntry<T> {

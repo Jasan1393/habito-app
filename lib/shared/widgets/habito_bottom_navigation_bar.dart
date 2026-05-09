@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_text_size.dart';
 
 class HabitoBottomNavigationBar extends StatelessWidget {
   final int selectedIndex;
@@ -18,9 +20,9 @@ class HabitoBottomNavigationBar extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
       backgroundColor: AppColors.primary,
-      indicatorColor: const Color(0xFFE7D39A),
+      indicatorColor: AppColors.goldLight,
       indicatorShape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.large,
       ),
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       surfaceTintColor: Colors.transparent,
@@ -28,9 +30,9 @@ class HabitoBottomNavigationBar extends StatelessWidget {
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
-          color: selected ? const Color(0xFFE7D39A) : Colors.white70,
+          color: selected ? AppColors.goldLight : Colors.white70,
           fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-          fontSize: 12,
+          fontSize: AppTextSize.label,
         );
       }),
       destinations: const [

@@ -5,6 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/ecuador_data.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/validators/ecuador_id_validator.dart';
+import '../../../../core/validators/form_validators.dart';
+import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../auth/provider/auth_provider.dart';
 
@@ -56,9 +64,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _contactType = _normalizeContactType(user?.contactType);
     _identificationType =
         _normalizeIdentificationType(user?.identificationType);
-    _province = kEcuadorProvinces.contains(user?.province)
-        ? user!.province
-        : 'Guayas';
+    _province =
+        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Guayas';
   }
 
   @override
@@ -102,8 +109,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFD4AF37),
-              surface: Color(0xFF1A1A1A),
+              primary: AppColors.secondary,
+              surface: AppColors.cardDark,
             ),
           ),
           child: child ?? const SizedBox.shrink(),
@@ -159,7 +166,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF1E1E1E),
+            backgroundColor: AppColors.primaryMuted,
             content: Text(
               auth.error!,
               style: const TextStyle(color: Colors.white),
@@ -171,37 +178,45 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
-    const bg = Color(0xFF111111);
-
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         final user = auth.user;
 
         return Scaffold(
-          backgroundColor: bg,
-          appBar: AppBar(
-            backgroundColor: bg,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            title: const Text(
+          backgroundColor: AppColors.primary,
+          appBar: AppTopHeader(
+            leadingIcon: Icons.arrow_back_rounded,
+            leadingTooltip: 'Volver',
+            onLeadingTap: () => Navigator.maybePop(context),
+            titleOverride: const Text(
               'Mis datos personales',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            actionsOverride: const [],
+            cartCount: 0,
+            onSearchTap: () {},
+            onCartTap: () {},
           ),
           body: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: AppSpacing.screen,
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(22),
+                      padding: const EdgeInsets.all(
+                        AppSpacing.xl - AppSpacing.xxs,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(24),
+                        color: AppColors.cardDark,
+                        borderRadius: AppRadius.extraLarge,
                       ),
                       child: Column(
                         children: [
@@ -209,17 +224,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             photoUrl: user?.photoUrl ?? '',
                             localPhotoPath: _photoPath,
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.cartItemGap),
                           Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
+                            spacing: AppSpacing.sm + AppSpacing.xxs,
+                            runSpacing: AppSpacing.sm + AppSpacing.xxs,
                             alignment: WrapAlignment.center,
                             children: [
                               OutlinedButton.icon(
                                 onPressed: auth.isLoading ? null : _pickPhoto,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: gold,
-                                  side: const BorderSide(color: gold),
+                                  foregroundColor: AppColors.secondary,
+                                  side: const BorderSide(
+                                    color: AppColors.secondary,
+                                  ),
                                 ),
                                 icon: const Icon(Icons.photo_library_outlined),
                                 label: const Text('Subir foto'),
@@ -246,7 +263,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _FieldCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,75 +271,76 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           const Text(
                             'Datos personales',
                             style: TextStyle(
-                              color: Color(0xFFE7D39A),
+                              color: AppColors.borderStrong,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.cartItemGap),
                           TextFormField(
                             controller: _firstNameCtrl,
+                            keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.givenName],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Primer nombre',
                               icon: Icons.person_outline_rounded,
                             ),
-                            validator: (value) {
-                              if ((value ?? '').trim().isEmpty) {
-                                return 'Ingresa tu primer nombre';
-                              }
-                              return null;
-                            },
+                            validator: (value) => FormValidators.requiredText(
+                              value,
+                              field: 'tu primer nombre',
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _middleNameCtrl,
+                            keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.middleName],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Segundo nombre',
                               icon: Icons.person_outline_rounded,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _lastNameCtrl,
+                            keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.familyName],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Apellidos',
                               icon: Icons.badge_outlined,
                             ),
-                            validator: (value) {
-                              if ((value ?? '').trim().isEmpty) {
-                                return 'Ingresa tus apellidos';
-                              }
-                              return null;
-                            },
+                            validator: (value) => FormValidators.requiredText(
+                              value,
+                              field: 'tus apellidos',
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.telephoneNumber,
+                            ],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Celular',
                               icon: Icons.phone_outlined,
                             ),
                             validator: (value) {
-                              final digits =
-                                  (value ?? '').replaceAll(RegExp(r'\D'), '');
-                              if (digits.isNotEmpty && digits.length < 8) {
-                                return 'Celular invalido';
-                              }
-                              return null;
+                              if ((value ?? '').trim().isEmpty) return null;
+                              return FormValidators.phone(value);
                             },
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _FieldCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,11 +348,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           const Text(
                             'Facturacion (Ecuador)',
                             style: TextStyle(
-                              color: Color(0xFFE7D39A),
+                              color: AppColors.borderStrong,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(
+                              height: AppSpacing.sm + AppSpacing.xxs),
                           const Text(
                             'Estos datos se usan para reservas, compras y vinculacion correcta con tu contacto en caja.',
                             style: TextStyle(
@@ -342,10 +361,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               height: 1.4,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           DropdownButtonFormField<String>(
                             initialValue: _contactType,
-                            dropdownColor: const Color(0xFF222222),
+                            dropdownColor: AppColors.primaryMuted,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Tipo de cliente',
@@ -370,10 +389,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             },
                           ),
                           if (_contactType == 'business') ...[
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _businessNameCtrl,
+                              keyboardType: TextInputType.name,
                               textInputAction: TextInputAction.next,
+                              autofillHints: const [
+                                AutofillHints.organizationName,
+                              ],
+                              maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: 'Razon social',
@@ -381,17 +405,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               ),
                               validator: (value) {
                                 if (_contactType != 'business') return null;
-                                if ((value ?? '').trim().isEmpty) {
-                                  return 'Ingresa la razon social';
-                                }
-                                return null;
+                                return FormValidators.requiredMaxLength(
+                                  value,
+                                  field: 'la razón social',
+                                );
                               },
                             ),
                           ],
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           DropdownButtonFormField<String>(
                             initialValue: _identificationType,
-                            dropdownColor: const Color(0xFF222222),
+                            dropdownColor: AppColors.primaryMuted,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Tipo de identificacion',
@@ -414,13 +438,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _taxNumberCtrl,
                             keyboardType: _identificationType == 'pasaporte'
                                 ? TextInputType.text
                                 : TextInputType.number,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.username],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: _documentLabel,
@@ -428,10 +453,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             ),
                             validator: _validateIdentificationNumber,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           DropdownButtonFormField<String>(
                             initialValue: _province,
-                            dropdownColor: const Color(0xFF222222),
+                            dropdownColor: AppColors.primaryMuted,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Provincia',
@@ -452,44 +477,48 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _cityCtrl,
+                            keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.addressCity],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Canton o ciudad',
                               icon: Icons.location_city_outlined,
                             ),
-                            validator: (value) {
-                              if ((value ?? '').trim().isEmpty) {
-                                return 'Ingresa el canton o ciudad';
-                              }
-                              return null;
-                            },
+                            validator: (value) => FormValidators.requiredText(
+                              value,
+                              field: 'el canton o ciudad',
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           TextFormField(
                             controller: _addressCtrl,
+                            keyboardType: TextInputType.streetAddress,
                             maxLines: 3,
                             minLines: 2,
                             textInputAction: TextInputAction.newline,
+                            autofillHints: const [
+                              AutofillHints.fullStreetAddress,
+                            ],
+                            maxLength: FormValidators.longTextMaxLength,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Direccion principal',
                               icon: Icons.home_outlined,
                             ),
-                            validator: (value) {
-                              if ((value ?? '').trim().isEmpty) {
-                                return 'Ingresa la direccion principal';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                FormValidators.requiredMaxLength(
+                              value,
+                              field: 'la direccion principal',
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _FieldCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,20 +526,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           const Text(
                             'Informacion adicional',
                             style: TextStyle(
-                              color: Color(0xFFE7D39A),
+                              color: AppColors.borderStrong,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.cartItemGap),
                           TextFormField(
                             controller: _birthdayCtrl,
                             readOnly: true,
+                            keyboardType: TextInputType.datetime,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.birthday],
                             onTap: auth.isLoading ? null : _pickBirthday,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
                               label: 'Cumpleanos',
                               icon: Icons.cake_outlined,
                               suffix: IconButton(
+                                tooltip: 'Seleccionar fecha de cumpleanos',
                                 onPressed:
                                     auth.isLoading ? null : _pickBirthday,
                                 icon: const Icon(
@@ -531,24 +564,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                     SizedBox(
-                      height: 54,
+                      height: AppSpacing.actionHeight,
                       child: ElevatedButton(
                         onPressed: auth.isLoading ? null : _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: gold,
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: AppRadius.tile,
                           ),
                         ),
                         child: auth.isLoading
                             ? const SizedBox(
-                                width: 22,
-                                height: 22,
+                                width: AppIconSize.progress,
+                                height: AppIconSize.progress,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
+                                  strokeWidth: AppSpacing.progressStroke +
+                                      AppSpacing.xxs / 10,
                                   color: Colors.black,
                                 ),
                               )
@@ -556,7 +590,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 'Guardar cambios',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: AppTextSize.titleMedium,
                                 ),
                               ),
                       ),
@@ -585,38 +619,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String get _documentLabel {
-    final label = kIdentificationTypeLabels[_identificationType] ??
-        _identificationType;
-    return 'Numero de $label';
+    final label =
+        kIdentificationTypeLabels[_identificationType] ?? _identificationType;
+    return 'Número de $label';
   }
 
   String? _validateIdentificationNumber(String? value) {
-    final text = (value ?? '').trim();
-    if (text.isEmpty) {
-      return 'Ingresa tu $_documentLabel';
-    }
-
-    if (_identificationType == 'cedula') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 10) {
-        return 'La cedula debe tener 10 digitos';
-      }
-      return null;
-    }
-
-    if (_identificationType == 'ruc') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 13) {
-        return 'El RUC debe tener 13 digitos';
-      }
-      return null;
-    }
-
-    if (text.length < 5) {
-      return 'Ingresa un pasaporte valido';
-    }
-
-    return null;
+    return EcuadorIdValidator.validate(
+      identificationType: _identificationType,
+      value: value,
+      emptyMessage: 'Ingresa tu $_documentLabel.',
+    );
   }
 
   InputDecoration _inputDecoration({
@@ -627,36 +640,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFD4AF37)),
+      prefixIcon: Icon(icon, color: AppColors.secondary),
       suffixIcon: suffix,
       filled: true,
-      fillColor: const Color(0xFF222222),
+      fillColor: AppColors.primaryMuted,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.medium,
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.medium,
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.medium,
         borderSide: const BorderSide(
-          color: Color(0xFFD4AF37),
+          color: AppColors.secondary,
           width: 1.2,
         ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.medium,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
+          color: AppColors.danger,
           width: 1.2,
         ),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.medium,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
+          color: AppColors.danger,
           width: 1.2,
         ),
       ),
@@ -695,10 +708,10 @@ class _FieldCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.lg + AppSpacing.xxs),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.cardDark,
+        borderRadius: AppRadius.extraLarge,
       ),
       child: child,
     );
@@ -725,13 +738,13 @@ class _ProfilePhoto extends StatelessWidget {
     }
 
     return CircleAvatar(
-      radius: 44,
-      backgroundColor: const Color(0xFFD4AF37),
+      radius: AppIconSize.optionBadge + AppSpacing.xs + AppSpacing.xxs,
+      backgroundColor: AppColors.secondary,
       backgroundImage: image,
       child: image == null
           ? const Icon(
               Icons.person,
-              size: 42,
+              size: AppIconSize.pointsBadge,
               color: Colors.black,
             )
           : null,

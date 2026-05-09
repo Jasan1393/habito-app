@@ -9,8 +9,16 @@ import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/location_coordinate_cache_service.dart';
 import '../../../../core/services/location_launcher_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/habito_bottom_navigation_bar.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_error_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
@@ -463,26 +471,44 @@ class _LocationsPageState extends State<LocationsPage> {
         onDestinationSelected: _goToMainTab,
       ),
       body: RefreshIndicator(
-        color: const Color(0xFFD4AF37),
+        color: AppColors.secondary,
         onRefresh: () => _loadLocations(forceRefresh: true),
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFD4AF37)),
+            ? ListView(
+                padding: EdgeInsets.all(AppSpacing.xl),
+                children: const [
+                  HabitoLoadingShimmer(
+                    itemCount: 4,
+                    itemHeight: 132,
+                  ),
+                ],
               )
             : _error != null && locations.isEmpty
-                ? _LocationsErrorView(
-                    message: _error!,
-                    onRetry: () => _loadLocations(forceRefresh: true),
+                ? ListView(
+                    padding: AppSpacing.section,
+                    children: [
+                      SizedBox(height: AppSpacing.actionHeight + AppSpacing.sm),
+                      HabitoErrorState(
+                        title: 'No pudimos cargar las sucursales',
+                        message: _error!,
+                        onRetry: () => _loadLocations(forceRefresh: true),
+                      ),
+                    ],
                   )
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      AppSpacing.sm,
+                      AppSpacing.lg,
+                      AppSpacing.xl + AppSpacing.xs,
+                    ),
                     children: [
                       _SectionTitle(
                         isLocating: _isLocating,
                         onFindNearest: _findNearestLocation,
                       ),
                       if (_locationAccessIssue != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _LocationAccessNotice(
                           issue: _locationAccessIssue!,
                           onAction: () => _handleLocationAccessAction(
@@ -491,16 +517,21 @@ class _LocationsPageState extends State<LocationsPage> {
                         ),
                       ],
                       if (_isRefreshing) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: AppSpacing.cartItemGap),
                         const LinearProgressIndicator(
-                          minHeight: 3,
-                          color: Color(0xFFD4AF37),
-                          backgroundColor: Color(0xFFE8E0D4),
+                          minHeight: AppSpacing.progress,
+                          color: AppColors.secondary,
+                          backgroundColor: AppColors.border,
                         ),
                       ],
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.cartItemGap),
                       if (locations.isEmpty)
-                        const _EmptyLocationsView()
+                        const HabitoEmptyState(
+                          icon: Icons.store_mall_directory_outlined,
+                          title: 'No hay sucursales disponibles',
+                          message:
+                              'Intenta actualizar la pantalla en unos segundos.',
+                        )
                       else
                         ...locations.asMap().entries.map(
                           (entry) {
@@ -510,7 +541,9 @@ class _LocationsPageState extends State<LocationsPage> {
                                 entry.key == 0;
 
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.cartItemGap,
+                              ),
                               child: _LocationCard(
                                 location: entry.value,
                                 isNearest: isNearest,
@@ -560,7 +593,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         SizedBox(
           width: double.infinity,
-          height: 48,
+          height: AppIconSize.xxl,
           child: ElevatedButton.icon(
             onPressed: isLocating ? null : onFindNearest,
             style: ElevatedButton.styleFrom(
@@ -569,19 +602,22 @@ class _SectionTitle extends StatelessWidget {
               disabledBackgroundColor:
                   AppColors.primary.withValues(alpha: 0.42),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: AppRadius.tile,
               ),
             ),
             icon: isLocating
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: AppIconSize.action,
+                    height: AppIconSize.action,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
+                      strokeWidth: AppSpacing.progressStroke,
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.my_location_rounded, size: 19),
+                : const Icon(
+                    Icons.my_location_rounded,
+                    size: AppIconSize.action + AppSpacing.xxs / 2,
+                  ),
             label: Text(
               isLocating ? 'Buscando...' : 'Buscar sucursal más cercana',
               style: const TextStyle(fontWeight: FontWeight.w900),
@@ -619,23 +655,15 @@ class _LocationCard extends StatelessWidget {
     final phone = (location['phone'] ?? '').toString();
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.lg + AppSpacing.xxs),
       decoration: BoxDecoration(
-        color: isNearest ? const Color(0xFFFFFAEC) : Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        color: isNearest ? AppColors.goldSurface : Colors.white,
+        borderRadius: AppRadius.hero,
         border: Border.all(
-          color: isNearest ? const Color(0xFFD4AF37) : AppColors.border,
-          width: isNearest ? 2 : 1,
+          color: isNearest ? AppColors.secondary : AppColors.border,
+          width: isNearest ? AppSpacing.xxs : AppSpacing.xxs / 2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isNearest
-                ? const Color(0xFFD4AF37).withValues(alpha: 0.22)
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: isNearest ? 24 : 16,
-            offset: Offset(0, isNearest ? 12 : 8),
-          ),
-        ],
+        boxShadow: isNearest ? AppShadows.goldGlow : AppShadows.cardSoft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,19 +671,22 @@ class _LocationCard extends StatelessWidget {
           if (isNearest) ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm + AppSpacing.xxs,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: AppRadius.tile,
               ),
               child: const Row(
                 children: [
                   Icon(
                     Icons.near_me_rounded,
-                    color: Color(0xFFE7D39A),
-                    size: 18,
+                    color: AppColors.borderStrong,
+                    size: AppIconSize.action,
                   ),
-                  SizedBox(width: 8),
+                  SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
                       'Sucursal más cercana a ti',
@@ -668,38 +699,38 @@ class _LocationCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.cartItemGap),
           ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: AppIconSize.xxl,
+                height: AppIconSize.xxl,
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(17),
+                  borderRadius: AppRadius.large,
                 ),
                 child: const Icon(
                   Icons.storefront_rounded,
-                  color: Color(0xFFE7D39A),
+                  color: AppColors.borderStrong,
                 ),
               ),
-              const SizedBox(width: 13),
+              const SizedBox(width: AppSpacing.md + AppSpacing.xxs / 2),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           name,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 18,
+                            fontSize: AppTextSize.titleLarge,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -711,13 +742,14 @@ class _LocationCard extends StatelessWidget {
                       ],
                     ),
                     if (showDistance) ...[
-                      const SizedBox(height: 5),
+                      const SizedBox(
+                          height: AppSpacing.xs + AppSpacing.xxs / 2),
                       Text(
                         distanceLabel.isEmpty
                             ? 'Distancia no disponible'
                             : distanceLabel,
                         style: const TextStyle(
-                          color: Color(0xFF9C7732),
+                          color: AppColors.goldDeep,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -728,28 +760,33 @@ class _LocationCard extends StatelessWidget {
             ],
           ),
           if (address.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             _InfoLine(icon: Icons.location_on_outlined, text: address),
           ],
           if (phone.isNotEmpty) ...[
-            const SizedBox(height: 9),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs / 2),
             _InfoLine(icon: Icons.call_outlined, text: phone),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onOpenMap,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF9C7732),
-                    side: const BorderSide(color: Color(0xFFD4AF37)),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    foregroundColor: AppColors.goldDeep,
+                    side: const BorderSide(color: AppColors.secondary),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md + AppSpacing.xxs / 2,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: AppRadius.soft,
                     ),
                   ),
-                  icon: const Icon(Icons.directions_rounded, size: 18),
+                  icon: const Icon(
+                    Icons.directions_rounded,
+                    size: AppIconSize.action,
+                  ),
                   label: const Text(
                     'Cómo llegar',
                     style: TextStyle(fontWeight: FontWeight.w800),
@@ -757,10 +794,10 @@ class _LocationCard extends StatelessWidget {
                 ),
               ),
               if (phone.isNotEmpty) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                 SizedBox(
-                  width: 52,
-                  height: 48,
+                  width: AppIconSize.successBadge,
+                  height: AppIconSize.xxl,
                   child: OutlinedButton(
                     onPressed: onCall,
                     style: OutlinedButton.styleFrom(
@@ -768,29 +805,35 @@ class _LocationCard extends StatelessWidget {
                       side: const BorderSide(color: AppColors.border),
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: AppRadius.soft,
                       ),
                     ),
-                    child: const Icon(Icons.call_rounded, size: 20),
+                    child: const Icon(
+                      Icons.call_rounded,
+                      size: AppTextSize.section,
+                    ),
                   ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: AppIconSize.xxl,
             child: ElevatedButton.icon(
               onPressed: onReserve,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: AppRadius.soft,
                 ),
               ),
-              icon: const Icon(Icons.calendar_month_rounded, size: 18),
+              icon: const Icon(
+                Icons.calendar_month_rounded,
+                size: AppIconSize.action,
+              ),
               label: const Text(
                 'Reservar en esta sucursal',
                 style: TextStyle(fontWeight: FontWeight.w900),
@@ -815,21 +858,26 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm + AppSpacing.xxs / 2,
+        vertical: AppSpacing.xs + AppSpacing.xxs / 2,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7D39A).withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(999),
+        color: AppColors.goldMuted,
+        borderRadius: AppRadius.full,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: const Color(0xFF7A5B1B)),
-          const SizedBox(width: 4),
+          Icon(icon,
+              size: AppIconSize.xs - AppSpacing.xxs / 2,
+              color: AppColors.goldDeep),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF7A5B1B),
-              fontSize: 11,
+              color: AppColors.goldDeep,
+              fontSize: AppTextSize.captionSm,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -853,8 +901,8 @@ class _InfoLine extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF9C7732)),
-        const SizedBox(width: 9),
+        Icon(icon, size: AppIconSize.action, color: AppColors.goldDeep),
+        const SizedBox(width: AppSpacing.sm + AppSpacing.xxs / 2),
         Expanded(
           child: Text(
             text,
@@ -920,29 +968,29 @@ class _LocationAccessNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.cartItemGap),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFAEC),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE7D39A)),
+        color: AppColors.goldSurface,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.borderStrong),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: AppIconSize.optionBadge,
+            height: AppIconSize.optionBadge,
             decoration: BoxDecoration(
               color: AppColors.primary,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppRadius.medium,
             ),
             child: const Icon(
               Icons.location_off_rounded,
-              color: Color(0xFFE7D39A),
-              size: 20,
+              color: AppColors.borderStrong,
+              size: AppTextSize.section,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -954,7 +1002,7 @@ class _LocationAccessNotice extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   _message,
                   style: const TextStyle(
@@ -963,7 +1011,7 @@ class _LocationAccessNotice extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
@@ -974,7 +1022,10 @@ class _LocationAccessNotice extends StatelessWidget {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
                     ),
-                    icon: const Icon(Icons.settings_rounded, size: 16),
+                    icon: const Icon(
+                      Icons.settings_rounded,
+                      size: AppTextSize.titleMedium,
+                    ),
                     label: Text(
                       _actionLabel,
                       style: const TextStyle(fontWeight: FontWeight.w900),
@@ -990,36 +1041,36 @@ class _LocationAccessNotice extends StatelessWidget {
   }
 }
 
-class _EmptyLocationsView extends StatelessWidget {
-  const _EmptyLocationsView();
+class EmptyLocationsView extends StatelessWidget {
+  const EmptyLocationsView({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(26),
+      padding: const EdgeInsets.all(AppSpacing.xl + AppSpacing.xxs),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: AppRadius.display,
         border: Border.all(color: AppColors.border),
       ),
       child: const Column(
         children: [
           Icon(
             Icons.store_mall_directory_outlined,
-            size: 52,
-            color: Color(0xFF9C7732),
+            size: AppIconSize.successBadge,
+            color: AppColors.goldDeep,
           ),
-          SizedBox(height: 14),
+          SizedBox(height: AppSpacing.cartItemGap),
           Text(
             'No hay sucursales disponibles',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 22,
+              fontSize: AppTextSize.headlineSmall,
               fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(height: 8),
+          SizedBox(height: AppSpacing.sm),
           Text(
             'Intenta actualizar la pantalla en unos segundos.',
             textAlign: TextAlign.center,
@@ -1034,11 +1085,12 @@ class _EmptyLocationsView extends StatelessWidget {
   }
 }
 
-class _LocationsErrorView extends StatelessWidget {
+class LocationsErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _LocationsErrorView({
+  const LocationsErrorView({
+    super.key,
     required this.message,
     required this.onRetry,
   });
@@ -1046,34 +1098,34 @@ class _LocationsErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: AppSpacing.section,
       children: [
-        const SizedBox(height: 60),
+        const SizedBox(height: AppSpacing.actionHeight + AppSpacing.sm),
         Container(
-          padding: const EdgeInsets.all(26),
+          padding: const EdgeInsets.all(AppSpacing.xl + AppSpacing.xxs),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: AppRadius.display,
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             children: [
               const Icon(
                 Icons.error_outline_rounded,
-                size: 52,
-                color: Color(0xFFA33A3A),
+                size: AppIconSize.successBadge,
+                color: AppColors.danger,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.cartItemGap),
               const Text(
                 'No pudimos cargar las sucursales',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 22,
+                  fontSize: AppTextSize.headlineSmall,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 message,
                 textAlign: TextAlign.center,
@@ -1082,20 +1134,23 @@ class _LocationsErrorView extends StatelessWidget {
                   height: 1.35,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: AppIconSize.successBadge - AppSpacing.xxs,
                 child: ElevatedButton.icon(
                   onPressed: onRetry,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
+                    backgroundColor: AppColors.secondary,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: AppRadius.tile,
                     ),
                   ),
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    size: AppIconSize.action,
+                  ),
                   label: const Text(
                     'Reintentar',
                     style: TextStyle(fontWeight: FontWeight.w900),

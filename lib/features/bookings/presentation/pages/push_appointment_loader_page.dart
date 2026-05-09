@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
 import 'appointment_detail_page.dart';
@@ -78,7 +79,7 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
       if (!mounted) return;
       setState(() {
         _error =
-            'No pudimos abrir el detalle de la cita desde la notificacion.';
+            'No pudimos abrir el detalle de la cita desde la notificación.';
       });
     }
   }
@@ -117,7 +118,7 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F4F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
@@ -142,7 +143,7 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
                   height: 28,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.6,
-                    color: Color(0xFFD4AF37),
+                    color: AppColors.secondary,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -150,9 +151,9 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
                   'Estamos abriendo el detalle de tu cita...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: AppTextSize.titleSmall,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2B2B2B),
+                    color: AppColors.primaryMuted,
                   ),
                 ),
               ] else ...[
@@ -160,9 +161,9 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
                   _error!,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: AppTextSize.titleSmall,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2B2B2B),
+                    color: AppColors.primaryMuted,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -171,7 +172,7 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
                   child: ElevatedButton(
                     onPressed: _redirectToMyAppointmentsLoginFlow,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: AppColors.primary,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14),

@@ -1,10 +1,19 @@
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/app_top_header.dart';
+import '../../../../shared/widgets/habito_payment_proof_picker.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
+import '../../../shop/presentation/pages/cart_page.dart';
+import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
 import 'bookings_page.dart';
 
@@ -80,44 +89,44 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Color _statusBg(String status) {
     switch (_normalizeStatusKey(status)) {
       case 'confirmada':
-        return const Color(0xFFE7F6EC);
+        return AppColors.successSoft;
       case 'pendiente':
-        return const Color(0xFFFFF4DD);
+        return AppColors.warningSoft;
       case 'pendiente_vencida':
-        return const Color(0xFFF3EFE9);
+        return AppColors.surfaceMuted;
       case 'cancelada':
-        return const Color(0xFFFDE8E8);
+        return AppColors.dangerSoft;
       case 'rechazada':
-        return const Color(0xFFFDE8E8);
+        return AppColors.dangerSoft;
       case 'completada':
-        return const Color(0xFFE8F0FD);
+        return AppColors.infoSoft;
       case 'pagado':
-        return const Color(0xFFE7F6EC);
+        return AppColors.successSoft;
       case 'no_pagado':
-        return const Color(0xFFFFF4DD);
+        return AppColors.warningSoft;
       default:
-        return const Color(0xFFF3EFE9);
+        return AppColors.surfaceMuted;
     }
   }
 
   Color _statusText(String status) {
     switch (_normalizeStatusKey(status)) {
       case 'confirmada':
-        return const Color(0xFF1F8B4D);
+        return AppColors.success;
       case 'pendiente':
-        return const Color(0xFFB7791F);
+        return AppColors.warningDeep;
       case 'pendiente_vencida':
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
       case 'cancelada':
-        return const Color(0xFFC53030);
+        return AppColors.danger;
       case 'rechazada':
-        return const Color(0xFFB91C1C);
+        return AppColors.dangerDeep;
       case 'completada':
-        return const Color(0xFF1565C0);
+        return AppColors.info;
       case 'pagado':
-        return const Color(0xFF1F8B4D);
+        return AppColors.success;
       case 'no_pagado':
-        return const Color(0xFFB7791F);
+        return AppColors.warningDeep;
       default:
         return AppColors.textSecondary;
     }
@@ -236,11 +245,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   String _formatPaymentMethod(String value) {
     final text = value.trim();
-    if (text.isEmpty || text == '-') return 'No definido';
+    if (text.isEmpty || text == '-') return 'On-site (pagar en el sitio)';
 
     final lower = text.toLowerCase();
     if (lower == 'bacs' || lower.contains('transfer')) {
       return 'Transferencia';
+    }
+    if (lower == 'cod' ||
+        lower == 'on_site' ||
+        lower == 'onsite' ||
+        lower.contains('on-site') ||
+        lower.contains('sitio') ||
+        lower.contains('barberia') ||
+        lower.contains('barbería') ||
+        lower.contains('local') ||
+        lower.contains('contra entrega')) {
+      return 'On-site (pagar en el sitio)';
     }
     if (lower.contains('point') || lower.contains('punto')) {
       return 'Puntos Habito';
@@ -502,7 +522,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
     if (statusKey == 'completada') return 'La cita ya fue completada.';
     if (statusKey == 'pendiente_vencida') {
-      return 'La solicitud vencio porque la fecha de la cita ya paso.';
+      return 'La solicitud venció porque la fecha de la cita ya pasó.';
     }
     if (!_isFutureAppointment(bookingStart)) {
       return 'Fuera de ventana para cancelar.';
@@ -532,7 +552,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Cancelar cita'),
         content: const Text(
-          'Esta accion cancelara tu cita. Deseas continuar?',
+          'Esta acción cancelará tu cita. ¿Deseas continuar?',
         ),
         actions: [
           TextButton(
@@ -541,7 +561,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Si, cancelar'),
+            child: const Text('Sí, cancelar'),
           ),
         ],
       ),
@@ -566,7 +586,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (!mounted) return;
       _showMessage(
         context,
-        'No se pudo cancelar la cita: ${e.toString().replaceFirst('Exception: ', '')}',
+        FriendlyErrors.cancelAppointment(e),
       );
     } finally {
       if (mounted) {
@@ -574,6 +594,57 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           _isCancelling = false;
         });
       }
+    }
+  }
+
+  Future<void> _openRescheduleFlow({
+    required int? appointmentId,
+    required int? serviceId,
+    required String serviceName,
+    required int? providerId,
+    required String barberName,
+    required int? locationId,
+    required String branchName,
+    required String bookingStart,
+  }) async {
+    if (appointmentId == null || appointmentId <= 0) {
+      _showMessage(context, 'No pudimos identificar la cita para reagendar.');
+      return;
+    }
+
+    final parsedStart = _parseBackendDateTime(bookingStart);
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingsPage(
+          appointmentId: appointmentId.toString(),
+          service: serviceId != null
+              ? {
+                  'id': serviceId,
+                  'title': serviceName,
+                }
+              : null,
+          selectedBarber: providerId != null
+              ? {
+                  'id': providerId,
+                  'fullName': barberName,
+                  'locationId': locationId,
+                }
+              : null,
+          initialBranch: branchName,
+          initialBarber: barberName,
+          initialDate: parsedStart == null
+              ? null
+              : DateTime(parsedStart.year, parsedStart.month, parsedStart.day),
+          initialTime:
+              parsedStart == null ? null : _formatBackendTime(bookingStart),
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (changed == true) {
+      Navigator.pop(context, true);
     }
   }
 
@@ -589,13 +660,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       return;
     }
 
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 82,
-      maxWidth: 1800,
+    final selectedProof = await HabitoPaymentProofPicker.pickAndConfirm(
+      context,
+      showMessage: (message) => _showMessage(context, message),
     );
 
-    if (picked == null || !mounted) return;
+    if (selectedProof == null || !mounted) return;
 
     setState(() {
       _isUploadingProof = true;
@@ -606,7 +676,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       final ok = await shop.uploadPaymentProof(
         token: token,
         orderId: orderId,
-        filePath: picked.path,
+        filePath: selectedProof.path,
       );
 
       if (!mounted) return;
@@ -630,13 +700,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
       _showMessage(
         context,
-        shop.paymentProofError ?? 'No pudimos subir el comprobante.',
+        FriendlyErrors.paymentProof(
+          shop.paymentProofError ?? 'No pudimos subir el comprobante.',
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       _showMessage(
         context,
-        'No pudimos subir el comprobante: ${e.toString().replaceFirst('Exception: ', '')}',
+        FriendlyErrors.paymentProof(e),
       );
     } finally {
       if (mounted) {
@@ -650,7 +722,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFF2B2118),
+        backgroundColor: AppColors.primarySoft,
         behavior: SnackBarBehavior.floating,
         content: Text(
           message,
@@ -744,16 +816,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         '-';
 
     final String paymentGateway = _firstNonEmpty([
+          appointmentMap['habitoPaymentTitle']?.toString(),
+          appointmentMap['habito_payment_title']?.toString(),
           appointmentMap['paymentTitle']?.toString(),
           appointmentMap['payment_title']?.toString(),
           appointmentMap['paymentMethodTitle']?.toString(),
           appointmentMap['payment_method_title']?.toString(),
+          appointmentMap['habitoPaymentMethod']?.toString(),
+          appointmentMap['habito_payment_method']?.toString(),
           appointmentMap['paymentMethod']?.toString(),
           appointmentMap['payment_method']?.toString(),
           appointmentMap['paymentGateway']?.toString(),
           appointmentMap['payment_gateway']?.toString(),
           bookingMap['paymentTitle']?.toString(),
           bookingMap['payment_title']?.toString(),
+          bookingMap['habitoPaymentMethod']?.toString(),
+          bookingMap['habito_payment_method']?.toString(),
           bookingMap['paymentMethod']?.toString(),
           bookingMap['payment_method']?.toString(),
         ]) ??
@@ -795,11 +873,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final proofUploadedAt =
         (paymentProof['uploaded_at'] ?? paymentProof['uploadedAt'] ?? '')
             .toString();
+    final int? appointmentId = _asInt(
+      appointmentMap['appointmentId'] ??
+          appointmentMap['appointment_id'] ??
+          appointmentMap['id'],
+    );
 
     final String reservationCode = _firstNonEmpty([
-          appointmentMap['appointmentId']?.toString(),
-          appointmentMap['appointment_id']?.toString(),
-          appointmentMap['id']?.toString(),
+          appointmentId?.toString(),
         ]) ??
         '-';
 
@@ -864,7 +945,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           appointmentMap['statusDisplay']?.toString(),
         ]) ??
         _statusLabel(normalizedStatus);
-    final canRebook = normalizedStatus == 'confirmada';
     final canCancel = _canCancelAppointment(
       appointmentMap: appointmentMap,
       bookingMap: bookingMap,
@@ -876,29 +956,43 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           bookingStart: bookingStart,
         ) ??
         (!canCancel ? 'Fuera de ventana para cancelar.' : null);
+    final isPendingAppointment = normalizedStatus == 'pendiente';
     final canUploadPaymentProof = isBankTransfer &&
         !proofUploaded &&
+        isPendingAppointment &&
         paymentOrderId != null &&
         paymentOrderId > 0 &&
         !const {'cancelada', 'rechazada', 'completada'}
             .contains(normalizedStatus);
+    final shouldShowPaymentProofPanel =
+        isBankTransfer && (proofUploaded || isPendingAppointment);
 
     final extras = _extractExtras(appointmentMap, bookingMap);
+    final cartCount = context.select<ShopProvider, int>(
+      (provider) => provider.cartCount,
+    );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F4F1),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Detalle de cita',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+      backgroundColor: AppColors.background,
+      appBar: AppTopHeader(
+        compactSearch: true,
+        searchHint: 'Buscar productos',
+        cartCount: cartCount,
+        leadingIcon: Icons.arrow_back_rounded,
+        leadingTooltip: 'Volver',
+        onLeadingTap: () => Navigator.maybePop(context),
+        onSearchTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProductsArchivePage()),
+          );
+        },
+        onCartTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CartPage()),
+          );
+        },
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -906,93 +1000,79 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: canRebook
-                      ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => BookingsPage(
-                                service: serviceId != null
-                                    ? {
-                                        'id': serviceId,
-                                        'title': service,
-                                      }
-                                    : null,
-                                selectedBarber: providerId != null
-                                    ? {
-                                        'id': providerId,
-                                        'fullName': barber,
-                                        'locationId': locationId,
-                                      }
-                                    : null,
-                                initialBranch: branch,
-                                initialBarber: barber,
-                              ),
-                            ),
-                          );
-                        }
-                      : null,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFD4AF37)),
-                    foregroundColor: const Color(0xFF9C7732),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    'Agendar nuevamente',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: canCancel && !_isCancelling
-                      ? () => _cancelAppointment(
-                            bookingId: bookingId,
-                            canCancel: canCancel,
-                          )
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    disabledBackgroundColor: const Color(0xFFE7DFD4),
-                    foregroundColor: AppColors.primary,
-                    disabledForegroundColor: const Color(0xFF9E9E9E),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isCancelling
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: AppColors.primary,
-                          ),
-                        )
-                      : const Text(
-                          'Cancelar cita',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+              Row(
+                children: [
+                  if (canCancel) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openRescheduleFlow(
+                          appointmentId: appointmentId,
+                          serviceId: serviceId,
+                          serviceName: service,
+                          providerId: providerId,
+                          barberName: barber,
+                          locationId: locationId,
+                          branchName: branch,
+                          bookingStart: bookingStart,
                         ),
-                ),
+                        icon: const Icon(Icons.edit_calendar_rounded),
+                        label: const Text('Reagendar'),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.secondary),
+                          foregroundColor: AppColors.goldDeep,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadius.tile,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
+                  ],
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: canCancel && !_isCancelling
+                          ? () => _cancelAppointment(
+                                bookingId: bookingId,
+                                canCancel: canCancel,
+                              )
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        disabledBackgroundColor: AppColors.border,
+                        foregroundColor: AppColors.primary,
+                        disabledForegroundColor: AppColors.textMuted,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.tile,
+                        ),
+                      ),
+                      child: _isCancelling
+                          ? const SizedBox(
+                              width: AppIconSize.action,
+                              height: AppIconSize.action,
+                              child: CircularProgressIndicator(
+                                strokeWidth: AppSpacing.progressStroke,
+                                color: AppColors.primary,
+                              ),
+                            )
+                          : const Text(
+                              'Cancelar cita',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                    ),
+                  ),
+                ],
               ),
               if (!canCancel && cancelUnavailableReason != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   cancelUnavailableReason,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 12.5,
+                    fontSize: AppTextSize.bodySmall,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1008,7 +1088,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: AppColors.primary,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: AppRadius.extraLarge,
             ),
             child: Row(
               children: [
@@ -1017,15 +1097,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   height: 58,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: AppRadius.large,
                   ),
                   child: const Icon(
                     Icons.content_cut,
                     color: Colors.white,
-                    size: 28,
+                    size: AppIconSize.lg,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: AppSpacing.md + AppSpacing.xxs),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1034,16 +1114,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         service,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: AppTextSize.headlineSmall,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                       Text(
                         'Reserva #$reservationCode',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.88),
-                          fontSize: 13.5,
+                          fontSize: AppTextSize.bodyStrong,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1053,19 +1133,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              borderRadius: AppRadius.extraLarge,
+              boxShadow: AppShadows.panel,
             ),
             child: Column(
               children: [
@@ -1074,46 +1148,46 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   label: 'Sucursal',
                   value: branch,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.person_outline_rounded,
                   label: 'Barbero',
                   value: barber,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.calendar_today_outlined,
                   label: 'Fecha',
                   value: date,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.access_time_rounded,
                   label: 'Hora',
                   value: endTime != '-' ? '$time - $endTime' : time,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.payments_outlined,
                   label: 'Precio',
                   value: priceText,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.info_outline_rounded,
-                      size: 20,
-                      color: Color(0xFF9C7732),
+                      size: AppIconSize.spinner,
+                      color: AppColors.goldDeep,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                     const SizedBox(
                       width: 86,
                       child: Text(
                         'Estado',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: AppTextSize.base,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                         ),
@@ -1129,13 +1203,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           ),
                           decoration: BoxDecoration(
                             color: _statusBg(normalizedStatus),
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: AppRadius.full,
                           ),
                           child: Text(
                             statusLabel,
                             style: TextStyle(
                               color: _statusText(normalizedStatus),
-                              fontSize: 12,
+                              fontSize: AppTextSize.label,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1144,22 +1218,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.account_balance_wallet_outlined,
-                      size: 20,
-                      color: Color(0xFF9C7732),
+                      size: AppIconSize.spinner,
+                      color: AppColors.goldDeep,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                     const SizedBox(
                       width: 86,
                       child: Text(
                         'Pago',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: AppTextSize.base,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                         ),
@@ -1175,13 +1249,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           ),
                           decoration: BoxDecoration(
                             color: _statusBg(paymentStatus),
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: AppRadius.full,
                           ),
                           child: Text(
                             _statusLabel(paymentStatus),
                             style: TextStyle(
                               color: _statusText(paymentStatus),
-                              fontSize: 12,
+                              fontSize: AppTextSize.label,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1193,19 +1267,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              borderRadius: AppRadius.extraLarge,
+              boxShadow: AppShadows.panel,
             ),
             child: Column(
               children: [
@@ -1214,13 +1282,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   label: 'Cliente',
                   value: clientName,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.phone_outlined,
                   label: 'Celular',
                   value: clientPhone,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.mail_outline_rounded,
                   label: 'Correo',
@@ -1229,20 +1297,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
           if (extras.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                borderRadius: AppRadius.extraLarge,
+                boxShadow: AppShadows.panel,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1250,12 +1312,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   const Text(
                     'Extras',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppTextSize.titleMedium,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   ...extras.map(
                     (extra) {
                       final extraName = _firstNonEmpty([
@@ -1279,27 +1341,28 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           children: [
                             const Icon(
                               Icons.add_circle_outline,
-                              size: 18,
-                              color: Color(0xFF9C7732),
+                              size: AppIconSize.action,
+                              color: AppColors.goldDeep,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(
+                                width: AppSpacing.sm + AppSpacing.xxs),
                             Expanded(
                               child: Text(
                                 quantity > 1
                                     ? '$extraName x$quantity'
                                     : extraName,
                                 style: const TextStyle(
-                                  fontSize: 14.5,
+                                  fontSize: AppTextSize.baseLarge,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(
                               totalPrice,
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: AppTextSize.base,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textSecondary,
                               ),
@@ -1312,19 +1375,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ],
               ),
             ),
-          if (extras.isNotEmpty) const SizedBox(height: 18),
+          if (extras.isNotEmpty)
+            const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              borderRadius: AppRadius.extraLarge,
+              boxShadow: AppShadows.panel,
             ),
             child: Column(
               children: [
@@ -1333,20 +1391,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   label: 'Dirección',
                   value: locationAddress,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.call_outlined,
                   label: 'Teléfono',
                   value: locationPhone,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                 _DetailRow(
                   icon: Icons.credit_card_outlined,
                   label: 'Forma de pago',
                   value: paymentMethodDisplay,
                 ),
-                if (isBankTransfer) ...[
-                  const SizedBox(height: 14),
+                if (shouldShowPaymentProofPanel) ...[
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _AppointmentPaymentProofPanel(
                     uploaded: proofUploaded,
                     uploadedAt: proofUploadedAt,
@@ -1362,7 +1420,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ),
     );
@@ -1385,14 +1443,14 @@ class _DetailRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF9C7732)),
-        const SizedBox(width: 10),
+        Icon(icon, size: AppIconSize.spinner, color: AppColors.goldDeep),
+        const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
         SizedBox(
           width: 86,
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: AppTextSize.base,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
             ),
@@ -1402,7 +1460,7 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value.trim().isEmpty ? '-' : value,
             style: const TextStyle(
-              fontSize: 14.5,
+              fontSize: AppTextSize.baseLarge,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
@@ -1432,22 +1490,21 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor =
-        uploaded ? const Color(0xFF2E7D32) : const Color(0xFF9C7732);
+    final statusColor = uploaded ? AppColors.success : AppColors.goldDeep;
     final title =
         uploaded ? 'Comprobante recibido' : 'Comprobante de transferencia';
     final description = uploaded
-        ? 'Tu comprobante quedo adjunto para validacion.'
+        ? 'Tu comprobante quedó adjunto para validación.'
         : hasLinkedOrder
             ? 'Sube una foto clara del pago para confirmar la transferencia.'
-            : 'La cita aun no tiene un pedido vinculado para adjuntar el comprobante.';
+            : 'La cita aún no tiene un pedido vinculado para adjuntar el comprobante.';
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: statusColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.large,
         border: Border.all(color: statusColor.withValues(alpha: 0.18)),
       ),
       child: Column(
@@ -1462,7 +1519,7 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
                     : Icons.upload_file_rounded,
                 color: statusColor,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1474,7 +1531,7 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       description,
                       style: const TextStyle(
@@ -1483,7 +1540,7 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
                       ),
                     ),
                     if (uploaded && uploadedAt.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         uploadedAt.split(' ').first,
                         style: const TextStyle(
@@ -1498,10 +1555,10 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
             ],
           ),
           if (!uploaded) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
-              height: 46,
+              height: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
               child: ElevatedButton.icon(
                 onPressed: canUpload && !isUploading ? onUpload : null,
                 style: ElevatedButton.styleFrom(
@@ -1510,19 +1567,23 @@ class _AppointmentPaymentProofPanel extends StatelessWidget {
                   disabledBackgroundColor:
                       AppColors.primary.withValues(alpha: 0.35),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: AppRadius.medium,
                   ),
                 ),
                 icon: isUploading
                     ? const SizedBox(
-                        width: 17,
-                        height: 17,
+                        width: AppIconSize.quantityIcon,
+                        height: AppIconSize.quantityIcon,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
+                          strokeWidth:
+                              AppSpacing.progressStroke - AppSpacing.xxs / 10,
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.add_photo_alternate_outlined, size: 19),
+                    : const Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: AppIconSize.sm + AppSpacing.xxs / 2,
+                      ),
                 label: Text(
                   isUploading ? 'Subiendo...' : 'Subir comprobante',
                   style: const TextStyle(fontWeight: FontWeight.w800),

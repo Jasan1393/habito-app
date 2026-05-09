@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCGFPcisKm2JqWSiWbGxuP-PZlqkPZRZ4g',
-    appId: '1:577447468142:android:77f55080e60f9104191a7f',
+    appId: '1:577447468142:android:c345ebf81c8d700a191a7f',
     messagingSenderId: '577447468142',
     projectId: 'habito-app-4e2de',
     storageBucket: 'habito-app-4e2de.firebasestorage.app',

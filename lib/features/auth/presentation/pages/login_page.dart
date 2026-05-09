@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/validators/form_validators.dart';
 import '../../provider/auth_provider.dart';
 import 'forgot_password_page.dart';
 import 'register_page.dart';
@@ -49,7 +56,7 @@ class _LoginPageState extends State<LoginPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF1E1E1E),
+            backgroundColor: AppColors.snackBarDark,
             behavior: SnackBarBehavior.floating,
             content: Text(
               auth.error!,
@@ -74,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFF1E1E1E),
+          backgroundColor: AppColors.snackBarDark,
           behavior: SnackBarBehavior.floating,
           content: Text(
             result,
@@ -99,8 +106,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
-    const bg = Color(0xFF111111);
+    const gold = AppColors.secondary;
+    const bg = AppColors.primary;
 
     return Scaffold(
       backgroundColor: bg,
@@ -109,33 +116,37 @@ class _LoginPageState extends State<LoginPage> {
           builder: (_, auth, __) {
             return Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.authTop,
+                  AppSpacing.xl,
+                  AppSpacing.xxl,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 430),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: AppRadius.authPanel,
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF171717),
-                          Color(0xFF111111),
+                          AppColors.darkPanel,
+                          AppColors.primary,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.14),
+                        color: AppColors.secondary.withValues(alpha: 0.14),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.28),
-                          blurRadius: 28,
-                          offset: const Offset(0, 16),
-                        ),
-                      ],
+                      boxShadow: AppShadows.authPanel,
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.dividerTall,
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                      ),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -145,39 +156,39 @@ class _LoginPageState extends State<LoginPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
-                                  width: 42,
-                                  height: 42,
+                                  width: AppIconSize.authBadge,
+                                  height: AppIconSize.authBadge,
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    color: const Color(0xFFD4AF37)
+                                    borderRadius: AppRadius.medium,
+                                    color: AppColors.secondary
                                         .withValues(alpha: 0.12),
                                     border: Border.all(
-                                      color: const Color(0xFFD4AF37)
+                                      color: AppColors.secondary
                                           .withValues(alpha: 0.22),
                                     ),
                                   ),
                                   child: const Icon(
                                     Icons.lock_person_rounded,
-                                    color: Color(0xFFE7D39A),
-                                    size: 22,
+                                    color: AppColors.goldLight,
+                                    size: AppIconSize.md,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: AppSpacing.md),
                                 Expanded(
                                   child: Image.asset(
                                     'assets/images/logo_habito_blanco.png',
-                                    height: 46,
+                                    height: AppIconSize.authLogo,
                                     alignment: Alignment.centerLeft,
                                     errorBuilder: (_, __, ___) =>
                                         const SizedBox(
-                                      height: 46,
+                                      height: AppIconSize.authLogo,
                                       child: Align(
                                         alignment: Alignment.centerLeft,
                                         child: Text(
                                           'Hábito Barbería',
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: 22,
+                                            fontSize: AppTextSize.headlineSmall,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
@@ -187,30 +198,31 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: AppIconSize.inline),
                             const Text(
                               'Iniciar sesión',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 28,
+                                fontSize: AppTextSize.displaySmall,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.sm),
                             const Text(
                               'Accede a tu cuenta para gestionar tus citas, puntos y pedidos desde una sola experiencia.',
                               style: TextStyle(
-                                color: Color(0xFFD3CDC5),
+                                color: AppColors.textOnDarkMuted,
                                 height: 1.45,
-                                fontSize: 14,
+                                fontSize: AppTextSize.base,
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: AppSpacing.authTop),
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              padding:
+                                  const EdgeInsets.all(AppSpacing.formNotice),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: AppRadius.large,
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.06),
                                 ),
@@ -220,24 +232,24 @@ class _LoginPageState extends State<LoginPage> {
                                 children: [
                                   Icon(
                                     Icons.fingerprint_rounded,
-                                    color: Color(0xFFE7D39A),
-                                    size: 20,
+                                    color: AppColors.goldLight,
+                                    size: AppIconSize.compact,
                                   ),
-                                  SizedBox(width: 10),
+                                  SizedBox(width: AppSpacing.gutter),
                                   Expanded(
                                     child: Text(
                                       'Si activas huella digital desde tu perfil, podras proteger el acceso automatico a la app.',
                                       style: TextStyle(
-                                        color: Color(0xFFD3CDC5),
+                                        color: AppColors.textOnDarkMuted,
                                         height: 1.38,
-                                        fontSize: 12.5,
+                                        fontSize: AppTextSize.bodySmall,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.xl),
                             TextFormField(
                               controller: _emailCtrl,
                               keyboardType: TextInputType.emailAddress,
@@ -251,17 +263,13 @@ class _LoginPageState extends State<LoginPage> {
                                 label: 'Correo electronico',
                                 icon: Icons.alternate_email_rounded,
                               ),
-                              validator: (value) {
-                                final v = value?.trim() ?? '';
-                                if (v.isEmpty) return 'Ingresa tu correo';
-                                if (!v.contains('@')) return 'Correo invalido';
-                                return null;
-                              },
+                              validator: FormValidators.email,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscurePassword,
+                              keyboardType: TextInputType.visiblePassword,
                               textInputAction: TextInputAction.done,
                               autofillHints: const [AutofillHints.password],
                               onFieldSubmitted: (_) {
@@ -274,6 +282,9 @@ class _LoginPageState extends State<LoginPage> {
                                 label: 'Contrasena',
                                 icon: Icons.lock_outline_rounded,
                                 suffix: IconButton(
+                                  tooltip: _obscurePassword
+                                      ? 'Mostrar contrasena'
+                                      : 'Ocultar contrasena',
                                   onPressed: () {
                                     setState(() {
                                       _obscurePassword = !_obscurePassword;
@@ -294,7 +305,7 @@ class _LoginPageState extends State<LoginPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: AppSpacing.gutter),
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
@@ -309,10 +320,10 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.sm),
                             SizedBox(
                               width: double.infinity,
-                              height: 54,
+                              height: AppSpacing.actionHeight,
                               child: ElevatedButton(
                                 onPressed: auth.isLoading ? null : _submit,
                                 style: ElevatedButton.styleFrom(
@@ -323,15 +334,16 @@ class _LoginPageState extends State<LoginPage> {
                                   disabledForegroundColor: Colors.black87,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: AppRadius.tile,
                                   ),
                                 ),
                                 child: auth.isLoading
                                     ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
+                                        width: AppIconSize.inline,
+                                        height: AppIconSize.inline,
                                         child: CircularProgressIndicator(
-                                          strokeWidth: 2.4,
+                                          strokeWidth:
+                                              AppSpacing.progressStrokeStrong,
                                           color: Colors.black,
                                         ),
                                       )
@@ -339,18 +351,19 @@ class _LoginPageState extends State<LoginPage> {
                                         'Ingresar',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 16,
+                                          fontSize: AppTextSize.titleMedium,
                                         ),
                                       ),
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.all(14),
+                              padding:
+                                  const EdgeInsets.all(AppSpacing.formNotice),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.035),
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: AppRadius.large,
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.07),
                                 ),
@@ -361,14 +374,14 @@ class _LoginPageState extends State<LoginPage> {
                                     'Aun no tienes cuenta?',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      color: Color(0xFFD3CDC5),
+                                      color: AppColors.textOnDarkMuted,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: AppSpacing.gutter),
                                   SizedBox(
                                     width: double.infinity,
-                                    height: 46,
+                                    height: AppSpacing.secondaryActionHeight,
                                     child: OutlinedButton.icon(
                                       onPressed:
                                           auth.isLoading ? null : _openRegister,
@@ -378,13 +391,12 @@ class _LoginPageState extends State<LoginPage> {
                                           color: gold.withValues(alpha: 0.76),
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
+                                          borderRadius: AppRadius.medium,
                                         ),
                                       ),
                                       icon: const Icon(
                                         Icons.person_add_alt_1_rounded,
-                                        size: 18,
+                                        size: AppIconSize.sm,
                                       ),
                                       label: const Text(
                                         'Crear cuenta',
@@ -419,41 +431,41 @@ class _LoginPageState extends State<LoginPage> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFD4AF37)),
+      prefixIcon: Icon(icon, color: AppColors.secondary),
       suffixIcon: suffix,
       filled: true,
-      fillColor: const Color(0xFF222222),
+      fillColor: AppColors.darkInput,
       contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 18,
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.inputVertical,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Color(0xFFD4AF37),
-          width: 1.2,
+          color: AppColors.secondary,
+          width: AppSpacing.focusBorder,
         ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.2,
+          color: AppColors.danger,
+          width: AppSpacing.focusBorder,
         ),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.2,
+          color: AppColors.danger,
+          width: AppSpacing.focusBorder,
         ),
       ),
     );

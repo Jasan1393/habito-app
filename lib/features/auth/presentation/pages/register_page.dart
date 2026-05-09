@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/ecuador_data.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/validators/ecuador_id_validator.dart';
+import '../../../../core/validators/form_validators.dart';
 import '../../provider/auth_provider.dart';
 
 const List<String> _appIdentificationTypes = <String>[
@@ -96,7 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF1E1E1E),
+            backgroundColor: AppColors.snackBarDark,
             behavior: SnackBarBehavior.floating,
             content: Text(
               auth.error!,
@@ -109,8 +117,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
-    const bg = Color(0xFF111111);
+    const gold = AppColors.secondary;
+    const bg = AppColors.primary;
 
     return Scaffold(
       backgroundColor: bg,
@@ -128,42 +136,46 @@ class _RegisterPageState extends State<RegisterPage> {
           builder: (_, auth, __) {
             return Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.authTop,
+                  AppSpacing.xl,
+                  AppSpacing.xxl,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: AppRadius.authPanel,
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF171717),
-                          Color(0xFF111111),
+                          AppColors.darkPanel,
+                          AppColors.primary,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.14),
+                        color: AppColors.secondary.withValues(alpha: 0.14),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.28),
-                          blurRadius: 28,
-                          offset: const Offset(0, 16),
-                        ),
-                      ],
+                      boxShadow: AppShadows.authPanel,
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.dividerTall,
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                      ),
                       child: Form(
                         key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildHeader(),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.xl),
                             _sectionTitle('Datos personales'),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: AppSpacing.formNotice),
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final singleColumn = constraints.maxWidth < 390;
@@ -172,9 +184,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                   return Column(
                                     children: [
                                       _buildFirstNameField(),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.lg),
                                       _buildMiddleNameField(),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.lg),
                                       _buildLastNameField(),
                                     ],
                                   );
@@ -183,15 +195,17 @@ class _RegisterPageState extends State<RegisterPage> {
                                 return Row(
                                   children: [
                                     Expanded(child: _buildFirstNameField()),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(
+                                        width: AppSpacing.formNotice),
                                     Expanded(child: _buildMiddleNameField()),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(
+                                        width: AppSpacing.formNotice),
                                     Expanded(child: _buildLastNameField()),
                                   ],
                                 );
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _phoneCtrl,
                               keyboardType: TextInputType.phone,
@@ -204,19 +218,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                 label: 'Celular',
                                 icon: Icons.phone_outlined,
                               ),
-                              validator: (value) {
-                                final digits =
-                                    (value ?? '').replaceAll(RegExp(r'\D'), '');
-                                if (digits.isEmpty) {
-                                  return 'Ingresa tu celular';
-                                }
-                                if (digits.length < 8) {
-                                  return 'Celular invalido';
-                                }
-                                return null;
-                              },
+                              validator: FormValidators.phone,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _emailCtrl,
                               keyboardType: TextInputType.emailAddress,
@@ -230,21 +234,17 @@ class _RegisterPageState extends State<RegisterPage> {
                                 label: 'Correo electronico',
                                 icon: Icons.alternate_email_rounded,
                               ),
-                              validator: (value) {
-                                final v = value?.trim() ?? '';
-                                if (v.isEmpty) return 'Ingresa tu correo';
-                                if (!v.contains('@')) return 'Correo invalido';
-                                return null;
-                              },
+                              validator: FormValidators.email,
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.xl),
                             _sectionTitle('Facturacion (Ecuador)'),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: AppSpacing.gutter),
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              padding:
+                                  const EdgeInsets.all(AppSpacing.formNotice),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: AppRadius.large,
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.06),
                                 ),
@@ -254,27 +254,27 @@ class _RegisterPageState extends State<RegisterPage> {
                                 children: [
                                   Icon(
                                     Icons.receipt_long_outlined,
-                                    color: Color(0xFFE7D39A),
-                                    size: 20,
+                                    color: AppColors.goldLight,
+                                    size: AppIconSize.compact,
                                   ),
-                                  SizedBox(width: 10),
+                                  SizedBox(width: AppSpacing.gutter),
                                   Expanded(
                                     child: Text(
                                       'Usaremos estos datos para tus facturas, reservas y futura vinculacion con puntos y compras en local.',
                                       style: TextStyle(
-                                        color: Color(0xFFD3CDC5),
+                                        color: AppColors.textOnDarkMuted,
                                         height: 1.38,
-                                        fontSize: 12.5,
+                                        fontSize: AppTextSize.bodySmall,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             DropdownButtonFormField<String>(
                               initialValue: _contactType,
-                              dropdownColor: const Color(0xFF222222),
+                              dropdownColor: AppColors.darkInput,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: 'Tipo de cliente',
@@ -299,10 +299,15 @@ class _RegisterPageState extends State<RegisterPage> {
                               },
                             ),
                             if (_contactType == 'business') ...[
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.lg),
                               TextFormField(
                                 controller: _businessNameCtrl,
+                                keyboardType: TextInputType.name,
                                 textInputAction: TextInputAction.next,
+                                autofillHints: const [
+                                  AutofillHints.organizationName,
+                                ],
+                                maxLength: FormValidators.longTextMaxLength,
                                 style: const TextStyle(color: Colors.white),
                                 decoration: _inputDecoration(
                                   label: 'Razon social',
@@ -310,14 +315,14 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                                 validator: (value) {
                                   if (_contactType != 'business') return null;
-                                  if ((value ?? '').trim().isEmpty) {
-                                    return 'Ingresa la razon social';
-                                  }
-                                  return null;
+                                  return FormValidators.requiredMaxLength(
+                                    value,
+                                    field: 'la razón social',
+                                  );
                                 },
                               ),
                             ],
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final singleColumn = constraints.maxWidth < 390;
@@ -325,7 +330,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 final identificationTypeField =
                                     DropdownButtonFormField<String>(
                                   initialValue: _identificationType,
-                                  dropdownColor: const Color(0xFF222222),
+                                  dropdownColor: AppColors.darkInput,
                                   style: const TextStyle(color: Colors.white),
                                   decoration: _inputDecoration(
                                     label: 'Tipo de identificacion',
@@ -357,6 +362,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                           ? TextInputType.text
                                           : TextInputType.number,
                                   textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.username,
+                                  ],
                                   style: const TextStyle(color: Colors.white),
                                   decoration: _inputDecoration(
                                     label: _documentLabel,
@@ -370,7 +378,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   return Column(
                                     children: [
                                       identificationTypeField,
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.lg),
                                       taxNumberField,
                                     ],
                                   );
@@ -379,16 +387,17 @@ class _RegisterPageState extends State<RegisterPage> {
                                 return Row(
                                   children: [
                                     Expanded(child: identificationTypeField),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(
+                                        width: AppSpacing.formNotice),
                                     Expanded(child: taxNumberField),
                                   ],
                                 );
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             DropdownButtonFormField<String>(
                               initialValue: _province,
-                              dropdownColor: const Color(0xFF222222),
+                              dropdownColor: AppColors.darkInput,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: 'Provincia',
@@ -409,46 +418,51 @@ class _RegisterPageState extends State<RegisterPage> {
                                 });
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _cityCtrl,
+                              keyboardType: TextInputType.text,
                               textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.addressCity],
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: 'Canton o ciudad',
                                 icon: Icons.location_city_outlined,
                               ),
-                              validator: (value) {
-                                if ((value ?? '').trim().isEmpty) {
-                                  return 'Ingresa el canton o ciudad';
-                                }
-                                return null;
-                              },
+                              validator: (value) => FormValidators.requiredText(
+                                value,
+                                field: 'el canton o ciudad',
+                              ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _addressCtrl,
+                              keyboardType: TextInputType.streetAddress,
                               maxLines: 3,
                               minLines: 2,
                               textInputAction: TextInputAction.newline,
+                              autofillHints: const [
+                                AutofillHints.fullStreetAddress,
+                              ],
+                              maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: 'Direccion principal',
                                 icon: Icons.home_outlined,
                               ),
-                              validator: (value) {
-                                if ((value ?? '').trim().isEmpty) {
-                                  return 'Ingresa la direccion principal';
-                                }
-                                return null;
-                              },
+                              validator: (value) =>
+                                  FormValidators.requiredMaxLength(
+                                value,
+                                field: 'la direccion principal',
+                              ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.xl),
                             _sectionTitle('Acceso'),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: AppSpacing.formNotice),
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscurePassword,
+                              keyboardType: TextInputType.visiblePassword,
                               textInputAction: TextInputAction.next,
                               autofillHints: const [AutofillHints.newPassword],
                               style: const TextStyle(color: Colors.white),
@@ -456,6 +470,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                 label: 'Contrasena',
                                 icon: Icons.lock_outline_rounded,
                                 suffix: IconButton(
+                                  tooltip: _obscurePassword
+                                      ? 'Mostrar contrasena'
+                                      : 'Ocultar contrasena',
                                   onPressed: () {
                                     setState(() {
                                       _obscurePassword = !_obscurePassword;
@@ -478,10 +495,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _confirmPasswordCtrl,
                               obscureText: _obscureConfirmPassword,
+                              keyboardType: TextInputType.visiblePassword,
                               textInputAction: TextInputAction.done,
                               autofillHints: const [AutofillHints.newPassword],
                               onFieldSubmitted: (_) {
@@ -492,6 +510,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                 label: 'Confirmar contrasena',
                                 icon: Icons.lock_person_outlined,
                                 suffix: IconButton(
+                                  tooltip: _obscureConfirmPassword
+                                      ? 'Mostrar confirmación'
+                                      : 'Ocultar confirmación',
                                   onPressed: () {
                                     setState(() {
                                       _obscureConfirmPassword =
@@ -516,10 +537,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.xl),
                             SizedBox(
                               width: double.infinity,
-                              height: 54,
+                              height: AppSpacing.actionHeight,
                               child: ElevatedButton(
                                 onPressed: auth.isLoading ? null : _submit,
                                 style: ElevatedButton.styleFrom(
@@ -530,15 +551,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                   disabledForegroundColor: Colors.black87,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: AppRadius.tile,
                                   ),
                                 ),
                                 child: auth.isLoading
                                     ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
+                                        width: AppIconSize.inline,
+                                        height: AppIconSize.inline,
                                         child: CircularProgressIndicator(
-                                          strokeWidth: 2.4,
+                                          strokeWidth:
+                                              AppSpacing.progressStrokeStrong,
                                           color: Colors.black,
                                         ),
                                       )
@@ -546,7 +568,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                         'Crear cuenta',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 16,
+                                          fontSize: AppTextSize.titleMedium,
                                         ),
                                       ),
                               ),
@@ -572,41 +594,41 @@ class _RegisterPageState extends State<RegisterPage> {
         Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: AppIconSize.authBadge,
+              height: AppIconSize.authBadge,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
+                borderRadius: AppRadius.medium,
+                color: AppColors.secondary.withValues(alpha: 0.12),
                 border: Border.all(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.22),
+                  color: AppColors.secondary.withValues(alpha: 0.22),
                 ),
               ),
               child: const Icon(
                 Icons.person_add_alt_1_rounded,
-                color: Color(0xFFE7D39A),
-                size: 22,
+                color: AppColors.goldLight,
+                size: AppIconSize.md,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             const Expanded(
               child: Text(
                 'Tu cuenta Habito',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: AppTextSize.section,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         const Text(
-          'Crea tu cuenta para reservar mas rapido, consultar tus puntos y dejar tus datos de facturacion listos para compras y servicios.',
+          'Crea tu cuenta para reservar más rápido, consultar tus puntos y dejar tus datos de facturación listos para compras y servicios.',
           style: TextStyle(
-            color: Color(0xFFD3CDC5),
+            color: AppColors.textOnDarkMuted,
             height: 1.45,
-            fontSize: 14,
+            fontSize: AppTextSize.base,
           ),
         ),
       ],
@@ -617,8 +639,8 @@ class _RegisterPageState extends State<RegisterPage> {
     return Text(
       title,
       style: const TextStyle(
-        color: Color(0xFFE7D39A),
-        fontSize: 15,
+        color: AppColors.goldLight,
+        fontSize: AppTextSize.titleSmall,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -627,24 +649,23 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildFirstNameField() {
     return TextFormField(
       controller: _firstNameCtrl,
+      keyboardType: TextInputType.name,
       textInputAction: TextInputAction.next,
       autofillHints: const [AutofillHints.givenName],
       style: const TextStyle(color: Colors.white),
       decoration: _inputDecoration(
-        label: 'Nombre de pila',
+        label: 'Primer nombre',
         icon: Icons.person_outline_rounded,
       ),
-      validator: (value) {
-        final v = value?.trim() ?? '';
-        if (v.isEmpty) return 'Ingresa tu nombre de pila';
-        return null;
-      },
+      validator: (value) =>
+          FormValidators.requiredText(value, field: 'tu primer nombre'),
     );
   }
 
   Widget _buildMiddleNameField() {
     return TextFormField(
       controller: _middleNameCtrl,
+      keyboardType: TextInputType.name,
       textInputAction: TextInputAction.next,
       autofillHints: const [AutofillHints.middleName],
       style: const TextStyle(color: Colors.white),
@@ -658,25 +679,23 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildLastNameField() {
     return TextFormField(
       controller: _lastNameCtrl,
+      keyboardType: TextInputType.name,
       textInputAction: TextInputAction.next,
       autofillHints: const [AutofillHints.familyName],
       style: const TextStyle(color: Colors.white),
       decoration: _inputDecoration(
-        label: 'Apellido',
+        label: 'Apellidos',
         icon: Icons.badge_outlined,
       ),
-      validator: (value) {
-        final v = value?.trim() ?? '';
-        if (v.isEmpty) return 'Ingresa tu apellido';
-        return null;
-      },
+      validator: (value) =>
+          FormValidators.requiredText(value, field: 'tus apellidos'),
     );
   }
 
   String get _documentLabel {
-    final label = kIdentificationTypeLabels[_identificationType] ??
-        _identificationType;
-    return 'Numero de $label';
+    final label =
+        kIdentificationTypeLabels[_identificationType] ?? _identificationType;
+    return 'Número de $label';
   }
 
   List<String> get _availableIdentificationTypes {
@@ -685,32 +704,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   String? _validateIdentificationNumber(String? value) {
-    final text = (value ?? '').trim();
-    if (text.isEmpty) {
-      return 'Ingresa tu $_documentLabel';
-    }
-
-    if (_identificationType == 'cedula') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 10) {
-        return 'La cedula debe tener 10 digitos';
-      }
-      return null;
-    }
-
-    if (_identificationType == 'ruc') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 13) {
-        return 'El RUC debe tener 13 digitos';
-      }
-      return null;
-    }
-
-    if (text.length < 5) {
-      return 'Ingresa un pasaporte valido';
-    }
-
-    return null;
+    return EcuadorIdValidator.validate(
+      identificationType: _identificationType,
+      value: value,
+      emptyMessage: 'Ingresa tu $_documentLabel.',
+    );
   }
 
   InputDecoration _inputDecoration({
@@ -721,41 +719,41 @@ class _RegisterPageState extends State<RegisterPage> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFD4AF37)),
+      prefixIcon: Icon(icon, color: AppColors.secondary),
       suffixIcon: suffix,
       filled: true,
-      fillColor: const Color(0xFF222222),
+      fillColor: AppColors.darkInput,
       contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 18,
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.inputVertical,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Color(0xFFD4AF37),
-          width: 1.2,
+          color: AppColors.secondary,
+          width: AppSpacing.focusBorder,
         ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.2,
+          color: AppColors.danger,
+          width: AppSpacing.focusBorder,
         ),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.tile,
         borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.2,
+          color: AppColors.danger,
+          width: AppSpacing.focusBorder,
         ),
       ),
     );

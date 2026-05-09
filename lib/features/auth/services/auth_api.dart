@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/auth_result.dart';
 import '../models/auth_user.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/errors/friendly_errors.dart';
 
 class AuthApi {
   static const String baseUrl = AppConfig.apiBaseUrl;
@@ -174,7 +175,7 @@ class AuthApi {
       'message': _extractMessage(
         data,
         fallback:
-            'Te enviamos un enlace a tu correo para confirmar la eliminacion de tu cuenta.',
+            'Te enviamos un enlace a tu correo para confirmar la eliminación de tu cuenta.',
       ),
       if (webUrl != null && webUrl.trim().isNotEmpty) 'webUrl': webUrl.trim(),
     };
@@ -240,8 +241,11 @@ class AuthApi {
     return {
       'success': false,
       '_statusCode': response.statusCode,
-      'message': 'No se pudo interpretar la respuesta del servidor.',
-      'raw': response.body,
+      'message': FriendlyErrors.clean(
+        response.body,
+        statusCode: response.statusCode,
+        fallback: 'No se pudo interpretar la respuesta del servidor.',
+      ),
     };
   }
 
@@ -291,7 +295,12 @@ class AuthApi {
     for (final value in candidates) {
       final text = value?.toString().trim();
       if (text != null && text.isNotEmpty) {
-        return text;
+        return FriendlyErrors.clean(
+          text,
+          fallback: fallback,
+          statusCode:
+              data['_statusCode'] is int ? data['_statusCode'] as int : null,
+        );
       }
     }
 

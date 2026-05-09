@@ -2,7 +2,7 @@ name: habito
 description: "App móvil de Hábito"
 publish_to: 'none'
 
-version: 3.0.1+20
+version: 3.0.6+25
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -29,6 +29,7 @@ dependencies:
   firebase_messaging: ^15.2.7
   flutter_local_notifications: ^18.0.1
   geolocator: ^14.0.2
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +42,10 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/images/app_icon.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/images/app_icon_foreground.png
+  min_sdk_android: 21
+  remove_alpha_ios: true
 
 flutter_native_splash:
   color: "#111111"

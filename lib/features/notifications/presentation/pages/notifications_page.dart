@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/notification_inbox_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -15,6 +21,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<Map<String, dynamic>> _items = [];
   bool _isLoading = true;
   _NotificationListFilter _selectedFilter = _NotificationListFilter.all;
+  int _deleteSnackBarSerial = 0;
 
   @override
   void initState() {
@@ -58,28 +65,36 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (!mounted || !showUndo) return;
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('Notificacion eliminada.'),
-          action: SnackBarAction(
-            label: 'Deshacer',
-            onPressed: () async {
-              await NotificationInboxService.record(
-                title: (snapshot['title'] ?? 'Habito').toString(),
-                body: (snapshot['body'] ?? '').toString(),
-                data: _asMap(snapshot['data']),
-                messageId: id,
-                receivedAt: DateTime.tryParse(
-                  (snapshot['received_at'] ?? '').toString(),
-                ),
-              );
-              await _load();
-            },
-          ),
+    final snackBarSerial = ++_deleteSnackBarSerial;
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        content: const Text('Notificación eliminada.'),
+        action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () async {
+            messenger.hideCurrentSnackBar();
+            await NotificationInboxService.record(
+              title: (snapshot['title'] ?? 'Hábito').toString(),
+              body: (snapshot['body'] ?? '').toString(),
+              data: _asMap(snapshot['data']),
+              messageId: id,
+              receivedAt: DateTime.tryParse(
+                (snapshot['received_at'] ?? '').toString(),
+              ),
+            );
+            await _load();
+          },
         ),
-      );
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted || snackBarSerial != _deleteSnackBarSerial) return;
+      messenger.hideCurrentSnackBar(reason: SnackBarClosedReason.timeout);
+    });
   }
 
   Future<void> _clearAll() async {
@@ -89,7 +104,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             return AlertDialog(
               title: const Text('Borrar historial'),
               content: const Text(
-                'Se eliminaran todas las notificaciones guardadas en este dispositivo.',
+                'Se eliminarán todas las notificaciones guardadas en este dispositivo.',
               ),
               actions: [
                 TextButton(
@@ -228,7 +243,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _showNotificationPreview(Map<String, dynamic> item) async {
     final dateLabel = _formatDate((item['received_at'] ?? '').toString());
     final meta = _NotificationMeta.fromItem(item);
-    final title = (item['title'] ?? 'Habito').toString();
+    final title = (item['title'] ?? 'Hábito').toString();
     final body = (item['body'] ?? '').toString().trim();
     final previewText = body.isNotEmpty
         ? body
@@ -238,46 +253,51 @@ class _NotificationsPageState extends State<NotificationsPage> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: AppRadius.bottomSheet,
       ),
       builder: (context) {
         return SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl - AppSpacing.xs,
+              AppSpacing.lg,
+              AppSpacing.xl - AppSpacing.xs,
+              AppSpacing.xl,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Container(
-                    width: 46,
-                    height: 4,
+                    width: AppIconSize.xxl - AppSpacing.xxs,
+                    height: AppSpacing.xs,
                     decoration: BoxDecoration(
                       color: AppColors.border,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: AppRadius.full,
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                 Row(
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
+                      height: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
                       decoration: BoxDecoration(
                         color: meta.iconBackground,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.tile,
                       ),
                       child: Icon(meta.icon, color: meta.iconColor),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Text(
                         title,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 20,
+                          fontSize: AppTextSize.section,
                           fontWeight: FontWeight.w900,
                           height: 1.15,
                         ),
@@ -285,7 +305,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -299,24 +319,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     if (dateLabel.isNotEmpty)
                       const _MetaBadge(
                         label: 'Reciente',
-                        background: Color(0xFFF5F1E8),
-                        foreground: Color(0xFF7A5B1B),
+                        background: AppColors.goldMuted,
+                        foreground: AppColors.goldDeep,
                       ),
                   ],
                 ),
                 if (dateLabel.isNotEmpty) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                   Text(
                     dateLabel,
                     style: const TextStyle(
-                      color: Color(0xFF7A5B1B),
-                      fontSize: 12.5,
+                      color: AppColors.goldDeep,
+                      fontSize: AppTextSize.bodySmall,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
                 if (meta.detailLine.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
                     meta.detailLine,
                     style: const TextStyle(
@@ -325,7 +345,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.cartItemGap),
                 Text(
                   previewText,
                   style: const TextStyle(
@@ -415,7 +435,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+        elevation: AppSpacing.none,
         title: const Text('Notificaciones'),
         actions: [
           if (_items.isNotEmpty)
@@ -443,19 +463,42 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ],
       ),
       body: RefreshIndicator(
-        color: const Color(0xFFD4AF37),
+        color: AppColors.secondary,
         onRefresh: _load,
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFD4AF37)),
+            ? ListView(
+                padding: EdgeInsets.all(AppSpacing.xl),
+                children: const [
+                  HabitoLoadingShimmer(
+                    itemCount: 5,
+                    itemHeight: 88,
+                  ),
+                ],
               )
             : _items.isEmpty
-                ? const _EmptyNotificationsView()
+                ? ListView(
+                    padding: AppSpacing.section,
+                    children: const [
+                      SizedBox(
+                          height: AppSpacing.actionHeight + AppSpacing.xxs),
+                      HabitoEmptyState(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Sin notificaciones por ahora',
+                        message:
+                            'Aquí verás avisos de citas, pedidos, promociones y actividad importante.',
+                      ),
+                    ],
+                  )
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      AppSpacing.sm,
+                      AppSpacing.lg,
+                      AppSpacing.xl,
+                    ),
                     children: [
                       _NotificationsHero(unreadCount: unreadCount),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       _NotificationFiltersRow(
                         selectedFilter: _selectedFilter,
                         counts: {
@@ -468,7 +511,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           });
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AppSpacing.xl - AppSpacing.xs),
                       if (visibleItems.isEmpty)
                         _FilteredNotificationsEmptyView(
                           filter: _selectedFilter,
@@ -476,7 +519,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       else
                         ...visibleItems.map(
                           (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
                             child: Dismissible(
                               key: ValueKey((item['id'] ?? '').toString()),
                               direction: DismissDirection.horizontal,
@@ -595,15 +640,15 @@ extension _NotificationListFilterInfo on _NotificationListFilter {
   String get emptyMessage {
     switch (this) {
       case _NotificationListFilter.all:
-        return 'Aqui veras avisos de citas, pedidos, promociones y actividad importante.';
+        return 'Aquí verás avisos de citas, pedidos, promociones y actividad importante.';
       case _NotificationListFilter.appointments:
-        return 'Cuando cambie una reserva o llegue un recordatorio, aparecera aqui.';
+        return 'Cuando cambie una reserva o llegue un recordatorio, aparecerá aquí.';
       case _NotificationListFilter.orders:
-        return 'Los cambios de estado de tus compras en tienda se mostraran en esta seccion.';
+        return 'Los cambios de estado de tus compras en tienda se mostrarán en esta sección.';
       case _NotificationListFilter.promotions:
-        return 'Las ofertas y campanas nuevas apareceran aqui cuando esten activas.';
+        return 'Las ofertas y campañas nuevas aparecerán aquí cuando estén activas.';
       case _NotificationListFilter.updates:
-        return 'Aqui reunimos cambios de horario, avisos de cuenta y otras novedades importantes.';
+        return 'Aquí reunimos cambios de horario, avisos de cuenta y otras novedades importantes.';
     }
   }
 }
@@ -623,10 +668,12 @@ class _SwipeDeleteBackground extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFA33A3A),
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.danger,
+        borderRadius: AppRadius.extraLarge,
       ),
-      padding: EdgeInsets.symmetric(horizontal: isLeft ? 20 : 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isLeft ? AppSpacing.xl - AppSpacing.xs : AppSpacing.xl,
+      ),
       alignment: alignment,
       child: Row(
         mainAxisAlignment:
@@ -640,9 +687,9 @@ class _SwipeDeleteBackground extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-          if (!isLeft) const SizedBox(width: 8),
+          if (!isLeft) const SizedBox(width: AppSpacing.sm),
           Icon(icon, color: Colors.white),
-          if (isLeft) const SizedBox(width: 8),
+          if (isLeft) const SizedBox(width: AppSpacing.sm),
           if (isLeft)
             const Text(
               'Borrar',
@@ -671,11 +718,12 @@ class _NotificationFiltersRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 42,
+      height: AppIconSize.pointsBadge,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _NotificationListFilter.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
         itemBuilder: (context, index) {
           final filter = _NotificationListFilter.values[index];
           final isSelected = filter == selectedFilter;
@@ -695,9 +743,12 @@ class _NotificationFiltersRow extends StatelessWidget {
               color: isSelected ? AppColors.primary : AppColors.border,
             ),
             showCheckmark: false,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppRadius.full,
             ),
           );
         },
@@ -714,26 +765,26 @@ class _NotificationsHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl - AppSpacing.xs),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: AppRadius.display,
       ),
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: AppSpacing.actionHeight,
+            height: AppSpacing.actionHeight,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: AppRadius.large,
             ),
             child: const Icon(
               Icons.notifications_active_outlined,
-              color: Color(0xFFE7D6AC),
+              color: AppColors.borderStrong,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.cartItemGap),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -742,17 +793,17 @@ class _NotificationsHero extends StatelessWidget {
                   'Centro de actividad',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: AppTextSize.section,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: AppSpacing.xs + AppSpacing.xxs / 2),
                 Text(
                   unreadCount == 0
-                      ? 'Estas al dia con tus avisos.'
+                      ? 'Estás al día con tus avisos.'
                       : '$unreadCount aviso(s) sin leer.',
                   style: const TextStyle(
-                    color: Color(0xFFD9D4CC),
+                    color: AppColors.border,
                     height: 1.35,
                   ),
                 ),
@@ -775,30 +826,30 @@ class _FilteredNotificationsEmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: AppSpacing.section,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: AppRadius.hero,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           const Icon(
             Icons.inbox_outlined,
-            size: 46,
-            color: Color(0xFF9C7732),
+            size: AppIconSize.xl + AppSpacing.sm + AppSpacing.xxs,
+            color: AppColors.goldDeep,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.cartItemGap),
           Text(
             filter.emptyTitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: AppTextSize.section,
               fontWeight: FontWeight.w900,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             filter.emptyMessage,
             textAlign: TextAlign.center,
@@ -827,7 +878,7 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUnread = item['read'] != true;
-    final title = (item['title'] ?? 'Habito').toString();
+    final title = (item['title'] ?? 'Hábito').toString();
     final body = (item['body'] ?? '').toString().trim();
     final meta = _NotificationMeta.fromItem(item);
 
@@ -835,14 +886,14 @@ class _NotificationCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.extraLarge,
         child: Ink(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.card,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: AppRadius.extraLarge,
             border: Border.all(
-              color: isUnread ? const Color(0xFFD4AF37) : AppColors.border,
+              color: isUnread ? AppColors.secondary : AppColors.border,
               width: isUnread ? 1.3 : 1,
             ),
           ),
@@ -850,15 +901,15 @@ class _NotificationCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: AppIconSize.pointsBadge,
+                height: AppIconSize.pointsBadge,
                 decoration: BoxDecoration(
                   color: meta.iconBackground,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: AppRadius.soft,
                 ),
                 child: Icon(meta.icon, color: meta.iconColor),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -877,12 +928,12 @@ class _NotificationCard extends StatelessWidget {
                           ),
                         ),
                         if (isUnread) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.sm),
                           Container(
-                            width: 9,
-                            height: 9,
+                            width: AppSpacing.sm + AppSpacing.xxs / 2,
+                            height: AppSpacing.sm + AppSpacing.xxs / 2,
                             decoration: const BoxDecoration(
-                              color: Color(0xFFD4AF37),
+                              color: AppColors.secondary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -891,10 +942,12 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     if (meta.badgeLabel != null || meta.detailLine.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 7),
+                        padding: const EdgeInsets.only(
+                          top: AppSpacing.sm - AppSpacing.xxs / 2,
+                        ),
                         child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             if (meta.badgeLabel != null)
@@ -908,7 +961,7 @@ class _NotificationCard extends StatelessWidget {
                                 meta.detailLine,
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
-                                  fontSize: 12.5,
+                                  fontSize: AppTextSize.bodySmall,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -916,7 +969,8 @@ class _NotificationCard extends StatelessWidget {
                         ),
                       ),
                     if (body.isNotEmpty) ...[
-                      const SizedBox(height: 7),
+                      const SizedBox(
+                          height: AppSpacing.sm - AppSpacing.xxs / 2),
                       Text(
                         body,
                         style: const TextStyle(
@@ -926,12 +980,13 @@ class _NotificationCard extends StatelessWidget {
                       ),
                     ],
                     if (dateLabel.isNotEmpty) ...[
-                      const SizedBox(height: 9),
+                      const SizedBox(
+                          height: AppSpacing.sm + AppSpacing.xxs / 2),
                       Text(
                         dateLabel,
                         style: const TextStyle(
-                          color: Color(0xFF9C7732),
-                          fontSize: 12,
+                          color: AppColors.goldDeep,
+                          fontSize: AppTextSize.label,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -961,16 +1016,19 @@ class _MetaBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm + AppSpacing.xxs,
+        vertical: AppSpacing.xs + AppSpacing.xxs / 2,
+      ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.full,
       ),
       child: Text(
         label,
         style: TextStyle(
           color: foreground,
-          fontSize: 11.5,
+          fontSize: AppTextSize.labelSmall,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1025,11 +1083,11 @@ class _NotificationMeta {
       ];
       return _NotificationMeta(
         icon: Icons.receipt_long_rounded,
-        iconBackground: const Color(0xFFEDEAF8),
-        iconColor: const Color(0xFF5B43A8),
+        iconBackground: AppColors.infoSoft,
+        iconColor: AppColors.infoDeep,
         badgeLabel: 'Pedido',
-        badgeBackground: const Color(0xFFEDEAF8),
-        badgeForeground: const Color(0xFF5B43A8),
+        badgeBackground: AppColors.infoSoft,
+        badgeForeground: AppColors.infoDeep,
         detailLine: orderParts.isNotEmpty
             ? orderParts.join(' - ')
             : 'Movimiento de tienda',
@@ -1041,11 +1099,11 @@ class _NotificationMeta {
         type.contains('offer')) {
       return const _NotificationMeta(
         icon: Icons.local_offer_outlined,
-        iconBackground: Color(0xFFF8F0DE),
-        iconColor: Color(0xFF9C7732),
+        iconBackground: AppColors.goldSurface,
+        iconColor: AppColors.goldDeep,
         badgeLabel: 'Promo',
-        badgeBackground: Color(0xFFF8F0DE),
-        badgeForeground: Color(0xFF9C7732),
+        badgeBackground: AppColors.goldSurface,
+        badgeForeground: AppColors.goldDeep,
         detailLine: 'Novedades y beneficios para ti',
       );
     }
@@ -1055,11 +1113,11 @@ class _NotificationMeta {
         type.contains('holiday')) {
       return const _NotificationMeta(
         icon: Icons.schedule_rounded,
-        iconBackground: Color(0xFFF5F1E8),
-        iconColor: Color(0xFF7A5B1B),
+        iconBackground: AppColors.goldMuted,
+        iconColor: AppColors.warningDeep,
         badgeLabel: 'Horario',
-        badgeBackground: Color(0xFFF5F1E8),
-        badgeForeground: Color(0xFF7A5B1B),
+        badgeBackground: AppColors.goldMuted,
+        badgeForeground: AppColors.warningDeep,
         detailLine: 'Aviso operativo importante',
       );
     }
@@ -1070,11 +1128,11 @@ class _NotificationMeta {
         type.contains('welcome')) {
       return const _NotificationMeta(
         icon: Icons.person_outline_rounded,
-        iconBackground: Color(0xFFEAF1FA),
-        iconColor: Color(0xFF2F5D8A),
+        iconBackground: AppColors.infoSoft,
+        iconColor: AppColors.infoDeep,
         badgeLabel: 'Cuenta',
-        badgeBackground: Color(0xFFEAF1FA),
-        badgeForeground: Color(0xFF2F5D8A),
+        badgeBackground: AppColors.infoSoft,
+        badgeForeground: AppColors.infoDeep,
         detailLine: 'Actividad importante de tu perfil',
       );
     }
@@ -1091,62 +1149,62 @@ class _NotificationMeta {
       case 'confirmed':
         return _NotificationMeta(
           icon: Icons.check_circle_outline_rounded,
-          iconBackground: const Color(0xFFE9F6EC),
-          iconColor: const Color(0xFF2E7D32),
+          iconBackground: AppColors.successSoft,
+          iconColor: AppColors.success,
           badgeLabel: 'Confirmada',
-          badgeBackground: const Color(0xFFE9F6EC),
-          badgeForeground: const Color(0xFF2E7D32),
+          badgeBackground: AppColors.successSoft,
+          badgeForeground: AppColors.success,
           detailLine: detailLine,
         );
       case 'canceled':
       case 'cancelled':
         return _NotificationMeta(
           icon: Icons.cancel_outlined,
-          iconBackground: const Color(0xFFFBE9E9),
-          iconColor: const Color(0xFFA33A3A),
+          iconBackground: AppColors.dangerSoft,
+          iconColor: AppColors.danger,
           badgeLabel: 'Cancelada',
-          badgeBackground: const Color(0xFFFBE9E9),
-          badgeForeground: const Color(0xFFA33A3A),
+          badgeBackground: AppColors.dangerSoft,
+          badgeForeground: AppColors.danger,
           detailLine: detailLine,
         );
       case 'completed':
         return _NotificationMeta(
           icon: Icons.verified_rounded,
-          iconBackground: const Color(0xFFE9F2FB),
-          iconColor: const Color(0xFF2F5D8A),
+          iconBackground: AppColors.infoSoft,
+          iconColor: AppColors.infoDeep,
           badgeLabel: 'Completada',
-          badgeBackground: const Color(0xFFE9F2FB),
-          badgeForeground: const Color(0xFF2F5D8A),
+          badgeBackground: AppColors.infoSoft,
+          badgeForeground: AppColors.infoDeep,
           detailLine: detailLine,
         );
       case 'rejected':
         return _NotificationMeta(
           icon: Icons.error_outline_rounded,
-          iconBackground: const Color(0xFFFBE9E9),
-          iconColor: const Color(0xFFA33A3A),
+          iconBackground: AppColors.dangerSoft,
+          iconColor: AppColors.danger,
           badgeLabel: 'Rechazada',
-          badgeBackground: const Color(0xFFFBE9E9),
-          badgeForeground: const Color(0xFFA33A3A),
+          badgeBackground: AppColors.dangerSoft,
+          badgeForeground: AppColors.danger,
           detailLine: detailLine,
         );
       case 'pending':
         return _NotificationMeta(
           icon: Icons.schedule_rounded,
-          iconBackground: const Color(0xFFF5F1E8),
-          iconColor: const Color(0xFF7A5B1B),
+          iconBackground: AppColors.warningSoft,
+          iconColor: AppColors.warningDeep,
           badgeLabel: 'Pendiente',
-          badgeBackground: const Color(0xFFF5F1E8),
-          badgeForeground: const Color(0xFF7A5B1B),
+          badgeBackground: AppColors.warningSoft,
+          badgeForeground: AppColors.warningDeep,
           detailLine: detailLine,
         );
       default:
         return _NotificationMeta(
           icon: Icons.notifications_none_rounded,
-          iconBackground: const Color(0xFFE7D39A).withValues(alpha: 0.26),
-          iconColor: const Color(0xFF7A5B1B),
+          iconBackground: AppColors.goldMuted,
+          iconColor: AppColors.goldDeep,
           badgeLabel: detailLine.isNotEmpty ? 'Reserva' : 'Aviso',
-          badgeBackground: const Color(0xFFF5F1E8),
-          badgeForeground: const Color(0xFF7A5B1B),
+          badgeBackground: AppColors.goldMuted,
+          badgeForeground: AppColors.goldDeep,
           detailLine: detailLine,
         );
     }
@@ -1167,42 +1225,42 @@ class _NotificationMeta {
   }
 }
 
-class _EmptyNotificationsView extends StatelessWidget {
-  const _EmptyNotificationsView();
+class EmptyNotificationsView extends StatelessWidget {
+  const EmptyNotificationsView({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: AppSpacing.section,
       children: [
-        const SizedBox(height: 56),
+        const SizedBox(height: AppSpacing.actionHeight + AppSpacing.xxs),
         Container(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(AppSpacing.xl + AppSpacing.xs),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: AppRadius.display,
             border: Border.all(color: AppColors.border),
           ),
           child: const Column(
             children: [
               Icon(
                 Icons.notifications_none_rounded,
-                size: 54,
-                color: Color(0xFF9C7732),
+                size: AppSpacing.actionHeight,
+                color: AppColors.goldDeep,
               ),
-              SizedBox(height: 16),
+              SizedBox(height: AppSpacing.lg),
               Text(
                 'Sin notificaciones por ahora',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 23,
+                  fontSize: AppTextSize.headlineSmall + AppSpacing.xxs / 2,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 10),
+              SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
               Text(
-                'Aqui veras avisos de citas, pedidos, promociones y actividad importante.',
+                'Aquí verás avisos de citas, pedidos, promociones y actividad importante.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.textSecondary,

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,13 +8,24 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/constants/ecuador_data.dart';
 import '../../../../core/services/location_launcher_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/validators/ecuador_id_validator.dart';
+import '../../../../core/validators/form_validators.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/habito_empty_state.dart';
+import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/provider/auth_provider.dart';
+import '../../../points/points_calculator.dart';
 import '../../../points/provider/points_provider.dart';
 import '../../../shop/models/shop_payment_method.dart';
 import '../../../shop/provider/shop_provider.dart';
@@ -205,7 +216,7 @@ class _BookingsPageState extends State<BookingsPage> {
         _addressController.text = user.address.trim();
       }
     } catch (_) {
-      // Evita romper la pantalla si el provider aÃºn no estÃ¡ listo.
+      // Evita romper la pantalla si el provider aún no está listo.
     }
   }
 
@@ -235,8 +246,17 @@ class _BookingsPageState extends State<BookingsPage> {
   List<ShopPaymentMethod> _enabledPaymentMethods(ShopProvider shop) {
     final methods = shop.paymentMethods
         .where((method) => method.enabled)
-        .toList(growable: false);
-    return methods.isEmpty ? const [ShopPaymentMethod.bankTransfer] : methods;
+        .toList(growable: true);
+
+    if (methods.isEmpty) {
+      return const [ShopPaymentMethod.bankTransfer, ShopPaymentMethod.onSite];
+    }
+
+    if (!methods.any((method) => method.isOnSite)) {
+      methods.add(ShopPaymentMethod.onSite);
+    }
+
+    return List<ShopPaymentMethod>.unmodifiable(methods);
   }
 
   ShopPaymentMethod _selectedPaymentMethod(List<ShopPaymentMethod> methods) {
@@ -295,7 +315,12 @@ class _BookingsPageState extends State<BookingsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      _showMessage('Error cargando datos: $e');
+      _showMessage(
+        FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar los datos para reservar.',
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -425,6 +450,7 @@ class _BookingsPageState extends State<BookingsPage> {
       }
     }
 
+    final incomingBarberId = _resolveIncomingBarberId();
     final incomingBarberName = _resolveIncomingBarberName();
     final selectedServiceToApply = preserveAvailability
         ? _matchCatalogItem(
@@ -460,6 +486,7 @@ class _BookingsPageState extends State<BookingsPage> {
     });
 
     _applyEmployeesForCurrentSelection(
+      preferredBarberId: _isNewBookingFlow ? null : incomingBarberId,
       preferredBarberName: _isNewBookingFlow ? null : incomingBarberName,
       showMessageIfAdjusted: false,
       preserveAvailability: preserveAvailability,
@@ -679,6 +706,10 @@ class _BookingsPageState extends State<BookingsPage> {
     return widget.initialBarber;
   }
 
+  int? _resolveIncomingBarberId() {
+    return _safeInt(widget.selectedBarber?['id']);
+  }
+
   List<Map<String, dynamic>> _getEmployeesForSelection({
     required int? serviceId,
     required int? locationId,
@@ -817,30 +848,14 @@ class _BookingsPageState extends State<BookingsPage> {
     return _getBaseServicePrice() + _getSelectedExtrasPriceTotal();
   }
 
-  _ResolvedPointsState _resolvePointsState(
+  PointsRedemptionState _resolvePointsState(
     AuthProvider auth, [
     PointsProvider? pointsProvider,
   ]) {
-    final user = auth.user;
-    final summary = pointsProvider?.summary;
-
-    return _ResolvedPointsState(
-      enabled: summary?.enabled ?? user?.pointsEnabled ?? false,
-      redeemEnabled:
-          summary?.redeemEnabled ?? user?.pointsRedeemEnabled ?? false,
-      redeemProductsEnabled: summary?.redeemProductsEnabled ??
-          user?.pointsRedeemProductsEnabled ??
-          false,
-      redeemBookingsEnabled: summary?.redeemBookingsEnabled ??
-          user?.pointsRedeemBookingsEnabled ??
-          false,
-      balance: summary?.balance ?? user?.pointsBalance ?? 0,
-      rate:
-          summary?.redeemPointsPerUsd ?? user?.pointsRedeemPointsPerUsd ?? 100,
-      minPoints: summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
-      maxPercent:
-          summary?.redeemMaxPercent ?? user?.pointsRedeemMaxPercent ?? 100,
-      label: (summary?.label ?? user?.pointsLabel ?? 'Puntos').trim(),
+    return PointsCalculator.resolveState(
+      user: auth.user,
+      summary: pointsProvider?.summary,
+      reservedPoints: pointsProvider?.reservedPoints ?? 0,
     );
   }
 
@@ -849,24 +864,11 @@ class _BookingsPageState extends State<BookingsPage> {
     double total, [
     PointsProvider? pointsProvider,
   ]) {
-    final pointsState = _resolvePointsState(auth, pointsProvider);
-    if (!pointsState.enabled ||
-        !pointsState.redeemEnabled ||
-        !pointsState.redeemBookingsEnabled ||
-        total <= 0) {
-      return 0;
-    }
-
-    final rate = pointsState.rate > 0 ? pointsState.rate : 100.0;
-    final maxPercent = pointsState.maxPercent.clamp(0, 100).toDouble();
-    final maxDiscount = total * (maxPercent / 100);
-    final maxPointsByTotal = maxDiscount * rate;
-    final points = pointsState.balance < maxPointsByTotal
-        ? pointsState.balance
-        : maxPointsByTotal;
-
-    if (points < pointsState.minPoints) return 0;
-    return double.parse(points.toStringAsFixed(2));
+    return PointsCalculator.calculate(
+      state: _resolvePointsState(auth, pointsProvider),
+      context: PointsRedemptionContext.booking,
+      total: total,
+    ).pointsToUse;
   }
 
   double _bookingPointsDiscount(
@@ -874,25 +876,33 @@ class _BookingsPageState extends State<BookingsPage> {
     double total, [
     PointsProvider? pointsProvider,
   ]) {
-    final points = _bookingPointsToUse(auth, total, pointsProvider);
-    final pointsState = _resolvePointsState(auth, pointsProvider);
-    final rate = pointsState.rate > 0 ? pointsState.rate : 100;
-    if (points <= 0 || rate <= 0) return 0;
-    final discount = points / rate;
-    return discount > total ? total : double.parse(discount.toStringAsFixed(2));
+    return PointsCalculator.calculate(
+      state: _resolvePointsState(auth, pointsProvider),
+      context: PointsRedemptionContext.booking,
+      total: total,
+    ).discount;
   }
 
   String _bookingPointsHelperMessage(
-    _ResolvedPointsState pointsState,
+    PointsRedemptionState pointsState,
     double totalPrice,
-    double pointsToUse,
   ) {
+    final pointsResult = PointsCalculator.calculate(
+      state: pointsState,
+      context: PointsRedemptionContext.booking,
+      total: totalPrice,
+    );
+    if (pointsResult.total >= 0) {
+      return pointsResult.helperMessage();
+    }
+    final pointsToUse = pointsResult.pointsToUse;
+
     if (totalPrice <= 0) {
-      return 'Selecciona un servicio para calcular cuÃ¡ntos ${pointsState.label.toLowerCase()} puedes usar en esta reserva.';
+      return 'Selecciona un servicio para calcular cuántos ${pointsState.label.toLowerCase()} puedes usar en esta reserva.';
     }
 
     if (pointsState.balance <= 0) {
-      return 'AÃºn no tienes ${pointsState.label.toLowerCase()} disponibles para aplicar en esta reserva.';
+      return 'Aún no tienes ${pointsState.label.toLowerCase()} disponibles para aplicar en esta reserva.';
     }
 
     if (pointsToUse <= 0) {
@@ -907,7 +917,7 @@ class _BookingsPageState extends State<BookingsPage> {
       return 'Tus ${pointsState.label.toLowerCase()} actuales no alcanzan para generar descuento en esta reserva.';
     }
 
-    return 'Puedes combinar tu mÃ©todo de pago con ${pointsState.label.toLowerCase()} para reducir el total de esta reserva.';
+    return 'Puedes combinar tu método de pago con ${pointsState.label.toLowerCase()} para reducir el total de esta reserva.';
   }
 
   int _getGrandTotalDuration() {
@@ -915,6 +925,7 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   void _applyEmployeesForCurrentSelection({
+    int? preferredBarberId,
     String? preferredBarberName,
     bool showMessageIfAdjusted = false,
     bool preserveAvailability = false,
@@ -933,6 +944,15 @@ class _BookingsPageState extends State<BookingsPage> {
     if (currentSelectedId != null) {
       for (final employee in filtered) {
         if (_safeInt(employee['id']) == currentSelectedId) {
+          nextSelected = employee;
+          break;
+        }
+      }
+    }
+
+    if (nextSelected == null && preferredBarberId != null) {
+      for (final employee in filtered) {
+        if (_safeInt(employee['id']) == preferredBarberId) {
           nextSelected = employee;
           break;
         }
@@ -1023,15 +1043,11 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   bool _isValidEmail(String value) {
-    final email = value.trim();
-    if (email.isEmpty) return false;
-    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    return FormValidators.isValidEmail(value);
   }
 
   bool _isValidPhone(String value) {
-    final phone = value.replaceAll(RegExp(r'\s+'), '').trim();
-    if (phone.isEmpty) return false;
-    return phone.length >= 7;
+    return FormValidators.isValidPhone(value);
   }
 
   String get _effectiveIdentificationType {
@@ -1046,12 +1062,16 @@ class _BookingsPageState extends State<BookingsPage> {
   String get _bookingDocumentLabel {
     final label = kIdentificationTypeLabels[_effectiveIdentificationType] ??
         _effectiveIdentificationType;
-    return 'Numero de $label';
+    return 'Número de $label';
   }
 
   bool get _isCustomerFiscalDataValid {
     if (_contactType == 'business' &&
-        _businessNameController.text.trim().isEmpty) {
+        FormValidators.requiredMaxLength(
+              _businessNameController.text,
+              field: 'la razón social',
+            ) !=
+            null) {
       return false;
     }
 
@@ -1060,7 +1080,11 @@ class _BookingsPageState extends State<BookingsPage> {
             ) ==
             null &&
         _cityController.text.trim().isNotEmpty &&
-        _addressController.text.trim().isNotEmpty;
+        FormValidators.requiredMaxLength(
+              _addressController.text,
+              field: 'la direccion principal',
+            ) ==
+            null;
   }
 
   String _normalizeIdentificationType(String? value) {
@@ -1071,32 +1095,11 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   String? _validateBookingIdentificationNumber(String? value) {
-    final text = (value ?? '').trim();
-    if (text.isEmpty) {
-      return 'Ingresa tu $_bookingDocumentLabel';
-    }
-
-    if (_effectiveIdentificationType == 'cedula') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 10) {
-        return 'La cedula debe tener 10 digitos';
-      }
-      return null;
-    }
-
-    if (_effectiveIdentificationType == 'ruc') {
-      final digits = text.replaceAll(RegExp(r'\D'), '');
-      if (digits.length != 13) {
-        return 'El RUC debe tener 13 digitos';
-      }
-      return null;
-    }
-
-    if (text.length < 5) {
-      return 'Ingresa un pasaporte vÃ¡lido';
-    }
-
-    return null;
+    return EcuadorIdValidator.validate(
+      identificationType: _effectiveIdentificationType,
+      value: value,
+      emptyMessage: 'Ingresa tu $_bookingDocumentLabel.',
+    );
   }
 
   String _composeGivenNames(String firstName, String middleName) {
@@ -1603,12 +1606,12 @@ class _BookingsPageState extends State<BookingsPage> {
   }) async {
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
     if (cleanPhone.isEmpty) {
-      _showMessage('No hay nÃºmero de WhatsApp disponible para esta sucursal.');
+      _showMessage('No hay número de WhatsApp disponible para esta sucursal.');
       return;
     }
 
     final message = Uri.encodeComponent(
-      'Hola ðŸ‘‹, tengo una cita agendada en HÃBITO.\n\n'
+      'Hola 👋, tengo una cita agendada en HÁBITO.\n\n'
       'Servicio: $serviceName\n'
       'Sucursal: $branch\n'
       'Fecha: $dateLabel\n'
@@ -1641,7 +1644,7 @@ class _BookingsPageState extends State<BookingsPage> {
     );
 
     if (!opened) {
-      _showMessage('No se pudo abrir la ubicaciÃ³n');
+      _showMessage('No se pudo abrir la ubicación');
     }
   }
 
@@ -1654,7 +1657,7 @@ class _BookingsPageState extends State<BookingsPage> {
     required String time,
   }) async {
     final text = Uri.encodeComponent(
-      'ðŸ“… Mi cita en HÃBITO\n\n'
+      '📅 Mi cita en HÁBITO\n\n'
       'Reserva: #$reservationCode\n'
       'Servicio: $serviceName\n'
       'Barbero: $barberName\n'
@@ -1669,7 +1672,7 @@ class _BookingsPageState extends State<BookingsPage> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       await Share.share(
-        'ðŸ“… Mi cita en HÃBITO\n\n'
+        '📅 Mi cita en HÁBITO\n\n'
         'Reserva: #$reservationCode\n'
         'Servicio: $serviceName\n'
         'Barbero: $barberName\n'
@@ -1707,7 +1710,7 @@ class _BookingsPageState extends State<BookingsPage> {
             '${two(utc.hour)}${two(utc.minute)}${two(utc.second)}Z';
       }
 
-      final summary = _sanitizeForIcs('Cita HÃBITO - $serviceName');
+      final summary = _sanitizeForIcs('Cita HÁBITO - $serviceName');
       final description = _sanitizeForIcs(
         'Reserva: #$reservationCode\n'
         'Servicio: $serviceName\n'
@@ -1809,10 +1812,10 @@ END:VCALENDAR
     const weekdays = [
       'lunes',
       'martes',
-      'miÃ©rcoles',
+      'miércoles',
       'jueves',
       'viernes',
-      'sÃ¡bado',
+      'sábado',
       'domingo',
     ];
 
@@ -1835,7 +1838,7 @@ END:VCALENDAR
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFFD4AF37)),
+            colorScheme: const ColorScheme.light(primary: AppColors.secondary),
             dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
           ),
           child: child!,
@@ -1871,19 +1874,24 @@ END:VCALENDAR
     }
 
     if (!_isValidPhone(_phoneController.text)) {
-      _showMessage('Ingresa un nÃºmero de celular vÃ¡lido');
+      _showMessage('Ingresa un numero de celular ecuatoriano valido');
       return;
     }
 
     if (!_isValidEmail(_emailController.text)) {
-      _showMessage('Ingresa un correo electrÃ³nico vÃ¡lido');
+      _showMessage('Ingresa un correo electrónico válido');
       return;
     }
 
-    if (_contactType == 'business' &&
-        _businessNameController.text.trim().isEmpty) {
-      _showMessage('Ingresa la razÃ³n social');
-      return;
+    if (_contactType == 'business') {
+      final businessNameError = FormValidators.requiredMaxLength(
+        _businessNameController.text,
+        field: 'la razón social',
+      );
+      if (businessNameError != null) {
+        _showMessage(businessNameError);
+        return;
+      }
     }
 
     final taxNumberError = _validateBookingIdentificationNumber(
@@ -1895,12 +1903,16 @@ END:VCALENDAR
     }
 
     if (_cityController.text.trim().isEmpty) {
-      _showMessage('Ingresa el cantÃ³n o ciudad');
+      _showMessage('Ingresa el cantón o ciudad');
       return;
     }
 
-    if (_addressController.text.trim().isEmpty) {
-      _showMessage('Ingresa la direcciÃ³n principal');
+    final addressError = FormValidators.requiredMaxLength(
+      _addressController.text,
+      field: 'la direccion principal',
+    );
+    if (addressError != null) {
+      _showMessage(addressError);
       return;
     }
 
@@ -1951,17 +1963,26 @@ END:VCALENDAR
 
     if (!selectedPaymentMethod.canCreateManualOrder) {
       _showMessage(
-        '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para reservas desde la app.',
+        '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.',
       );
       return;
     }
 
+    String? pointsReservationId;
+    PointsProvider? pointsProviderForReservation;
+
     try {
       final authProvider = context.read<AuthProvider>();
       final pointsProvider = context.read<PointsProvider>();
+      pointsProviderForReservation = pointsProvider;
 
       final totalPrice = _getGrandTotalPrice();
       var redeemPoints = 0.0;
+      var redeemDiscount = 0.0;
+
+      setState(() {
+        _isSubmittingBooking = true;
+      });
 
       if (_usePoints) {
         await pointsProvider.refresh();
@@ -1985,18 +2006,32 @@ END:VCALENDAR
         }
 
         redeemPoints = quote.points;
+        redeemDiscount = quote.discount;
+
+        pointsReservationId =
+            'booking-${DateTime.now().microsecondsSinceEpoch}';
+        final reserved = pointsProvider.reserveRedemption(
+          id: pointsReservationId,
+          context: 'booking',
+          points: redeemPoints,
+        );
+        if (!reserved) {
+          setState(() {
+            _usePoints = false;
+          });
+          _showMessage(
+            'Ya hay un canje de puntos en proceso. Espera unos segundos e intenta nuevamente.',
+          );
+          return;
+        }
       }
 
       if (_usePoints && redeemPoints <= 0) {
         _showMessage(
-          'Tus puntos ya no estÃ¡n disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
+          'Tus puntos ya no están disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
         );
         return;
       }
-
-      setState(() {
-        _isSubmittingBooking = true;
-      });
 
       final token = authProvider.token;
       final user = authProvider.user;
@@ -2013,7 +2048,7 @@ END:VCALENDAR
 
       if (isLoggedIn && (token == null || token.trim().isEmpty)) {
         throw Exception(
-          'La sesiÃ³n estÃ¡ activa pero no se encontrÃ³ el token de autenticaciÃ³n.',
+          'La sesión está activa pero no se encontró el token de autenticación.',
         );
       }
 
@@ -2053,7 +2088,7 @@ END:VCALENDAR
         extras: selectedExtras,
         paymentMethod: selectedPaymentMethod,
         redeemPoints: redeemPoints,
-        redeemAmount: totalPrice,
+        redeemAmount: redeemDiscount,
       );
 
       final int? appointmentId = _safeInt(response['appointment_id']);
@@ -2065,7 +2100,7 @@ END:VCALENDAR
 
       if (reservationCodeValue == null || reservationCodeValue <= 0) {
         throw Exception(
-          'La reserva se creÃ³, pero no pudimos confirmar el cÃ³digo de la cita. Revisa tus citas o intenta actualizar.',
+          'La reserva se creó, pero no pudimos confirmar el código de la cita. Revisa tus citas o intenta actualizar.',
         );
       }
 
@@ -2113,6 +2148,9 @@ END:VCALENDAR
       if (!mounted) return;
       _showMessage('No se pudo crear la reserva: ${_friendlyBookingError(e)}');
     } finally {
+      if (pointsReservationId != null) {
+        pointsProviderForReservation?.releaseReservation(pointsReservationId);
+      }
       if (mounted) {
         setState(() {
           _isSubmittingBooking = false;
@@ -2139,7 +2177,7 @@ END:VCALENDAR
     final token = authProvider.token?.trim();
 
     if (!authProvider.isLoggedIn || token == null || token.isEmpty) {
-      _showMessage('Inicia sesiÃ³n para reagendar tu cita.');
+      _showMessage('Inicia sesión para reagendar tu cita.');
       return;
     }
 
@@ -2157,19 +2195,10 @@ END:VCALENDAR
       if (!mounted) return;
 
       _showMessage('Tu cita fue reagendada correctamente.');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          settings: const RouteSettings(name: AppRoutes.main),
-          builder: (_) => const MainNavigationPage(
-            initialIndex: 2,
-            myAppointmentsArguments: {'refreshMyBookings': true},
-          ),
-        ),
-        (route) => false,
-      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      _showMessage('No se pudo reagendar la cita: ${_friendlyBookingError(e)}');
+      _showMessage(_friendlyRescheduleError(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -2207,7 +2236,7 @@ END:VCALENDAR
     }
 
     if (_containsAny(lower, ['sesi', 'token', '401'])) {
-      return 'Tu sesiÃ³n venciÃ³. Inicia sesiÃ³n nuevamente para consultar horarios.';
+      return 'Tu sesión venció. Inicia sesión nuevamente para consultar horarios.';
     }
 
     if (_containsAny(lower, [
@@ -2216,7 +2245,7 @@ END:VCALENDAR
       'minimum notice',
       'booking_notice',
     ])) {
-      return 'Por ahora no hay horarios que cumplan con el tiempo mÃ­nimo de anticipaciÃ³n. Elige una hora mÃ¡s adelante.';
+      return 'Por ahora no hay horarios que cumplan con el tiempo mínimo de anticipación. Elige una hora más adelante.';
     }
 
     if (_containsAny(lower, [
@@ -2227,7 +2256,7 @@ END:VCALENDAR
       'connection',
       'conectar',
     ])) {
-      return 'No pudimos actualizar los horarios a tiempo. Revisa tu conexiÃ³n e intenta nuevamente.';
+      return 'No pudimos actualizar los horarios a tiempo. Revisa tu conexión e intenta nuevamente.';
     }
 
     if (_containsAny(lower, [
@@ -2248,15 +2277,15 @@ END:VCALENDAR
     final lower = message.toLowerCase();
 
     if (message.isEmpty) {
-      return 'intÃ©ntalo nuevamente en unos segundos.';
+      return 'inténtalo nuevamente en unos segundos.';
     }
 
     if (_containsAny(lower, ['sesi', 'token', '401'])) {
-      return 'Tu sesiÃ³n venciÃ³. Inicia sesiÃ³n nuevamente para continuar.';
+      return 'Tu sesión venció. Inicia sesión nuevamente para continuar.';
     }
 
     if (_containsAny(lower, ['no tienes permisos', '403', 'permisos'])) {
-      return 'No pudimos validar tu sesiÃ³n para continuar. Intenta ingresar nuevamente.';
+      return 'No pudimos validar tu sesión para continuar. Intenta ingresar nuevamente.';
     }
 
     if (_containsAny(lower, [
@@ -2265,7 +2294,7 @@ END:VCALENDAR
       'minimum notice',
       'booking_notice',
     ])) {
-      return 'Ese horario ya no cumple con el tiempo mÃ­nimo de anticipaciÃ³n. Elige uno mÃ¡s adelante.';
+      return 'Ese horario ya no cumple con el tiempo mínimo de anticipación. Elige uno más adelante.';
     }
 
     if (_containsAny(lower, [
@@ -2276,14 +2305,14 @@ END:VCALENDAR
       'already',
       'ocup',
     ])) {
-      return 'Ese horario ya no estÃ¡ disponible. Elige otro para continuar.';
+      return 'Ese horario ya no está disponible. Elige otro para continuar.';
     }
 
     if (_containsAny(lower, [
       'faltan campos obligatorios',
       'debes enviar customerid',
       'datos del cliente',
-      'correo electrÃ³nico',
+      'correo electrónico',
       'correo electronico',
       'celular',
       'first_name',
@@ -2294,22 +2323,22 @@ END:VCALENDAR
     }
 
     if (_containsAny(lower, [
-      'fecha/hora de la reserva es invÃ¡lida',
+      'fecha/hora de la reserva es inválida',
       'fecha/hora de la reserva es invalida',
       'booking_start',
       'fecha y hora',
     ])) {
-      return 'La fecha u hora seleccionada ya no es vÃ¡lida. Elige un horario nuevamente.';
+      return 'La fecha u hora seleccionada ya no es válida. Elige un horario nuevamente.';
     }
 
     if (_containsAny(lower, [
-      'ya estÃ¡ cancelada',
+      'ya está cancelada',
       'ya esta cancelada',
       'ya fue completada',
       'finalizada',
       'no se puede modificar',
     ])) {
-      return 'La cita ya no puede actualizarse porque su estado cambiÃ³.';
+      return 'La cita ya no puede actualizarse porque su estado cambió.';
     }
 
     if (_containsAny(lower, ['no encontramos la cita', 'booking_not_found'])) {
@@ -2324,7 +2353,7 @@ END:VCALENDAR
       'connection',
       'conectar',
     ])) {
-      return 'No pudimos completar la solicitud a tiempo. Revisa tu conexiÃ³n e intenta nuevamente.';
+      return 'No pudimos completar la solicitud a tiempo. Revisa tu conexión e intenta nuevamente.';
     }
 
     if (_containsAny(lower, ['error 500', 'error en el servidor'])) {
@@ -2332,6 +2361,17 @@ END:VCALENDAR
     }
 
     return message;
+  }
+
+  String _friendlyRescheduleError(Object error) {
+    final message = _friendlyBookingError(error);
+    final lower = message.toLowerCase();
+
+    if (_containsAny(lower, ['horario', 'disponible', 'anticip'])) {
+      return message;
+    }
+
+    return FriendlyErrors.rescheduleAppointment(message);
   }
 
   void _showSuccessSheet({
@@ -2358,7 +2398,7 @@ END:VCALENDAR
       enableDrag: false,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        borderRadius: AppRadius.bottomSheetCompact,
       ),
       builder: (sheetContext) {
         return PopScope(
@@ -2386,39 +2426,39 @@ END:VCALENDAR
                       ),
                     ),
                     Container(
-                      width: 52,
-                      height: 52,
+                      width: AppIconSize.successBadge,
+                      height: AppIconSize.successBadge,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8E7A8),
-                        borderRadius: BorderRadius.circular(18),
+                        color: AppColors.goldSoft,
+                        borderRadius: AppRadius.large,
                       ),
                       child: const Icon(
                         Icons.check_circle_rounded,
-                        color: Color(0xFF9C7732),
-                        size: 30,
+                        color: AppColors.goldDeep,
+                        size: AppIconSize.successIcon,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                     const Text(
-                      'Cita agendada con Ã©xito',
+                      'Cita agendada con éxito',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 22,
+                        fontSize: AppTextSize.headlineSmall,
                         fontWeight: FontWeight.w800,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     const Text(
-                      'Tu reserva ya quedÃ³ registrada correctamente.',
+                      'Tu reserva ya quedó registrada correctamente.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 14.5,
+                        fontSize: AppTextSize.baseLarge,
                         height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                     if (reservationCode != null &&
                         reservationCode.trim().isNotEmpty)
                       _summaryRow('Reserva', '#$reservationCode'),
@@ -2431,14 +2471,14 @@ END:VCALENDAR
                       _summaryRow('Estado', statusLabel),
                     if (paymentMethodTitle != null &&
                         paymentMethodTitle.trim().isNotEmpty)
-                      _summaryRow('MÃ©todo de pago', paymentMethodTitle),
+                      _summaryRow('Método de pago', paymentMethodTitle),
                     if (paymentStatus != null &&
                         paymentStatus.trim().isNotEmpty)
                       _summaryRow(
                         'Pago',
                         _normalizeStatusLabel(paymentStatus),
                       ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.chat_rounded,
                       label: 'Contactar por WhatsApp',
@@ -2452,10 +2492,10 @@ END:VCALENDAR
                         );
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.location_on_rounded,
-                      label: 'Ver ubicaciÃ³n / CÃ³mo llegar',
+                      label: 'Ver ubicación / Cómo llegar',
                       onTap: () async {
                         await _openLocation(
                           address: locationAddress,
@@ -2466,7 +2506,7 @@ END:VCALENDAR
                         );
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.calendar_month_rounded,
                       label: 'Agregar al calendario',
@@ -2483,7 +2523,7 @@ END:VCALENDAR
                         );
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.share_rounded,
                       label: 'Compartir cita por WhatsApp',
@@ -2498,26 +2538,26 @@ END:VCALENDAR
                         );
                       },
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () =>
                             _closeSuccessAndGoToMyAppointments(sheetContext),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD4AF37),
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: AppColors.primary,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: AppRadius.tile,
                           ),
                         ),
                         child: const Text(
                           'Cerrar e ir a mis citas',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                            fontSize: AppTextSize.titleMedium,
                           ),
                         ),
                       ),
@@ -2541,21 +2581,21 @@ END:VCALENDAR
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, color: const Color(0xFF9C7732)),
+        icon: Icon(icon, color: AppColors.goldDeep),
         label: Text(
           label,
           style: const TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 14.5,
+            fontSize: AppTextSize.baseLarge,
           ),
         ),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14),
-          side: const BorderSide(color: Color(0xFFE7DFD4)),
-          backgroundColor: const Color(0xFFF9F8F6),
+          side: const BorderSide(color: AppColors.border),
+          backgroundColor: AppColors.surfaceElevated,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.tile,
           ),
         ),
       ),
@@ -2565,7 +2605,7 @@ END:VCALENDAR
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFF2B2118),
+        backgroundColor: AppColors.primarySoft,
         behavior: SnackBarBehavior.floating,
         content: Text(message, style: const TextStyle(color: Colors.white)),
       ),
@@ -2584,7 +2624,7 @@ END:VCALENDAR
               '$label:',
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: AppTextSize.base,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -2594,7 +2634,7 @@ END:VCALENDAR
               value,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 14.5,
+                fontSize: AppTextSize.baseLarge,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -2612,7 +2652,7 @@ END:VCALENDAR
         'Selecciona primero un servicio para ver sus complementos.',
         style: TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13.5,
+          fontSize: AppTextSize.bodyStrong,
           height: 1.4,
         ),
       );
@@ -2623,7 +2663,7 @@ END:VCALENDAR
         'Este servicio no tiene extras disponibles.',
         style: TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13.5,
+          fontSize: AppTextSize.bodyStrong,
           height: 1.4,
         ),
       );
@@ -2637,20 +2677,20 @@ END:VCALENDAR
             'Deseas agregar extras a tu servicio?',
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 15,
+              fontSize: AppTextSize.titleSmall,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
           const Text(
             'Puedes sumar complementos ahora o continuar solo con el servicio principal.',
             style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 13.5,
+              fontSize: AppTextSize.bodyStrong,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -2660,11 +2700,11 @@ END:VCALENDAR
                 });
               },
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF9C7732),
-                side: const BorderSide(color: Color(0xFFD4AF37)),
+                foregroundColor: AppColors.goldDeep,
+                side: const BorderSide(color: AppColors.secondary),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: AppRadius.soft,
                 ),
               ),
               icon: const Icon(Icons.add_rounded, size: 18),
@@ -2692,11 +2732,10 @@ END:VCALENDAR
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF9F8F6),
-              borderRadius: BorderRadius.circular(16),
+              color: AppColors.surfaceElevated,
+              borderRadius: AppRadius.tile,
               border: Border.all(
-                color:
-                    qty > 0 ? const Color(0xFFD4AF37) : const Color(0xFFE7DFD4),
+                color: qty > 0 ? AppColors.secondary : AppColors.border,
               ),
             ),
             child: Column(
@@ -2709,7 +2748,7 @@ END:VCALENDAR
                         (extra['name'] ?? '').toString(),
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 15,
+                          fontSize: AppTextSize.titleSmall,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -2720,14 +2759,14 @@ END:VCALENDAR
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8E7A8),
-                        borderRadius: BorderRadius.circular(30),
+                        color: AppColors.goldSoft,
+                        borderRadius: AppRadius.full,
                       ),
                       child: Text(
                         '+${_formatCurrency(price)}',
                         style: const TextStyle(
-                          color: Color(0xFF9C7732),
-                          fontSize: 12.5,
+                          color: AppColors.goldDeep,
+                          fontSize: AppTextSize.bodySmall,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -2735,17 +2774,17 @@ END:VCALENDAR
                   ],
                 ),
                 if (description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     description,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 13.2,
+                      fontSize: AppTextSize.bodyRelaxed,
                       height: 1.35,
                     ),
                   ),
                 ],
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Row(
                   children: [
                     Container(
@@ -2755,21 +2794,22 @@ END:VCALENDAR
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: const Color(0xFFE7DFD4)),
+                        borderRadius: AppRadius.full,
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: Text(
                         '+ ${_formatDurationLabel(duration)}',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12.5,
+                          fontSize: AppTextSize.bodySmall,
                         ),
                       ),
                     ),
                     const Spacer(),
                     _qtyButton(
                       icon: Icons.remove_rounded,
+                      tooltip: 'Disminuir extra',
                       onTap: qty > 0 ? () => _changeExtraQty(extra, -1) : null,
                     ),
                     Container(
@@ -2779,13 +2819,14 @@ END:VCALENDAR
                         '$qty',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 15,
+                          fontSize: AppTextSize.titleSmall,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                     _qtyButton(
                       icon: Icons.add_rounded,
+                      tooltip: 'Aumentar extra',
                       onTap: qty < maxQuantity
                           ? () => _changeExtraQty(extra, 1)
                           : null,
@@ -2802,15 +2843,15 @@ END:VCALENDAR
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E7),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFF0DE9A)),
+              color: AppColors.goldSurface,
+              borderRadius: AppRadius.medium,
+              border: Border.all(color: AppColors.goldSoft),
             ),
             child: Text(
-              'Extras seleccionados: ${_formatCurrency(_getSelectedExtrasPriceTotal())} Â· ${_formatDurationLabel(_getSelectedExtrasDurationTotal())}',
+              'Extras seleccionados: ${_formatCurrency(_getSelectedExtrasPriceTotal())} · ${_formatDurationLabel(_getSelectedExtrasDurationTotal())}',
               style: const TextStyle(
-                color: Color(0xFF9C7732),
-                fontSize: 13.5,
+                color: AppColors.goldDeep,
+                fontSize: AppTextSize.bodyStrong,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -2823,7 +2864,7 @@ END:VCALENDAR
     ShopProvider shop,
     AuthProvider auth,
     PointsProvider pointsProvider,
-    _ResolvedPointsState pointsState,
+    PointsRedemptionState pointsState,
     double totalPrice,
   ) {
     final methods = _enabledPaymentMethods(shop);
@@ -2837,7 +2878,12 @@ END:VCALENDAR
         !_isEditing &&
         pointsState.enabled &&
         pointsState.redeemEnabled &&
-        pointsState.redeemBookingsEnabled;
+        PointsCalculator.isContextEnabled(
+          pointsState,
+          PointsRedemptionContext.booking,
+        );
+    final canTogglePoints =
+        !_isSubmittingBooking && !pointsProvider.hasPointsReservation;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2845,10 +2891,10 @@ END:VCALENDAR
         if (shop.isLoadingPaymentMethods) ...[
           const LinearProgressIndicator(
             minHeight: 3,
-            color: Color(0xFFD4AF37),
-            backgroundColor: Color(0xFFF1EBDD),
+            color: AppColors.secondary,
+            backgroundColor: AppColors.goldMuted,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
         ],
         ...methods.map(
           (method) => Padding(
@@ -2860,7 +2906,7 @@ END:VCALENDAR
               onTap: () {
                 if (!method.canCreateManualOrder) {
                   _showMessage(
-                    '${method.title} estarÃ¡ disponible pronto para reservas desde la app.',
+                    '${method.title} estará disponible pronto para reservas desde la app.',
                   );
                   return;
                 }
@@ -2873,14 +2919,14 @@ END:VCALENDAR
           ),
         ),
         if (canShowPointsModule) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F7F4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE7DFD4)),
+              color: AppColors.surfaceElevated,
+              borderRadius: AppRadius.tile,
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2889,37 +2935,36 @@ END:VCALENDAR
                   children: [
                     const Icon(
                       Icons.stars_rounded,
-                      color: Color(0xFF9C7732),
-                      size: 20,
+                      color: AppColors.goldDeep,
+                      size: AppIconSize.spinner,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                     Expanded(
                       child: Text(
                         'Canjear ${pointsState.label}',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w800,
-                          fontSize: 14.5,
+                          fontSize: AppTextSize.baseLarge,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Text(
                   _bookingPointsHelperMessage(
                     pointsState,
                     totalPrice,
-                    pointsToUse,
                   ),
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
-                    fontSize: 12.8,
+                    fontSize: AppTextSize.bodyCompact,
                   ),
                 ),
                 if (pointsToUse > 0) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   _BookingPointsRedeemTile(
                     enabled: _usePoints,
                     pointsLabel: pointsState.label,
@@ -2928,6 +2973,7 @@ END:VCALENDAR
                     total: totalPrice,
                     payableTotal: projectedPayableTotal,
                     balance: pointsState.balance,
+                    interactive: canTogglePoints,
                     onChanged: (value) {
                       setState(() {
                         _usePoints = value;
@@ -2940,40 +2986,40 @@ END:VCALENDAR
           ),
         ],
         if (shop.paymentMethodsError != null) ...[
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xxs),
           const Text(
-            'No pudimos actualizar los mÃ©todos de pago. Usamos transferencia como respaldo.',
+            'No pudimos actualizar los métodos de pago. Usamos transferencia como respaldo.',
             style: TextStyle(
               color: AppColors.textSecondary,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F7F4),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE7DFD4)),
+            color: AppColors.surfaceElevated,
+            borderRadius: AppRadius.tile,
+            border: Border.all(color: AppColors.border),
           ),
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 Icons.verified_user_outlined,
-                color: Color(0xFF9C7732),
-                size: 20,
+                color: AppColors.goldDeep,
+                size: AppIconSize.spinner,
               ),
-              SizedBox(width: 10),
+              SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
               Expanded(
                 child: Text(
-                  'Antes de confirmar revisaremos que el horario siga libre y que tus datos estÃ©n listos para la reserva.',
+                  'Antes de confirmar revisaremos que el horario siga libre y que tus datos estén listos para la reserva.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
-                    fontSize: 13.2,
+                    fontSize: AppTextSize.bodyRelaxed,
                   ),
                 ),
               ),
@@ -2986,24 +3032,33 @@ END:VCALENDAR
 
   Widget _qtyButton({
     required IconData icon,
+    required String tooltip,
     required VoidCallback? onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: onTap == null ? const Color(0xFFF0EEEA) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE7DFD4)),
-        ),
-        child: Icon(
-          icon,
-          color:
-              onTap == null ? AppColors.textSecondary : const Color(0xFF9C7732),
-          size: 18,
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        enabled: onTap != null,
+        label: tooltip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.compact,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: onTap == null ? AppColors.surfaceMuted : Colors.white,
+              borderRadius: AppRadius.compact,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Icon(
+              icon,
+              color:
+                  onTap == null ? AppColors.textSecondary : AppColors.goldDeep,
+              size: AppIconSize.compact,
+            ),
+          ),
         ),
       ),
     );
@@ -3035,7 +3090,7 @@ END:VCALENDAR
         : '-';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F4F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
@@ -3051,9 +3106,11 @@ END:VCALENDAR
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFD4AF37),
+            ? const Padding(
+                padding: EdgeInsets.all(AppSpacing.lg),
+                child: HabitoLoadingShimmer(
+                  itemCount: 5,
+                  itemHeight: 118,
                 ),
               )
             : ListView(
@@ -3062,35 +3119,35 @@ END:VCALENDAR
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                      borderRadius: AppRadius.panel,
+                      boxShadow: AppShadows.panel,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Row(
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: AppRadius.large,
                             child: Container(
-                              width: 86,
-                              height: 86,
-                              color: const Color(0xFFF3EFE9),
+                              width: AppIconSize.serviceThumbnail,
+                              height: AppIconSize.serviceThumbnail,
+                              color: AppColors.surfaceMuted,
                               child: image != null && image.isNotEmpty
                                   ? HabitoCachedNetworkImage(
                                       imageUrl: image,
                                       fit: BoxFit.cover,
+                                      semanticLabel:
+                                          'Imagen del servicio $title',
                                       errorWidget: _serviceFallback(),
                                     )
-                                  : _serviceFallback(),
+                                  : Semantics(
+                                      label: 'Imagen del servicio $title',
+                                      image: true,
+                                      child: _serviceFallback(),
+                                    ),
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: AppSpacing.md + AppSpacing.xxs),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3099,20 +3156,22 @@ END:VCALENDAR
                                   'Servicio seleccionado',
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
-                                    fontSize: 12.5,
+                                    fontSize: AppTextSize.bodySmall,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(
+                                    height: AppSpacing.xs + AppSpacing.xxs),
                                 Text(
                                   title,
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
-                                    fontSize: 18,
+                                    fontSize: AppTextSize.titleLarge,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(
+                                    height: AppSpacing.sm + AppSpacing.xxs),
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
@@ -3123,15 +3182,15 @@ END:VCALENDAR
                                         vertical: 7,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF8E7A8),
-                                        borderRadius: BorderRadius.circular(30),
+                                        color: AppColors.goldSoft,
+                                        borderRadius: AppRadius.full,
                                       ),
                                       child: Text(
                                         price,
                                         style: const TextStyle(
-                                          color: Color(0xFF9C7732),
+                                          color: AppColors.goldDeep,
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 14,
+                                          fontSize: AppTextSize.base,
                                         ),
                                       ),
                                     ),
@@ -3141,15 +3200,15 @@ END:VCALENDAR
                                         vertical: 7,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF5F3EF),
-                                        borderRadius: BorderRadius.circular(30),
+                                        color: AppColors.surfaceMuted,
+                                        borderRadius: AppRadius.full,
                                       ),
                                       child: Text(
                                         durationLabel,
                                         style: const TextStyle(
                                           color: AppColors.textSecondary,
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 13,
+                                          fontSize: AppTextSize.body,
                                         ),
                                       ),
                                     ),
@@ -3162,32 +3221,32 @@ END:VCALENDAR
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Servicio',
                     child: _buildServiceDropdown(),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Extras del servicio',
                     child: _buildExtrasSection(),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Sucursal',
                     child: _buildLocationDropdown(),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Barbero',
                     child: _buildEmployeeDropdown(),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Fecha',
                     child: InkWell(
                       onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: AppRadius.tile,
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -3195,26 +3254,26 @@ END:VCALENDAR
                           vertical: 16,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF9F8F6),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE7DFD4)),
+                          color: AppColors.surfaceElevated,
+                          borderRadius: AppRadius.tile,
+                          border: Border.all(color: AppColors.border),
                         ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.calendar_month_rounded,
-                              color: Color(0xFF9C7732),
+                              color: AppColors.goldDeep,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             Expanded(
                               child: Text(
                                 _selectedDate == null
-                                    ? 'Selecciona el dÃ­a de tu reserva'
+                                    ? 'Selecciona el día de tu reserva'
                                     : _formatDate(_selectedDate!),
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 15,
+                                  fontSize: AppTextSize.titleSmall,
                                 ),
                               ),
                             ),
@@ -3227,37 +3286,43 @@ END:VCALENDAR
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
                     title: 'Horarios disponibles',
                     child: _buildAvailabilitySection(),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
-                    title: 'Datos del cliente y facturacion',
+                    title: 'Datos del cliente y facturación',
                     child: Column(
                       children: [
                         _buildTextField(
                           controller: _firstNameController,
-                          label: 'Nombre de pila',
+                          label: 'Primer nombre',
                           icon: Icons.person_outline_rounded,
                           keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.givenName],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _middleNameController,
                           label: 'Segundo nombre',
                           icon: Icons.person_outline_rounded,
                           keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.middleName],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _lastNameController,
-                          label: 'Apellido',
+                          label: 'Apellidos',
                           icon: Icons.badge_outlined,
                           keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.familyName],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildDropdownField(
                           label: 'Tipo de cliente',
                           icon: Icons.apartment_outlined,
@@ -3281,15 +3346,20 @@ END:VCALENDAR
                           },
                         ),
                         if (_contactType == 'business') ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.md),
                           _buildTextField(
                             controller: _businessNameController,
                             label: 'Razon social',
                             icon: Icons.business_outlined,
                             keyboardType: TextInputType.name,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.organizationName,
+                            ],
+                            maxLength: FormValidators.longTextMaxLength,
                           ),
                         ],
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildDropdownField(
                           label: 'Tipo de identificacion',
                           icon: Icons.credit_card_outlined,
@@ -3311,7 +3381,7 @@ END:VCALENDAR
                             });
                           },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _taxNumberController,
                           label: _bookingDocumentLabel,
@@ -3320,8 +3390,10 @@ END:VCALENDAR
                               _effectiveIdentificationType == 'pasaporte'
                                   ? TextInputType.text
                                   : TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.username],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildDropdownField(
                           label: 'Provincia',
                           icon: Icons.map_outlined,
@@ -3341,41 +3413,54 @@ END:VCALENDAR
                             });
                           },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _cityController,
                           label: 'Canton o ciudad',
                           icon: Icons.location_city_outlined,
                           keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.addressCity],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _addressController,
                           label: 'Direccion principal',
                           icon: Icons.home_outlined,
                           keyboardType: TextInputType.streetAddress,
+                          textInputAction: TextInputAction.newline,
+                          autofillHints: const [
+                            AutofillHints.fullStreetAddress,
+                          ],
+                          maxLength: FormValidators.longTextMaxLength,
                           maxLines: 2,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _phoneController,
                           label: 'Celular',
                           icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [
+                            AutofillHints.telephoneNumber,
+                          ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _emailController,
-                          label: 'Correo electrÃ³nico',
+                          label: 'Correo electronico',
                           icon: Icons.mail_outline_rounded,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.email],
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                   _sectionCard(
-                    title: 'MÃ©todo de pago',
+                    title: 'Método de pago',
                     child: _buildPaymentMethodSection(
                       shop,
                       auth,
@@ -3384,19 +3469,13 @@ END:VCALENDAR
                       totalPrice,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                      borderRadius: AppRadius.panel,
+                      boxShadow: AppShadows.panel,
                     ),
                     child: Column(
                       children: [
@@ -3404,15 +3483,16 @@ END:VCALENDAR
                           children: [
                             const Icon(
                               Icons.receipt_long_rounded,
-                              color: Color(0xFF9C7732),
+                              color: AppColors.goldDeep,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(
+                                width: AppSpacing.sm + AppSpacing.xxs),
                             const Expanded(
                               child: Text(
-                                'Resumen rÃ¡pido',
+                                'Resumen rápido',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontSize: 16,
+                                  fontSize: AppTextSize.titleMedium,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -3424,24 +3504,24 @@ END:VCALENDAR
                               ),
                               decoration: BoxDecoration(
                                 color: isReadyForSubmit
-                                    ? const Color(0xFFE7F6EC)
-                                    : const Color(0xFFFFF4DD),
-                                borderRadius: BorderRadius.circular(30),
+                                    ? AppColors.successSoft
+                                    : AppColors.warningSoft,
+                                borderRadius: AppRadius.full,
                               ),
                               child: Text(
                                 isReadyForSubmit ? 'Listo' : 'Incompleto',
                                 style: TextStyle(
                                   color: isReadyForSubmit
-                                      ? const Color(0xFF2E7D32)
-                                      : const Color(0xFFB7791F),
-                                  fontSize: 12,
+                                      ? AppColors.success
+                                      : AppColors.warningDeep,
+                                  fontSize: AppTextSize.label,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                         _infoLine('Servicio', title),
                         _infoLine(
                           'Base',
@@ -3458,7 +3538,7 @@ END:VCALENDAR
                             '-${_formatCurrency(pointsDiscount)}',
                           ),
                         _infoLine('Total', price),
-                        _infoLine('DuraciÃ³n', durationLabel),
+                        _infoLine('Duración', durationLabel),
                         _infoLine(
                             'Sucursal', _selectedLocation?['name'] ?? '-'),
                         _infoLine(
@@ -3475,19 +3555,20 @@ END:VCALENDAR
                             'Hora', _selectedTimeSlot ?? 'No seleccionada'),
                         _infoLine('Pago', selectedPaymentMethod.title),
                         if (_getSelectedExtrasDetailed().isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(
+                              height: AppSpacing.xs + AppSpacing.xxs),
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               'Complementos elegidos',
                               style: const TextStyle(
-                                color: Color(0xFF9C7732),
+                                color: AppColors.goldDeep,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 13.5,
+                                fontSize: AppTextSize.bodyStrong,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.sm),
                           ..._getSelectedExtrasDetailed().map(
                             (extra) => _infoLine(
                               '${extra['quantity']}x',
@@ -3498,28 +3579,28 @@ END:VCALENDAR
                       ],
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: canConfirmBooking ? _confirmBooking : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        disabledBackgroundColor: const Color(0xFFE7DFD4),
+                        backgroundColor: AppColors.secondary,
+                        disabledBackgroundColor: AppColors.border,
                         foregroundColor: AppColors.primary,
-                        disabledForegroundColor: const Color(0xFF9E9E9E),
+                        disabledForegroundColor: AppColors.textMuted,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 17),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: AppRadius.large,
                         ),
                       ),
                       child: _isSubmittingBooking
                           ? const SizedBox(
-                              width: 22,
-                              height: 22,
+                              width: AppIconSize.progress,
+                              height: AppIconSize.progress,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
+                                strokeWidth: AppSpacing.progressStroke,
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   AppColors.primary,
                                 ),
@@ -3528,30 +3609,30 @@ END:VCALENDAR
                           : Text(
                               _isEditing ? 'Guardar cambios' : 'Confirmar cita',
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: AppTextSize.titleMedium,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                   if (!_isFormValid)
                     const Text(
                       'Completa servicio, sucursal, barbero, horario y todos los datos fiscales para continuar.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 13.5,
+                        fontSize: AppTextSize.bodyStrong,
                         height: 1.4,
                       ),
                     )
                   else if (!selectedPaymentMethod.canCreateManualOrder)
                     Text(
-                      '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para reservas desde la app.',
+                      '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 13.5,
+                        fontSize: AppTextSize.bodyStrong,
                         height: 1.4,
                       ),
                     ),
@@ -3567,7 +3648,7 @@ END:VCALENDAR
         'Selecciona servicio, sucursal, barbero y fecha para consultar horarios reales.',
         style: TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13.5,
+          fontSize: AppTextSize.bodyStrong,
           height: 1.4,
         ),
       );
@@ -3575,24 +3656,21 @@ END:VCALENDAR
 
     if (_isLoadingAvailability) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 10),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFFD4AF37),
-          ),
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.gutter),
+        child: HabitoLoadingShimmer(
+          itemCount: 2,
+          itemHeight: 48,
         ),
       );
     }
 
     if (_availableTimeSlots.isEmpty) {
-      return Text(
-        _availabilityNoticeMessage ??
+      return HabitoEmptyState(
+        icon: Icons.schedule_rounded,
+        title: 'Sin horarios disponibles',
+        message: _availabilityNoticeMessage ??
             'No hay horarios disponibles para esta fecha.',
-        style: const TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 13.5,
-          height: 1.4,
-        ),
+        compact: true,
       );
     }
 
@@ -3601,25 +3679,25 @@ END:VCALENDAR
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E7),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFD4AF37)),
+          color: AppColors.goldSurface,
+          borderRadius: AppRadius.large,
+          border: Border.all(color: AppColors.secondary),
         ),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: AppIconSize.pointsBadge,
+              height: AppIconSize.pointsBadge,
               decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37),
-                borderRadius: BorderRadius.circular(14),
+                color: AppColors.secondary,
+                borderRadius: AppRadius.medium,
               ),
               child: const Icon(
                 Icons.schedule_rounded,
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3628,16 +3706,16 @@ END:VCALENDAR
                     'Horario seleccionado',
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 12.5,
+                      fontSize: AppTextSize.bodySmall,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: AppSpacing.progress),
                   Text(
                     _selectedTimeSlot!,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 20,
+                      fontSize: AppTextSize.section,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -3680,14 +3758,11 @@ END:VCALENDAR
               vertical: 12,
             ),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? const Color(0xFFD4AF37)
-                  : const Color(0xFFF9F8F6),
-              borderRadius: BorderRadius.circular(14),
+              color:
+                  isSelected ? AppColors.secondary : AppColors.surfaceElevated,
+              borderRadius: AppRadius.medium,
               border: Border.all(
-                color: isSelected
-                    ? const Color(0xFFD4AF37)
-                    : const Color(0xFFE7DFD4),
+                color: isSelected ? AppColors.secondary : AppColors.border,
               ),
             ),
             child: Text(
@@ -3695,7 +3770,7 @@ END:VCALENDAR
               style: TextStyle(
                 color: isSelected ? AppColors.primary : AppColors.textPrimary,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: AppTextSize.base,
               ),
             ),
           ),
@@ -3714,11 +3789,11 @@ END:VCALENDAR
           _availabilityNoticeMessage!,
           style: const TextStyle(
             color: AppColors.textSecondary,
-            fontSize: 13,
+            fontSize: AppTextSize.body,
             height: 1.35,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         slotsWrap,
       ],
     );
@@ -3731,7 +3806,7 @@ END:VCALENDAR
 
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFF3EFE9),
+        color: AppColors.surfaceMuted,
       ),
       child: Image.asset(
         placeholderImage,
@@ -3740,8 +3815,8 @@ END:VCALENDAR
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF2B2118),
-                Color(0xFF6E5031),
+                AppColors.primarySoft,
+                AppColors.goldDeep,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -3785,17 +3860,19 @@ END:VCALENDAR
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9F8F6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE7DFD4)),
+        color: _isEditing ? AppColors.surfaceMuted : AppColors.surfaceElevated,
+        borderRadius: AppRadius.tile,
+        border: Border.all(color: AppColors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: selectedTitle,
           dropdownColor: Colors.white,
           isExpanded: true,
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
+          icon: Icon(
+            _isEditing
+                ? Icons.lock_outline_rounded
+                : Icons.keyboard_arrow_down_rounded,
             color: AppColors.textSecondary,
           ),
           hint: const Text(
@@ -3804,7 +3881,7 @@ END:VCALENDAR
           ),
           style: const TextStyle(
             color: AppColors.textPrimary,
-            fontSize: 15,
+            fontSize: AppTextSize.titleSmall,
             fontWeight: FontWeight.w600,
           ),
           items: _services.map((service) {
@@ -3813,10 +3890,12 @@ END:VCALENDAR
               child: Text(service['title'] as String),
             );
           }).toList(),
-          onChanged: (value) async {
-            if (value == null) return;
-            await _onServiceChanged(value);
-          },
+          onChanged: _isEditing
+              ? null
+              : (value) async {
+                  if (value == null) return;
+                  await _onServiceChanged(value);
+                },
         ),
       ),
     );
@@ -3828,17 +3907,19 @@ END:VCALENDAR
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9F8F6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE7DFD4)),
+        color: _isEditing ? AppColors.surfaceMuted : AppColors.surfaceElevated,
+        borderRadius: AppRadius.tile,
+        border: Border.all(color: AppColors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: selectedName,
           dropdownColor: Colors.white,
           isExpanded: true,
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
+          icon: Icon(
+            _isEditing
+                ? Icons.lock_outline_rounded
+                : Icons.keyboard_arrow_down_rounded,
             color: AppColors.textSecondary,
           ),
           hint: const Text(
@@ -3847,7 +3928,7 @@ END:VCALENDAR
           ),
           style: const TextStyle(
             color: AppColors.textPrimary,
-            fontSize: 15,
+            fontSize: AppTextSize.titleSmall,
             fontWeight: FontWeight.w600,
           ),
           items: _locations.map((location) {
@@ -3857,26 +3938,28 @@ END:VCALENDAR
               child: Text(name),
             );
           }).toList(),
-          onChanged: (value) async {
-            if (value == null) return;
+          onChanged: _isEditing
+              ? null
+              : (value) async {
+                  if (value == null) return;
 
-            final location = _locations.firstWhere(
-              (item) => item['name'] == value,
-            );
+                  final location = _locations.firstWhere(
+                    (item) => item['name'] == value,
+                  );
 
-            setState(() {
-              _selectedLocation = location;
-              _selectedTimeSlot = null;
-              _availableTimeSlots = [];
-              _showAllTimeSlots = true;
-            });
+                  setState(() {
+                    _selectedLocation = location;
+                    _selectedTimeSlot = null;
+                    _availableTimeSlots = [];
+                    _showAllTimeSlots = true;
+                  });
 
-            _applyEmployeesForCurrentSelection(
-              showMessageIfAdjusted: true,
-            );
+                  _applyEmployeesForCurrentSelection(
+                    showMessageIfAdjusted: true,
+                  );
 
-            await _loadAvailabilityIfPossible();
-          },
+                  await _loadAvailabilityIfPossible();
+                },
         ),
       ),
     );
@@ -3888,7 +3971,7 @@ END:VCALENDAR
         'Selecciona servicio y sucursal para ver los barberos disponibles.',
         style: TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13.5,
+          fontSize: AppTextSize.bodyStrong,
           height: 1.4,
         ),
       );
@@ -3896,10 +3979,10 @@ END:VCALENDAR
 
     if (_filteredEmployees.isEmpty) {
       return const Text(
-        'No encontramos barberos disponibles para esta selecciÃ³n.',
+        'No encontramos barberos disponibles para esta selección.',
         style: TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13.5,
+          fontSize: AppTextSize.bodyStrong,
           height: 1.4,
         ),
       );
@@ -3910,7 +3993,7 @@ END:VCALENDAR
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _filteredEmployees.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
           final employee = _filteredEmployees[index];
           final selected =
@@ -3919,18 +4002,21 @@ END:VCALENDAR
           return _BarberPickerCard(
             employee: employee,
             selected: selected,
-            onTap: () async {
-              setState(() {
-                _selectedEmployee = employee;
-                _selectedTimeSlot = null;
-                _availableTimeSlots = [];
-                _showAllTimeSlots = true;
-              });
+            locked: _isEditing,
+            onTap: _isEditing
+                ? null
+                : () async {
+                    setState(() {
+                      _selectedEmployee = employee;
+                      _selectedTimeSlot = null;
+                      _availableTimeSlots = [];
+                      _showAllTimeSlots = true;
+                    });
 
-              await _loadAvailabilityIfPossible(
-                employeeOverride: employee,
-              );
-            },
+                    await _loadAvailabilityIfPossible(
+                      employeeOverride: employee,
+                    );
+                  },
           );
         },
       ),
@@ -3941,14 +4027,8 @@ END:VCALENDAR
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: AppRadius.panel,
+        boxShadow: AppShadows.panel,
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -3958,12 +4038,12 @@ END:VCALENDAR
             Text(
               title,
               style: const TextStyle(
-                color: Color(0xFF9C7732),
-                fontSize: 15,
+                color: AppColors.goldDeep,
+                fontSize: AppTextSize.titleSmall,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
             child,
           ],
         ),
@@ -3976,11 +4056,17 @@ END:VCALENDAR
     required String label,
     required IconData icon,
     required TextInputType keyboardType,
+    TextInputAction textInputAction = TextInputAction.next,
+    Iterable<String>? autofillHints,
+    int? maxLength,
     int maxLines = 1,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      autofillHints: autofillHints,
+      maxLength: maxLength,
       maxLines: maxLines,
       minLines: maxLines > 1 ? maxLines : 1,
       style: const TextStyle(
@@ -3990,20 +4076,20 @@ END:VCALENDAR
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.textSecondary),
-        prefixIcon: Icon(icon, color: const Color(0xFF9C7732)),
+        prefixIcon: Icon(icon, color: AppColors.goldDeep),
         filled: true,
-        fillColor: const Color(0xFFF9F8F6),
+        fillColor: AppColors.surfaceElevated,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE7DFD4)),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE7DFD4)),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFD4AF37), width: 1.2),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.secondary, width: 1.2),
         ),
       ),
     );
@@ -4028,20 +4114,20 @@ END:VCALENDAR
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.textSecondary),
-        prefixIcon: Icon(icon, color: const Color(0xFF9C7732)),
+        prefixIcon: Icon(icon, color: AppColors.goldDeep),
         filled: true,
-        fillColor: const Color(0xFFF9F8F6),
+        fillColor: AppColors.surfaceElevated,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE7DFD4)),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE7DFD4)),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFD4AF37), width: 1.2),
+          borderRadius: AppRadius.tile,
+          borderSide: const BorderSide(color: AppColors.secondary, width: 1.2),
         ),
       ),
     );
@@ -4059,7 +4145,7 @@ END:VCALENDAR
               '$label:',
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 13.5,
+                fontSize: AppTextSize.bodyStrong,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -4069,7 +4155,7 @@ END:VCALENDAR
               value,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 13.8,
+                fontSize: AppTextSize.bodyMedium,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -4088,6 +4174,7 @@ class _BookingPointsRedeemTile extends StatelessWidget {
   final double total;
   final double payableTotal;
   final double balance;
+  final bool interactive;
   final ValueChanged<bool> onChanged;
 
   const _BookingPointsRedeemTile({
@@ -4098,6 +4185,7 @@ class _BookingPointsRedeemTile extends StatelessWidget {
     required this.total,
     required this.payableTotal,
     required this.balance,
+    this.interactive = true,
     required this.onChanged,
   });
 
@@ -4117,17 +4205,17 @@ class _BookingPointsRedeemTile extends StatelessWidget {
     final isFullPayment = payableTotal <= 0.009;
 
     return InkWell(
-      onTap: () => onChanged(!enabled),
-      borderRadius: BorderRadius.circular(18),
+      onTap: interactive ? () => onChanged(!enabled) : null,
+      borderRadius: AppRadius.large,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: enabled ? const Color(0xFFFFFBEB) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          color: enabled ? AppColors.goldSurface : Colors.white,
+          borderRadius: AppRadius.large,
           border: Border.all(
-            color: enabled ? const Color(0xFFD4AF37) : const Color(0xFFE4DED2),
+            color: enabled ? AppColors.secondary : AppColors.border,
             width: enabled ? 1.4 : 1,
           ),
         ),
@@ -4140,18 +4228,16 @@ class _BookingPointsRedeemTile extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: enabled
-                        ? const Color(0xFFD4AF37)
-                        : const Color(0xFFF1EBDD),
-                    borderRadius: BorderRadius.circular(14),
+                    color: enabled ? AppColors.secondary : AppColors.goldMuted,
+                    borderRadius: AppRadius.medium,
                   ),
                   child: Icon(
                     Icons.stars_rounded,
-                    color: enabled ? Colors.white : const Color(0xFF9C7732),
+                    color: enabled ? Colors.white : AppColors.goldDeep,
                     size: 21,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -4163,15 +4249,15 @@ class _BookingPointsRedeemTile extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w900,
-                          fontSize: 14.5,
+                          fontSize: AppTextSize.baseLarge,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: AppSpacing.progress),
                       Text(
                         '$pointsText de $balanceText puntos disponibles',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 12.4,
+                          fontSize: AppTextSize.bodyTiny,
                           height: 1.3,
                           fontWeight: FontWeight.w600,
                         ),
@@ -4181,13 +4267,13 @@ class _BookingPointsRedeemTile extends StatelessWidget {
                 ),
                 Switch.adaptive(
                   value: enabled,
-                  activeThumbColor: const Color(0xFFD4AF37),
-                  activeTrackColor: const Color(0xFFE8D79D),
-                  onChanged: onChanged,
+                  activeThumbColor: AppColors.secondary,
+                  activeTrackColor: AppColors.borderStrong,
+                  onChanged: interactive ? onChanged : null,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 380;
@@ -4203,14 +4289,14 @@ class _BookingPointsRedeemTile extends StatelessWidget {
                       width: metricWidth,
                       label: 'Ahorras',
                       value: _formatCurrency(discount),
-                      valueColor: const Color(0xFF2E7D32),
+                      valueColor: AppColors.success,
                     ),
                     _BookingPointsMetric(
                       width: metricWidth,
                       label: enabled ? 'Pagaras' : 'Pagarias',
                       value: _formatCurrency(payableTotal),
                       valueColor: isFullPayment
-                          ? const Color(0xFF2E7D32)
+                          ? AppColors.success
                           : AppColors.textPrimary,
                     ),
                     _BookingPointsMetric(
@@ -4224,13 +4310,13 @@ class _BookingPointsRedeemTile extends StatelessWidget {
               },
             ),
             if (isFullPayment) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
               const Text(
                 'La reserva queda cubierta al 100% con puntos.',
                 style: TextStyle(
-                  color: Color(0xFF2E7D32),
+                  color: AppColors.success,
                   fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
+                  fontSize: AppTextSize.bodySmall,
                   height: 1.3,
                 ),
               ),
@@ -4262,9 +4348,9 @@ class _BookingPointsMetric extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F7F4),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE7DFD4)),
+          color: AppColors.surfaceElevated,
+          borderRadius: AppRadius.medium,
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -4273,18 +4359,18 @@ class _BookingPointsMetric extends StatelessWidget {
               label,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 11,
+                fontSize: AppTextSize.captionSm,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: AppSpacing.progress),
             Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: valueColor,
-                fontSize: 15.5,
+                fontSize: AppTextSize.title,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -4314,29 +4400,29 @@ class _BookingPaymentMethodTile extends StatelessWidget {
         ? 'Pago online'
         : method.id == 'bacs'
             ? 'Transferencia'
-            : 'Manual';
+            : method.isOnSite
+                ? 'On-site'
+                : 'Manual';
 
     final description = enabled
         ? _descriptionForBooking(method)
-        : '${_descriptionForBooking(method)} EstarÃ¡ disponible pronto.';
+        : '${_descriptionForBooking(method)} Estará disponible pronto.';
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.large,
         child: Opacity(
           opacity: enabled ? 1 : 0.62,
           child: Ink(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color:
-                  selected ? const Color(0xFFFFF8E7) : const Color(0xFFF8F7F4),
-              borderRadius: BorderRadius.circular(18),
+                  selected ? AppColors.goldSurface : AppColors.surfaceElevated,
+              borderRadius: AppRadius.large,
               border: Border.all(
-                color: selected
-                    ? const Color(0xFFD4AF37)
-                    : const Color(0xFFE4DED2),
+                color: selected ? AppColors.secondary : AppColors.border,
                 width: selected ? 1.4 : 1,
               ),
             ),
@@ -4349,12 +4435,11 @@ class _BookingPaymentMethodTile extends StatelessWidget {
                       : enabled
                           ? Icons.radio_button_off_outlined
                           : Icons.lock_outline_rounded,
-                  color: selected
-                      ? const Color(0xFFD4AF37)
-                      : const Color(0xFF7A7268),
+                  color:
+                      selected ? AppColors.secondary : AppColors.textSecondary,
                   size: 23,
                 ),
-                const SizedBox(width: 11),
+                const SizedBox(width: AppSpacing.sm + AppSpacing.progress),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -4369,40 +4454,40 @@ class _BookingPaymentMethodTile extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 14.5,
+                                fontSize: AppTextSize.baseLarge,
                                 height: 1.15,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.sm),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 9,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE7D39A)
+                              color: AppColors.borderStrong
                                   .withValues(alpha: 0.24),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: AppRadius.full,
                             ),
                             child: Text(
                               badgeText,
                               style: const TextStyle(
-                                color: Color(0xFF7A5B1B),
-                                fontSize: 10.5,
+                                color: AppColors.goldDeep,
+                                fontSize: AppTextSize.captionXs,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                       Text(
                         description,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 13,
+                          fontSize: AppTextSize.body,
                           height: 1.35,
                         ),
                       ),
@@ -4419,50 +4504,51 @@ class _BookingPaymentMethodTile extends StatelessWidget {
 
   String _descriptionForBooking(ShopPaymentMethod method) {
     if (method.id == 'bacs') {
-      return 'Confirmamos tu cita y validas el pago con el equipo de HÃ¡bito.';
+      return 'Confirmamos tu cita y validas el pago con el equipo de Hábito.';
     }
 
-    if (method.id == 'cod') {
-      return 'Confirma tu cita y paga directamente en la barberÃ­a.';
+    if (method.isOnSite) {
+      return 'Confirma tu cita y paga directamente en la barberia.';
     }
 
     if (method.description.trim().isNotEmpty) {
       return method.description.trim();
     }
 
-    return 'Selecciona este mÃ©todo para confirmar tu cita.';
+    return 'Selecciona este método para confirmar tu cita.';
   }
 }
 
 class _BarberPickerCard extends StatelessWidget {
   final Map<String, dynamic> employee;
   final bool selected;
-  final Future<void> Function() onTap;
+  final bool locked;
+  final Future<void> Function()? onTap;
 
   const _BarberPickerCard({
     required this.employee,
     required this.selected,
+    this.locked = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final name = employee['fullName']?.toString() ?? 'Barbero HÃ¡bito';
+    final name = employee['fullName']?.toString() ?? 'Barbero Hábito';
     final imageUrl = employee['image']?.toString() ?? '';
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: AppRadius.panel,
         child: Ink(
           width: 156,
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFFFF8E7) : const Color(0xFFF9F8F6),
-            borderRadius: BorderRadius.circular(22),
+            color: selected ? AppColors.goldSurface : AppColors.surfaceElevated,
+            borderRadius: AppRadius.panel,
             border: Border.all(
-              color:
-                  selected ? const Color(0xFFD4AF37) : const Color(0xFFE7DFD4),
+              color: selected ? AppColors.secondary : AppColors.border,
               width: selected ? 1.6 : 1,
             ),
           ),
@@ -4472,7 +4558,7 @@ class _BarberPickerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.large,
                   child: SizedBox(
                     height: 104,
                     width: double.infinity,
@@ -4486,7 +4572,7 @@ class _BarberPickerCard extends StatelessWidget {
                         : const _BarberPickerFallback(),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                 Row(
                   children: [
                     Container(
@@ -4494,29 +4580,36 @@ class _BarberPickerCard extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         color: selected
-                            ? const Color(0xFFD4AF37)
+                            ? AppColors.secondary
                             : AppColors.textSecondary.withValues(alpha: 0.35),
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(
+                        width: AppSpacing.sm -
+                            AppSpacing.xxs +
+                            AppSpacing.progress),
                     Expanded(
                       child: Text(
-                        selected ? 'Seleccionado' : 'Barbero',
+                        locked && selected
+                            ? 'Fijo para reagendar'
+                            : selected
+                                ? 'Seleccionado'
+                                : 'Barbero',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: selected
-                              ? const Color(0xFF9C7732)
+                              ? AppColors.goldDeep
                               : AppColors.textSecondary,
-                          fontSize: 11,
+                          fontSize: AppTextSize.captionSm,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     name,
@@ -4524,7 +4617,7 @@ class _BarberPickerCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 14.5,
+                      fontSize: AppTextSize.baseLarge,
                       height: 1.15,
                       fontWeight: FontWeight.w800,
                     ),
@@ -4547,7 +4640,7 @@ class _BarberPickerFallback extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2B2118), Color(0xFF6E5031)],
+          colors: [AppColors.primarySoft, AppColors.goldDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -4561,28 +4654,4 @@ class _BarberPickerFallback extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ResolvedPointsState {
-  final bool enabled;
-  final bool redeemEnabled;
-  final bool redeemProductsEnabled;
-  final bool redeemBookingsEnabled;
-  final double balance;
-  final double rate;
-  final double minPoints;
-  final double maxPercent;
-  final String label;
-
-  const _ResolvedPointsState({
-    required this.enabled,
-    required this.redeemEnabled,
-    required this.redeemProductsEnabled,
-    required this.redeemBookingsEnabled,
-    required this.balance,
-    required this.rate,
-    required this.minPoints,
-    required this.maxPercent,
-    required this.label,
-  });
 }

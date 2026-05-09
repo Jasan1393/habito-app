@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/errors/friendly_errors.dart';
 import '../../models/points_history_entry.dart';
 import '../../models/points_quote.dart';
 import '../../models/points_summary.dart';
@@ -128,8 +129,7 @@ class PointsApi {
     return {
       'success': false,
       '_statusCode': response.statusCode,
-      'message': 'No se pudo interpretar la respuesta del servidor.',
-      'raw': response.body,
+      'message': FriendlyErrors.points(response.body),
     };
   }
 
@@ -167,7 +167,7 @@ class PointsApi {
 
     for (final candidate in candidates) {
       final text = candidate?.toString().trim() ?? '';
-      if (text.isNotEmpty) return text;
+      if (text.isNotEmpty) return FriendlyErrors.points(text);
     }
 
     return fallback;

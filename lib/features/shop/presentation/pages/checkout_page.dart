@@ -1,17 +1,27 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/ecuador_data.dart';
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_icon_size.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/validators/ecuador_id_validator.dart';
+import '../../../../core/validators/form_validators.dart';
 import '../../../../shared/widgets/habito_bottom_navigation_bar.dart';
+import '../../../../shared/widgets/habito_bank_data_sheet.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/models/auth_user.dart';
 import '../../../auth/provider/auth_provider.dart';
+import '../../../points/points_calculator.dart';
 import '../../../points/provider/points_provider.dart';
 import '../../data/services/habito_shop_api.dart';
+import '../../models/cart_validation.dart';
 import '../../models/shop_payment_method.dart';
 import '../../provider/shop_provider.dart';
 import 'orders_page.dart';
@@ -411,30 +421,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return cantons.isNotEmpty ? cantons.first : city.trim();
   }
 
-  _CheckoutPointsState _resolvePointsState(
+  PointsRedemptionState _resolvePointsState(
     AuthProvider auth, [
     PointsProvider? pointsProvider,
   ]) {
-    final user = auth.user;
-    final summary = pointsProvider?.summary;
-
-    return _CheckoutPointsState(
-      enabled: summary?.enabled ?? user?.pointsEnabled ?? false,
-      redeemEnabled:
-          summary?.redeemEnabled ?? user?.pointsRedeemEnabled ?? false,
-      redeemProductsEnabled: summary?.redeemProductsEnabled ??
-          user?.pointsRedeemProductsEnabled ??
-          false,
-      redeemBookingsEnabled: summary?.redeemBookingsEnabled ??
-          user?.pointsRedeemBookingsEnabled ??
-          false,
-      balance: summary?.balance ?? user?.pointsBalance ?? 0,
-      rate:
-          summary?.redeemPointsPerUsd ?? user?.pointsRedeemPointsPerUsd ?? 100,
-      minPoints: summary?.redeemMinPoints ?? user?.pointsRedeemMinPoints ?? 1,
-      maxPercent:
-          summary?.redeemMaxPercent ?? user?.pointsRedeemMaxPercent ?? 100,
-      label: (summary?.label ?? user?.pointsLabel ?? 'Puntos').trim(),
+    return PointsCalculator.resolveState(
+      user: auth.user,
+      summary: pointsProvider?.summary,
+      reservedPoints: pointsProvider?.reservedPoints ?? 0,
     );
   }
 
@@ -443,24 +437,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
     double total, [
     PointsProvider? pointsProvider,
   ]) {
-    final pointsState = _resolvePointsState(auth, pointsProvider);
-    if (!pointsState.enabled ||
-        !pointsState.redeemEnabled ||
-        !pointsState.redeemProductsEnabled ||
-        total <= 0) {
-      return 0;
-    }
-
-    final rate = pointsState.rate > 0 ? pointsState.rate : 100.0;
-    final maxPercent = pointsState.maxPercent.clamp(0, 100).toDouble();
-    final maxDiscount = total * (maxPercent / 100);
-    final maxPointsByTotal = maxDiscount * rate;
-    final points = pointsState.balance < maxPointsByTotal
-        ? pointsState.balance
-        : maxPointsByTotal;
-
-    if (points < pointsState.minPoints) return 0;
-    return double.parse(points.toStringAsFixed(2));
+    return PointsCalculator.calculate(
+      state: _resolvePointsState(auth, pointsProvider),
+      context: PointsRedemptionContext.order,
+      total: total,
+    ).pointsToUse;
   }
 
   double _pointsDiscount(
@@ -468,17 +449,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
     double total, [
     PointsProvider? pointsProvider,
   ]) {
-    final points = _pointsToUse(auth, total, pointsProvider);
-    final pointsState = _resolvePointsState(auth, pointsProvider);
-    final rate = pointsState.rate > 0 ? pointsState.rate : 100;
-    if (points <= 0 || rate <= 0) return 0;
-    final discount = points / rate;
-    return discount > total ? total : double.parse(discount.toStringAsFixed(2));
+    return PointsCalculator.calculate(
+      state: _resolvePointsState(auth, pointsProvider),
+      context: PointsRedemptionContext.order,
+      total: total,
+    ).discount;
   }
 
   Future<void> _loadPaymentMethods() async {
     final shop = context.read<ShopProvider>();
-    await shop.loadPaymentMethods();
+    await shop.loadPaymentMethods(forceRefresh: true);
 
     if (!mounted) return;
 
@@ -511,7 +491,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             .toList();
       });
     } catch (_) {
-      // El checkout puede continuar con envÃ­o aunque las sucursales no carguen.
+      // El checkout puede continuar con envío aunque las sucursales no carguen.
     } finally {
       if (mounted) {
         setState(() {
@@ -568,67 +548,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return [list.first, list.skip(1).join(' ')];
   }
 
-  bool _isValidDocument(String value) {
-    final text = value.trim();
-    final digits = text.replaceAll(RegExp(r'\D'), '');
-
-    if (_documentType == 'ruc') return digits.length == 13;
-    if (_documentType == 'pasaporte') return text.length >= 5;
-    return digits.length == 10;
-  }
-
-  bool _isValidEmail(String value) {
-    final text = value.trim();
-    return text.contains('@') && text.contains('.');
-  }
-
   List<String> _missingCheckoutInfo(ShopFulfillmentMethod fulfillmentMethod) {
     final missing = <String>[];
-    final name = _billingNameController.text.trim();
-    final email = _billingEmailController.text.trim();
-    final phoneDigits =
-        _billingPhoneController.text.replaceAll(RegExp(r'\D'), '');
-    final documentLabel = _documentLabel;
-    final document = _documentController.text.trim();
-
-    if (name.isEmpty) missing.add('nombre de facturaciÃ³n');
-    if (email.isEmpty) {
-      missing.add('correo electrÃ³nico');
-    } else if (!_isValidEmail(email)) {
-      missing.add('correo electrÃ³nico vÃ¡lido');
-    }
-    if (phoneDigits.length < 7) missing.add('nÃºmero de telÃ©fono');
-    if (document.isEmpty) {
-      missing.add(documentLabel);
-    } else if (!_isValidDocument(document)) {
-      missing.add('$documentLabel vÃ¡lido');
-    }
-
-    if (fulfillmentMethod == ShopFulfillmentMethod.delivery) {
-      if (_selectedProvince.trim().isEmpty) missing.add('provincia');
-      if (_selectedCanton.trim().isEmpty) missing.add('cantÃ³n');
-      if (_addressController.text.trim().isEmpty) {
-        missing.add('direcciÃ³n de entrega');
-      }
-    } else if (context.read<ShopProvider>().pickupLocationName.isEmpty) {
+    if (fulfillmentMethod == ShopFulfillmentMethod.pickup &&
+        context.read<ShopProvider>().pickupLocationName.isEmpty) {
       missing.add('sucursal preferida de retiro');
     }
-
     return missing;
-  }
-
-  String get _documentLabel {
-    return kIdentificationTypeLabels[_documentType] ?? 'documento';
   }
 
   void _showMissingCheckoutInfo(List<String> missing) {
     if (missing.isEmpty) return;
     final hasBillingIssue = missing.any(
       (item) =>
-          item.contains('facturaciÃ³n') ||
+          item.contains('facturación') ||
           item.contains('correo') ||
-          item.contains('telÃ©fono') ||
-          item.contains('cÃ©dula') ||
+          item.contains('teléfono') ||
+          item.contains('cédula') ||
           item.contains('RUC'),
     );
     if (hasBillingIssue && !_isBillingEditing) {
@@ -730,41 +666,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (_isSubmittingCheckout || shop.isCreatingOrder) return;
 
-    final missingInfo = _missingCheckoutInfo(fulfillmentMethod);
-    if (missingInfo.isNotEmpty) {
-      _formKey.currentState!.validate();
-      _showMissingCheckoutInfo(missingInfo);
-      return;
-    }
-
     if (!_formKey.currentState!.validate()) {
       _showMissingCheckoutInfo(['revisa los datos marcados en rojo']);
       return;
     }
+
+    final missingInfo = _missingCheckoutInfo(fulfillmentMethod);
+    if (missingInfo.isNotEmpty) {
+      _showMissingCheckoutInfo(missingInfo);
+      return;
+    }
+
     if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Inicia sesion para confirmar tu pedido.'),
-        ),
-      );
-      return;
-    }
-
-    if (fulfillmentMethod == ShopFulfillmentMethod.pickup &&
-        shop.pickupLocationName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona la sucursal preferida de retiro.'),
-        ),
-      );
-      return;
-    }
-
-    if (fulfillmentMethod == ShopFulfillmentMethod.delivery &&
-        (_selectedProvince.isEmpty || _selectedCanton.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona provincia y cantÃ³n para el envÃ­o.'),
         ),
       );
       return;
@@ -782,9 +698,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
       }
     }
 
+    try {
+      final validation = await shop.validateCartForCheckout(
+        token: auth.token!,
+        fulfillmentMethod: fulfillmentMethod,
+      );
+      if (!mounted) return;
+      if (validation.shouldInterruptCheckout) {
+        if (_usePoints) {
+          setState(() {
+            _usePoints = false;
+          });
+        }
+        stopSubmitting();
+        await _showCartValidationDialog(validation);
+        return;
+      }
+    } catch (e) {
+      stopSubmitting();
+      messenger.showSnackBar(
+        SnackBar(content: Text(FriendlyErrors.checkout(e))),
+      );
+      return;
+    }
+
     final orderTotal = shop.orderTotalFor(fulfillmentMethod);
     var redeemPoints = 0.0;
     var redeemDiscount = 0.0;
+    String? pointsReservationId;
 
     if (_usePoints) {
       try {
@@ -815,13 +756,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
         redeemPoints = quote.points;
         redeemDiscount = quote.discount;
+
+        pointsReservationId = 'order-${DateTime.now().microsecondsSinceEpoch}';
+        final reserved = pointsProvider.reserveRedemption(
+          id: pointsReservationId,
+          context: 'order',
+          points: redeemPoints,
+        );
+        if (!reserved) {
+          setState(() {
+            _usePoints = false;
+            _isSubmittingCheckout = false;
+          });
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Ya hay un canje de puntos en proceso. Espera unos segundos e intenta nuevamente.',
+              ),
+            ),
+          );
+          return;
+        }
       } catch (e) {
         if (!mounted) return;
         stopSubmitting();
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'No pudimos validar tus puntos: ${e.toString().replaceFirst('Exception: ', '')}',
+              FriendlyErrors.points(e),
             ),
           ),
         );
@@ -830,13 +792,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     final pointsCoverTotal = redeemDiscount + 0.001 >= orderTotal;
+    final payableTotal =
+        (orderTotal - redeemDiscount).clamp(0, double.infinity).toDouble();
 
     if (!selectedPaymentMethod.canCreateManualOrder && !pointsCoverTotal) {
+      if (pointsReservationId != null) {
+        pointsProvider.releaseReservation(pointsReservationId);
+      }
       stopSubmitting();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '${selectedPaymentMethod.title} estarÃ¡ disponible pronto para pedidos desde la app.',
+            '${selectedPaymentMethod.title} estará disponible pronto para pedidos desde la app.',
           ),
         ),
       );
@@ -844,38 +811,62 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     final nameParts = _splitCustomerName(_billingNameController.text);
-    final order = await shop.checkout(
-      token: auth.token!,
-      user: auth.user!,
-      firstName: nameParts[0],
-      lastName: nameParts[1],
-      billingName: _billingNameController.text.trim(),
-      billingEmail: _billingEmailController.text.trim(),
-      billingPhone: _billingPhoneController.text.trim(),
-      documentType: _documentType,
-      documentNumber: _documentController.text.trim(),
-      address: fulfillmentMethod == ShopFulfillmentMethod.pickup
-          ? 'Retiro en tienda'
-          : _addressController.text.trim(),
-      address2: fulfillmentMethod == ShopFulfillmentMethod.pickup
-          ? ''
-          : _address2Controller.text.trim(),
-      city: fulfillmentMethod == ShopFulfillmentMethod.pickup
-          ? 'Retiro en tienda'
-          : _selectedCanton,
-      state: fulfillmentMethod == ShopFulfillmentMethod.pickup
-          ? ''
-          : _selectedProvince,
-      customerNote: _noteController.text.trim(),
-      paymentMethod: selectedPaymentMethod,
-      fulfillmentMethod: fulfillmentMethod,
-      redeemPoints: redeemPoints,
-    );
+    Map<String, dynamic>? order;
+    try {
+      order = await shop.checkout(
+        token: auth.token!,
+        user: auth.user!,
+        firstName: nameParts[0],
+        lastName: nameParts[1],
+        billingName: _billingNameController.text.trim(),
+        billingEmail: _billingEmailController.text.trim(),
+        billingPhone: _billingPhoneController.text.trim(),
+        documentType: _documentType,
+        documentNumber: _documentController.text.trim(),
+        address: fulfillmentMethod == ShopFulfillmentMethod.pickup
+            ? 'Retiro en tienda'
+            : _addressController.text.trim(),
+        address2: fulfillmentMethod == ShopFulfillmentMethod.pickup
+            ? ''
+            : _address2Controller.text.trim(),
+        city: fulfillmentMethod == ShopFulfillmentMethod.pickup
+            ? 'Retiro en tienda'
+            : _selectedCanton,
+        state: fulfillmentMethod == ShopFulfillmentMethod.pickup
+            ? ''
+            : _selectedProvince,
+        customerNote: _noteController.text.trim(),
+        paymentMethod: selectedPaymentMethod,
+        fulfillmentMethod: fulfillmentMethod,
+        redeemPoints: redeemPoints,
+        redeemAmount: redeemDiscount,
+      );
+    } catch (e) {
+      if (pointsReservationId != null) {
+        pointsProvider.releaseReservation(pointsReservationId);
+      }
+      if (!mounted) return;
+      stopSubmitting();
+      messenger.showSnackBar(
+        SnackBar(content: Text(FriendlyErrors.checkout(e))),
+      );
+      return;
+    }
 
-    if (!mounted) return;
+    if (!mounted) {
+      if (pointsReservationId != null) {
+        pointsProvider.releaseReservation(pointsReservationId);
+      }
+      return;
+    }
 
     if (order == null) {
-      final error = shop.checkoutError ?? 'No pudimos crear tu pedido.';
+      if (pointsReservationId != null) {
+        pointsProvider.releaseReservation(pointsReservationId);
+      }
+      final error = FriendlyErrors.checkout(
+        shop.checkoutError ?? 'No pudimos crear tu pedido.',
+      );
       stopSubmitting();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error)),
@@ -886,6 +877,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (redeemPoints > 0) {
       unawaited(auth.refreshProfile());
       unawaited(pointsProvider.refresh());
+      if (pointsReservationId != null) {
+        pointsProvider.releaseReservation(pointsReservationId);
+      }
     }
 
     stopSubmitting();
@@ -896,6 +890,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
 
     final createdOrderId = _parseInt(order['id'] ?? order['order_id']);
+    final orderNumber = _orderNumberFrom(order, fallbackId: createdOrderId);
+
+    if (selectedPaymentMethod.isBankTransfer && payableTotal > 0.009) {
+      await HabitoBankDataSheet.show(
+        context,
+        bankDetails: selectedPaymentMethod.bankDetails,
+        orderNumber: orderNumber,
+        amountLabel: _formatPrice(payableTotal),
+      );
+      if (!mounted) return;
+    }
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -906,6 +912,86 @@ class _CheckoutPageState extends State<CheckoutPage> {
               : null,
         ),
       ),
+    );
+  }
+
+  String _orderNumberFrom(Map<String, dynamic> order, {int? fallbackId}) {
+    final raw = order['number'] ??
+        order['order_number'] ??
+        order['orderNumber'] ??
+        order['invoice_no'] ??
+        order['id'] ??
+        fallbackId;
+    final text = raw?.toString().trim() ?? '';
+    if (text.isNotEmpty) return '#$text';
+    return 'reciente';
+  }
+
+  Future<void> _showCartValidationDialog(
+    ShopCartValidationResult validation,
+  ) async {
+    final visibleItems = validation.visibleItems;
+    final title = validation.canCheckout
+        ? 'Tu carrito necesita actualizarse'
+        : 'Revisa tu carrito antes de pagar';
+    final message = validation.message.isNotEmpty
+        ? validation.message
+        : validation.canCheckout
+            ? 'Actualizamos cantidades o precios con la información más reciente de la tienda. Revisa el nuevo total antes de confirmar.'
+            : 'Algunos productos ya no están disponibles para finalizar el pedido.';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.extraLarge),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (visibleItems.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    ...visibleItems.map(_CartValidationItemTile.new),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                validation.canCheckout
+                    ? 'Revisar totales actualizados'
+                    : 'Entendido',
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -930,6 +1016,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         final pointsDiscount = _usePoints ? projectedPointsDiscount : 0.0;
         final payableTotal =
             (orderTotal - pointsDiscount).clamp(0, double.infinity).toDouble();
+        final canTogglePoints =
+            !isSubmittingCheckout && !pointsProvider.hasPointsReservation;
         final projectedPayableTotal = (orderTotal - projectedPointsDiscount)
             .clamp(0, double.infinity)
             .toDouble();
@@ -952,7 +1040,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             children: [
               if ((widget.headerMessage ?? '').trim().isNotEmpty) ...[
                 _InlineInfoCard(message: widget.headerMessage!),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
               ],
               _CheckoutSummaryHeader(
                 itemCount: shop.cartCount,
@@ -960,7 +1048,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 deliveryLabel: fulfillmentMethod.title,
                 deliveryValue: _formatShipping(shippingTotal),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _CheckoutCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -981,7 +1069,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             Text(
                               _formatPrice(item.total),
                               style: const TextStyle(
@@ -993,31 +1081,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         ),
                       ),
                     ),
-                    const Divider(height: 24),
+                    const Divider(height: AppSpacing.divider),
                     _CheckoutRow(
                       label: 'Productos',
                       value: _formatPrice(shop.subtotal),
                     ),
                     if (shop.hasIvaBreakdown) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                       _CheckoutRow(
                         label: taxLabel,
                         value: _formatPrice(shop.taxTotal),
                       ),
                     ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     _CheckoutRow(
                       label: fulfillmentMethod.title,
                       value: _formatShipping(shippingTotal),
                     ),
-                    const Divider(height: 24),
+                    const Divider(height: AppSpacing.divider),
                     if (pointsDiscount > 0) ...[
                       _CheckoutRow(
                         label: 'Descuento por puntos',
                         value: '-${_formatPrice(pointsDiscount)}',
-                        valueColor: const Color(0xFF2E7D32),
+                        valueColor: AppColors.success,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     ],
                     _CheckoutRow(
                       label: 'Total',
@@ -1027,7 +1115,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl - AppSpacing.xs),
               if (pointsToUse > 0) ...[
                 _PointsRedeemTile(
                   enabled: _usePoints,
@@ -1037,6 +1125,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   total: orderTotal,
                   payableTotal: projectedPayableTotal,
                   balance: pointsState.balance,
+                  interactive: canTogglePoints,
                   onChanged: (value) {
                     setState(() {
                       _usePoints = value;
@@ -1044,14 +1133,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   },
                   formatPrice: _formatPrice,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl - AppSpacing.xs),
               ],
               _SectionHeader(
                 title: 'Entrega',
                 subtitle:
                     'Elige si prefieres recibir el pedido o retirarlo en tienda.',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md + AppSpacing.xs),
               _CheckoutCard(
                 child: Form(
                   key: _formKey,
@@ -1072,7 +1161,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           );
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       _FulfillmentMethodTile(
                         method: ShopFulfillmentMethod.pickup,
                         selected:
@@ -1087,7 +1176,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           );
                         },
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
                       _HabitoBillingDetailsForm(
                         isEditing: _isBillingEditing,
                         documentType: _documentType,
@@ -1107,25 +1196,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           });
                         },
                         documentValidator: (value) {
-                          final text = (value ?? '').trim();
-                          if (text.isEmpty) {
-                            return 'Ingresa tu ${kIdentificationTypeLabels[_documentType] ?? 'documento'}.';
-                          }
-                          if (!_isValidDocument(text)) {
-                            if (_documentType == 'ruc') {
-                              return 'El RUC debe tener 13 digitos.';
-                            }
-                            if (_documentType == 'pasaporte') {
-                              return 'Ingresa un pasaporte valido.';
-                            }
-                            return 'La cedula debe tener 10 digitos.';
-                          }
-                          return null;
+                          return EcuadorIdValidator.validate(
+                            identificationType: _documentType,
+                            value: value,
+                            emptyMessage:
+                                'Ingresa tu ${kIdentificationTypeLabels[_documentType] ?? 'documento'}.',
+                          );
                         },
                       ),
                       if (fulfillmentMethod ==
                           ShopFulfillmentMethod.delivery) ...[
-                        const SizedBox(height: 18),
+                        const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
                         _ShippingAddressForm(
                           selectedProvince: _selectedProvince,
                           selectedCanton: _selectedCanton,
@@ -1136,7 +1217,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           onCantonChanged: _selectCanton,
                         ),
                       ] else ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         _PickupLocationSelector(
                           locationName: shop.pickupLocationName,
                           selectedPickupLocation: shop.pickupLocation,
@@ -1146,10 +1227,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                               _handlePickupLocationSelection(shop, location),
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       TextFormField(
                         controller: _noteController,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
                         maxLines: 3,
+                        maxLength: FormValidators.longTextMaxLength,
                         decoration: const InputDecoration(
                           labelText: 'Nota del pedido',
                           hintText: 'Indicaciones adicionales o referencia',
@@ -1159,23 +1243,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl - AppSpacing.xs),
               _SectionHeader(
                 title: 'Pago',
                 subtitle: 'Selecciona la forma de confirmar este pedido.',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md + AppSpacing.xs),
               _CheckoutCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (shop.isLoadingPaymentMethods) ...[
                       const LinearProgressIndicator(
-                        minHeight: 3,
-                        color: Color(0xFFD4AF37),
-                        backgroundColor: Color(0xFFF1EBDD),
+                        minHeight: AppSpacing.progress,
+                        color: AppColors.secondary,
+                        backgroundColor: AppColors.goldMuted,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md + AppSpacing.xs),
                     ],
                     ...paymentMethods.map(
                       (method) => Padding(
@@ -1194,7 +1278,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ),
                     if (shop.paymentMethodsError != null) ...[
                       Text(
-                        'No pudimos actualizar los mÃ©todos de pago. Usamos transferencia como respaldo.',
+                        'No pudimos actualizar los métodos de pago. Usamos transferencia como respaldo.',
                         style: TextStyle(
                           color: AppColors.textSecondary.withValues(
                             alpha: 0.9,
@@ -1202,22 +1286,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           height: 1.35,
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md + AppSpacing.xs),
                     ],
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8F7F4),
-                        borderRadius: BorderRadius.circular(18),
+                        color: AppColors.surfaceMuted,
+                        borderRadius: AppRadius.large,
                       ),
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
                             Icons.verified_user_outlined,
-                            color: Color(0xFF9C7732),
+                            color: AppColors.goldDeep,
                           ),
-                          SizedBox(width: 12),
+                          SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
                               'El stock y los datos del pedido se validan al momento de crear la orden para mantener una compra correcta.',
@@ -1233,24 +1317,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl - AppSpacing.xs),
               SizedBox(
-                height: 54,
+                height: AppSpacing.actionHeight,
                 child: ElevatedButton(
                   onPressed: isSubmittingCheckout ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
+                    backgroundColor: AppColors.secondary,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: AppRadius.large,
                     ),
                   ),
                   child: isSubmittingCheckout
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: AppIconSize.spinner,
+                          height: AppIconSize.spinner,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
+                            strokeWidth: AppSpacing.progressStroke,
                             color: Colors.black,
                           ),
                         )
@@ -1278,6 +1362,7 @@ class _PointsRedeemTile extends StatelessWidget {
   final double total;
   final double payableTotal;
   final double balance;
+  final bool interactive;
   final ValueChanged<bool> onChanged;
   final String Function(double value) formatPrice;
 
@@ -1289,6 +1374,7 @@ class _PointsRedeemTile extends StatelessWidget {
     required this.total,
     required this.payableTotal,
     required this.balance,
+    this.interactive = true,
     required this.onChanged,
     required this.formatPrice,
   });
@@ -1306,21 +1392,21 @@ class _PointsRedeemTile extends StatelessWidget {
     final balanceText = _formatPoints(balance);
     final isFullPayment = payableTotal <= 0.009;
     final statusLabel = enabled ? 'Descuento activo' : 'Activar descuento';
+    final textTheme = Theme.of(context).textTheme;
 
     return _CheckoutCard(
       child: InkWell(
-        onTap: () => onChanged(!enabled),
-        borderRadius: BorderRadius.circular(20),
+        onTap: interactive ? () => onChanged(!enabled) : null,
+        borderRadius: AppRadius.card,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: enabled ? const Color(0xFFFFFBEB) : const Color(0xFFF8F7F4),
-            borderRadius: BorderRadius.circular(20),
+            color: enabled ? AppColors.goldSurface : AppColors.surfaceMuted,
+            borderRadius: AppRadius.card,
             border: Border.all(
-              color:
-                  enabled ? const Color(0xFFD4AF37) : const Color(0xFFE7DFD4),
+              color: enabled ? AppColors.secondary : AppColors.border,
               width: enabled ? 1.4 : 1,
             ),
           ),
@@ -1330,33 +1416,31 @@ class _PointsRedeemTile extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: AppIconSize.pointsBadge,
+                    height: AppIconSize.pointsBadge,
                     decoration: BoxDecoration(
-                      color: enabled
-                          ? const Color(0xFFD4AF37)
-                          : const Color(0xFFF1EBDD),
-                      borderRadius: BorderRadius.circular(16),
+                      color:
+                          enabled ? AppColors.secondary : AppColors.goldMuted,
+                      borderRadius: AppRadius.medium,
                     ),
                     child: Icon(
                       Icons.stars_rounded,
-                      color: enabled ? Colors.white : const Color(0xFF9C7732),
+                      color: enabled ? Colors.white : AppColors.goldDeep,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Usar $pointsLabel',
-                          style: const TextStyle(
+                          style: textTheme.titleSmall?.copyWith(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w900,
-                            fontSize: 16,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: AppSpacing.progress),
                         Text(
                           '$pointsText de $balanceText puntos disponibles',
                           style: const TextStyle(
@@ -1368,26 +1452,25 @@ class _PointsRedeemTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
                     statusLabel,
-                    style: TextStyle(
+                    style: textTheme.labelMedium?.copyWith(
                       color: enabled
-                          ? const Color(0xFF7A5B1B)
+                          ? AppColors.goldDeep
                           : AppColors.textSecondary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 12,
                     ),
                   ),
                   Switch.adaptive(
                     value: enabled,
-                    activeThumbColor: const Color(0xFFD4AF37),
-                    activeTrackColor: const Color(0xFFE8D79D),
-                    onChanged: onChanged,
+                    activeThumbColor: AppColors.secondary,
+                    activeTrackColor: AppColors.goldSoft,
+                    onChanged: interactive ? onChanged : null,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md + AppSpacing.xs),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 430;
@@ -1403,14 +1486,14 @@ class _PointsRedeemTile extends StatelessWidget {
                         width: metricWidth,
                         label: 'Ahorras',
                         value: formatPrice(discount),
-                        valueColor: const Color(0xFF2E7D32),
+                        valueColor: AppColors.success,
                       ),
                       _PointsCheckoutMetric(
                         width: metricWidth,
                         label: enabled ? 'Pagaras' : 'Pagarias',
                         value: formatPrice(payableTotal),
                         valueColor: isFullPayment
-                            ? const Color(0xFF2E7D32)
+                            ? AppColors.success
                             : AppColors.textPrimary,
                       ),
                       _PointsCheckoutMetric(
@@ -1424,11 +1507,11 @@ class _PointsRedeemTile extends StatelessWidget {
                 },
               ),
               if (isFullPayment) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 const Text(
                   'Con este canje el pedido queda cubierto al 100%.',
                   style: TextStyle(
-                    color: Color(0xFF2E7D32),
+                    color: AppColors.success,
                     fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
@@ -1457,34 +1540,34 @@ class _PointsCheckoutMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return SizedBox(
       width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE7DFD4)),
+          borderRadius: AppRadius.medium,
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: textTheme.labelSmall?.copyWith(
                 color: AppColors.textSecondary,
-                fontSize: 11.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: textTheme.titleSmall?.copyWith(
                 color: valueColor,
-                fontSize: 16,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1511,6 +1594,7 @@ class _CheckoutSummaryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final productLabel = itemCount == 1 ? '1 producto' : '$itemCount productos';
+    final textTheme = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.only(top: 2),
@@ -1519,11 +1603,10 @@ class _CheckoutSummaryHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Resumen',
-                  style: TextStyle(
-                    fontSize: 22,
+                  style: textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                     color: AppColors.textPrimary,
                   ),
@@ -1532,7 +1615,7 @@ class _CheckoutSummaryHeader extends StatelessWidget {
               _CheckoutInfoPill(label: total, dark: true),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               const Expanded(
@@ -1545,9 +1628,9 @@ class _CheckoutSummaryHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
               _CheckoutInfoPill(label: productLabel),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.xs + AppSpacing.xxs),
               Flexible(
                 child: _CheckoutInfoPill(
                   label: '$deliveryLabel $deliveryValue',
@@ -1572,22 +1655,23 @@ class _CheckoutInfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: dark ? AppColors.primary : const Color(0xFFF7F0DE),
-        borderRadius: BorderRadius.circular(999),
+        color: dark ? AppColors.primary : AppColors.goldMuted,
+        borderRadius: AppRadius.full,
         border: Border.all(
-          color: dark ? AppColors.primary : const Color(0xFFE8D79D),
+          color: dark ? AppColors.primary : AppColors.goldSoft,
         ),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: dark ? const Color(0xFFE7D39A) : const Color(0xFF7A5B1B),
-          fontSize: 12,
+        style: textTheme.labelMedium?.copyWith(
+          color: dark ? AppColors.goldSoft : AppColors.goldDeep,
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -1606,18 +1690,19 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 22,
+          style: textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           subtitle,
           style: const TextStyle(
@@ -1626,6 +1711,78 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CartValidationItemTile extends StatelessWidget {
+  final ShopCartValidationItem item;
+
+  const _CartValidationItemTile(this.item);
+
+  String _formatCurrency(double value) => '\$${value.toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final details = <String>[
+      if (item.removed)
+        'Producto retirado del carrito'
+      else if (item.hasQuantityChanged)
+        'Cantidad: ${item.requestedQuantity} -> ${item.finalQuantity}',
+      if (item.hasPriceChanged)
+        'Precio: ${_formatCurrency(item.oldUnitPrice!)} -> ${_formatCurrency(item.newUnitPrice!)}',
+      if (item.availableQuantity != null && !item.removed)
+        'Disponible: ${item.availableQuantity}',
+      if (item.message.isNotEmpty) item.message,
+    ];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: item.isBlocking ? AppColors.dangerSoft : AppColors.goldMuted,
+        borderRadius: AppRadius.large,
+        border: Border.all(
+          color: item.isBlocking ? AppColors.danger : AppColors.goldSoft,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            item.isBlocking
+                ? Icons.error_outline_rounded
+                : Icons.sync_alt_rounded,
+            color: item.isBlocking ? AppColors.danger : AppColors.goldDeep,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    details.join('\n'),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1641,15 +1798,9 @@ class _CheckoutCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.extraLarge,
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppShadows.cardSoft,
       ),
       child: child,
     );
@@ -1671,6 +1822,8 @@ class _CheckoutRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       children: [
         Text(
@@ -1683,8 +1836,8 @@ class _CheckoutRow extends StatelessWidget {
         const Spacer(),
         Text(
           value,
-          style: TextStyle(
-            fontSize: highlight ? 20 : 16,
+          style: (highlight ? textTheme.titleLarge : textTheme.titleSmall)
+              ?.copyWith(
             fontWeight: FontWeight.w900,
             color: valueColor ?? AppColors.textPrimary,
           ),
@@ -1705,17 +1858,17 @@ class _InlineInfoCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE7D8C4)),
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.borderStrong),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.event_available_rounded,
-            color: Color(0xFF9C7732),
+            color: AppColors.goldDeep,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               message,
@@ -1753,14 +1906,14 @@ class _FulfillmentMethodTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: AppRadius.large,
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFF7F0DE) : const Color(0xFFF8F7F4),
-          borderRadius: BorderRadius.circular(18),
+          color: selected ? AppColors.goldMuted : AppColors.surfaceMuted,
+          borderRadius: AppRadius.large,
           border: Border.all(
-            color: selected ? const Color(0xFFD4AF37) : AppColors.border,
+            color: selected ? AppColors.secondary : AppColors.border,
           ),
         ),
         child: Row(
@@ -1768,20 +1921,20 @@ class _FulfillmentMethodTile extends StatelessWidget {
           children: [
             Icon(
               selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color:
-                  selected ? const Color(0xFFD4AF37) : AppColors.textSecondary,
+              color: selected ? AppColors.secondary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Container(
-              width: 38,
-              height: 38,
+              width: AppIconSize.optionBadge,
+              height: AppIconSize.optionBadge,
               decoration: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.medium,
               ),
-              child: Icon(icon, color: const Color(0xFFE7D39A), size: 20),
+              child: Icon(icon,
+                  color: AppColors.goldSoft, size: AppIconSize.spinner),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1800,13 +1953,13 @@ class _FulfillmentMethodTile extends StatelessWidget {
                       Text(
                         price,
                         style: const TextStyle(
-                          color: Color(0xFF9C7732),
+                          color: AppColors.goldDeep,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                   Text(
                     method.description,
                     style: const TextStyle(
@@ -1851,8 +2004,8 @@ class _PickupLocationSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F7F4),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceMuted,
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -1861,13 +2014,13 @@ class _PickupLocationSelector extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline_rounded, color: Color(0xFF9C7732)),
-              const SizedBox(width: 12),
+              const Icon(Icons.info_outline_rounded, color: AppColors.goldDeep),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   locationName.isEmpty
-                      ? 'Indica tu sucursal preferida para coordinar el retiro. No se cobrarÃ¡ envÃ­o.'
-                      : 'Retiro preferido en $locationName. Te avisaremos cuando el pedido estÃ© listo.',
+                      ? 'Indica tu sucursal preferida para coordinar el retiro. No se cobrará envío.'
+                      : 'Retiro preferido en $locationName. Te avisaremos cuando el pedido esté listo.',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     height: 1.35,
@@ -1877,7 +2030,7 @@ class _PickupLocationSelector extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<int>(
             initialValue: dropdownValue,
             isExpanded: true,
@@ -1907,11 +2060,11 @@ class _PickupLocationSelector extends StatelessWidget {
                   },
           ),
           if (isLoadingLocations) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
             const LinearProgressIndicator(
-              minHeight: 3,
-              color: Color(0xFFD4AF37),
-              backgroundColor: Color(0xFFF1EBDD),
+              minHeight: AppSpacing.progress,
+              color: AppColors.secondary,
+              backgroundColor: AppColors.goldMuted,
             ),
           ],
         ],
@@ -1942,24 +2095,23 @@ class _PaymentMethodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badgeText = method.requiresOnlinePayment
-        ? 'Pago en lÃ­nea'
+        ? 'Pago en línea'
         : method.id == 'bacs'
             ? 'Transferencia'
             : 'Disponible';
 
     return InkWell(
       onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: AppRadius.large,
       child: Opacity(
         opacity: enabled ? 1 : 0.58,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFF7F0DE) : const Color(0xFFF8F7F4),
-            borderRadius: BorderRadius.circular(18),
+            color: selected ? AppColors.goldMuted : AppColors.surfaceMuted,
+            borderRadius: AppRadius.large,
             border: Border.all(
-              color:
-                  selected ? const Color(0xFFD4AF37) : const Color(0xFFE4DED2),
+              color: selected ? AppColors.secondary : AppColors.border,
             ),
           ),
           child: Row(
@@ -1971,11 +2123,9 @@ class _PaymentMethodTile extends StatelessWidget {
                     : enabled
                         ? Icons.radio_button_off_outlined
                         : Icons.lock_outline_rounded,
-                color: selected
-                    ? const Color(0xFFD4AF37)
-                    : const Color(0xFF7A7268),
+                color: selected ? AppColors.secondary : AppColors.textMuted,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1992,34 +2142,36 @@ class _PaymentMethodTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 9,
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE7D39A).withValues(
+                            color: AppColors.goldSoft.withValues(
                               alpha: 0.24,
                             ),
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: AppRadius.full,
                           ),
                           child: Text(
                             badgeText,
-                            style: const TextStyle(
-                              color: Color(0xFF7A5B1B),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: AppColors.goldDeep,
+                                  fontWeight: FontWeight.w800,
+                                ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
                     Text(
                       enabled
                           ? method.description
-                          : '${method.description} EstarÃ¡ disponible pronto para pedidos desde la app.',
+                          : '${method.description} Estará disponible pronto para pedidos desde la app.',
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         height: 1.35,
@@ -2062,13 +2214,13 @@ class _BillingDetailsForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final documentLabel = documentType == 'ruc' ? 'RUC' : 'CÃ©dula';
+    final documentLabel = documentType == 'ruc' ? 'RUC' : 'Cédula';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F7F4),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceMuted,
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2078,7 +2230,7 @@ class _BillingDetailsForm extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Datos de facturaciÃ³n',
+                  'Datos de facturación',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w900,
@@ -2089,63 +2241,57 @@ class _BillingDetailsForm extends StatelessWidget {
                 onPressed: onToggleEditing,
                 icon: Icon(
                   isEditing ? Icons.check_rounded : Icons.edit_outlined,
-                  size: 18,
+                  size: AppIconSize.action,
                 ),
                 label: Text(isEditing ? 'Listo' : 'Cambiar'),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           TextFormField(
             controller: nameController,
             readOnly: !isEditing,
+            keyboardType: TextInputType.name,
             textInputAction: TextInputAction.next,
+            autofillHints: documentType == 'ruc'
+                ? const [AutofillHints.organizationName]
+                : const [AutofillHints.name],
+            maxLength: FormValidators.longTextMaxLength,
             decoration: InputDecoration(
               labelText: documentType == 'ruc'
-                  ? 'RazÃ³n social o nombre'
+                  ? 'Razón social o nombre'
                   : 'Nombre del cliente',
             ),
-            validator: (value) {
-              if ((value ?? '').trim().isEmpty) {
-                return 'Ingresa el nombre para facturaciÃ³n.';
-              }
-              return null;
-            },
+            validator: (value) => FormValidators.requiredMaxLength(
+              value,
+              field: 'el nombre para facturación',
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: emailController,
             readOnly: !isEditing,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(
-              labelText: 'Correo electrÃ³nico',
+              labelText: 'Correo electrónico',
             ),
-            validator: (value) {
-              final text = (value ?? '').trim();
-              if (text.isEmpty) return 'Ingresa el correo electrÃ³nico.';
-              if (!text.contains('@') || !text.contains('.')) {
-                return 'Ingresa un correo vÃ¡lido.';
-              }
-              return null;
-            },
+            validator: FormValidators.email,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: phoneController,
             readOnly: !isEditing,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.telephoneNumber],
             decoration: const InputDecoration(
-              labelText: 'NÃºmero de telÃ©fono',
+              labelText: 'Número de teléfono',
             ),
-            validator: (value) {
-              final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
-              if (digits.length < 7) return 'Ingresa un telÃ©fono vÃ¡lido.';
-              return null;
-            },
+            validator: FormValidators.phone,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md + AppSpacing.xs),
           DropdownButtonFormField<String>(
             initialValue: documentType,
             isExpanded: true,
@@ -2155,7 +2301,7 @@ class _BillingDetailsForm extends StatelessWidget {
             items: const [
               DropdownMenuItem(
                 value: 'cedula',
-                child: Text('CÃ©dula'),
+                child: Text('Cédula'),
               ),
               DropdownMenuItem(
                 value: 'ruc',
@@ -2164,15 +2310,17 @@ class _BillingDetailsForm extends StatelessWidget {
             ],
             onChanged: onDocumentTypeChanged,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: documentController,
             keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.username],
             decoration: InputDecoration(
               labelText: documentLabel,
               helperText: documentType == 'ruc'
                   ? 'Selecciona RUC si la compra es para empresa.'
-                  : 'Por defecto se usa cÃ©dula para la compra.',
+                  : 'Por defecto se usa cédula para la compra.',
             ),
             validator: documentValidator,
           ),
@@ -2213,8 +2361,8 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F7F4),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceMuted,
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2224,7 +2372,7 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Datos de facturacion',
+                  'Datos de facturación',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w900,
@@ -2235,63 +2383,57 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
                 onPressed: onToggleEditing,
                 icon: Icon(
                   isEditing ? Icons.check_rounded : Icons.edit_outlined,
-                  size: 18,
+                  size: AppIconSize.action,
                 ),
                 label: Text(isEditing ? 'Listo' : 'Cambiar'),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
           TextFormField(
             controller: nameController,
             readOnly: !isEditing,
+            keyboardType: TextInputType.name,
             textInputAction: TextInputAction.next,
+            autofillHints: documentType == 'ruc'
+                ? const [AutofillHints.organizationName]
+                : const [AutofillHints.name],
+            maxLength: FormValidators.longTextMaxLength,
             decoration: InputDecoration(
               labelText: documentType == 'ruc'
                   ? 'Razon social o nombre'
                   : 'Nombre del cliente',
             ),
-            validator: (value) {
-              if ((value ?? '').trim().isEmpty) {
-                return 'Ingresa el nombre para facturacion.';
-              }
-              return null;
-            },
+            validator: (value) => FormValidators.requiredMaxLength(
+              value,
+              field: 'el nombre para facturación',
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: emailController,
             readOnly: !isEditing,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(
               labelText: 'Correo electronico',
             ),
-            validator: (value) {
-              final text = (value ?? '').trim();
-              if (text.isEmpty) return 'Ingresa el correo electronico.';
-              if (!text.contains('@') || !text.contains('.')) {
-                return 'Ingresa un correo valido.';
-              }
-              return null;
-            },
+            validator: FormValidators.email,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: phoneController,
             readOnly: !isEditing,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.telephoneNumber],
             decoration: const InputDecoration(
-              labelText: 'Numero de telefono',
+              labelText: 'Número de teléfono',
             ),
-            validator: (value) {
-              final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
-              if (digits.length < 7) return 'Ingresa un telefono valido.';
-              return null;
-            },
+            validator: FormValidators.phone,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md + AppSpacing.xs),
           DropdownButtonFormField<String>(
             initialValue: documentType,
             isExpanded: true,
@@ -2314,19 +2456,21 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
             ],
             onChanged: onDocumentTypeChanged,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: documentController,
             keyboardType: documentType == 'pasaporte'
                 ? TextInputType.text
                 : TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.username],
             decoration: InputDecoration(
               labelText: documentLabel,
               helperText: documentType == 'ruc'
                   ? 'Usa RUC si la compra es para empresa.'
                   : documentType == 'pasaporte'
                       ? 'Ingresa el numero de pasaporte.'
-                      : 'Por defecto se usa cedula para la compra.',
+                      : 'Por defecto se usa cédula para la compra.',
             ),
             validator: documentValidator,
           ),
@@ -2360,21 +2504,21 @@ class _ShippingAddressForm extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F7F4),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceMuted,
+        borderRadius: AppRadius.large,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Datos de envÃ­o',
+            'Datos de envío',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<String>(
             initialValue: selectedProvince,
             isExpanded: true,
@@ -2397,14 +2541,14 @@ class _ShippingAddressForm extends StatelessWidget {
             },
             onChanged: onProvinceChanged,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<String>(
             initialValue: cantons.contains(selectedCanton)
                 ? selectedCanton
                 : (cantons.isNotEmpty ? cantons.first : null),
             isExpanded: true,
             decoration: const InputDecoration(
-              labelText: 'CantÃ³n',
+              labelText: 'Cantón',
             ),
             items: cantons
                 .map(
@@ -2416,61 +2560,47 @@ class _ShippingAddressForm extends StatelessWidget {
                 .toList(),
             validator: (value) {
               if ((value ?? '').trim().isEmpty) {
-                return 'Selecciona el cantÃ³n.';
+                return 'Selecciona el cantón.';
               }
               return null;
             },
             onChanged: onCantonChanged,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: addressController,
+            keyboardType: TextInputType.streetAddress,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.fullStreetAddress],
+            maxLength: FormValidators.longTextMaxLength,
             decoration: const InputDecoration(
-              labelText: 'DirecciÃ³n de entrega',
-              hintText: 'Calle principal, numeraciÃ³n, sector',
+              labelText: 'Dirección de entrega',
+              hintText: 'Calle principal, numeración, sector',
             ),
-            validator: (value) {
-              if ((value ?? '').trim().isEmpty) {
-                return 'Ingresa la direcciÃ³n de entrega.';
-              }
-              return null;
-            },
+            validator: (value) => FormValidators.requiredMaxLength(
+              value,
+              field: 'la direccion de entrega',
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: address2Controller,
+            keyboardType: TextInputType.streetAddress,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.fullStreetAddress],
+            maxLength: FormValidators.longTextMaxLength,
             decoration: const InputDecoration(
               labelText: 'Referencia',
               hintText: 'Casa, local, edificio o punto de referencia',
+            ),
+            validator: (value) => FormValidators.maxLength(
+              value,
+              max: FormValidators.longTextMaxLength,
+              field: 'la referencia',
             ),
           ),
         ],
       ),
     );
   }
-}
-
-class _CheckoutPointsState {
-  final bool enabled;
-  final bool redeemEnabled;
-  final bool redeemProductsEnabled;
-  final bool redeemBookingsEnabled;
-  final double balance;
-  final double rate;
-  final double minPoints;
-  final double maxPercent;
-  final String label;
-
-  const _CheckoutPointsState({
-    required this.enabled,
-    required this.redeemEnabled,
-    required this.redeemProductsEnabled,
-    required this.redeemBookingsEnabled,
-    required this.balance,
-    required this.rate,
-    required this.minPoints,
-    required this.maxPercent,
-    required this.label,
-  });
 }

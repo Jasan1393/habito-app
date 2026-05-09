@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/services/notification_inbox_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../provider/auth_provider.dart';
 import '../../services/biometric_service.dart';
@@ -229,7 +230,7 @@ class _AuthSplashScreen extends StatelessWidget {
             _BrandMark(),
             SizedBox(height: 22),
             CircularProgressIndicator(
-              color: Color(0xFFD4AF37),
+              color: AppColors.secondary,
             ),
           ],
         ),
@@ -264,10 +265,10 @@ class _BiometricGateScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF171717),
+                  color: AppColors.darkPanel,
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: const Color(0xFFD4AF37).withValues(alpha: 0.18),
+                    color: AppColors.secondary.withValues(alpha: 0.18),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -287,15 +288,14 @@ class _BiometricGateScreen extends StatelessWidget {
                       height: 82,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
+                        color: AppColors.secondary.withValues(alpha: 0.12),
                         border: Border.all(
-                          color:
-                              const Color(0xFFD4AF37).withValues(alpha: 0.35),
+                          color: AppColors.secondary.withValues(alpha: 0.35),
                         ),
                       ),
                       child: const Icon(
                         Icons.fingerprint_rounded,
-                        color: Color(0xFFE7D39A),
+                        color: AppColors.goldLight,
                         size: 42,
                       ),
                     ),
@@ -305,7 +305,7 @@ class _BiometricGateScreen extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 26,
+                        fontSize: AppTextSize.displaySmall - 2,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -314,7 +314,7 @@ class _BiometricGateScreen extends StatelessWidget {
                       message,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFFD6D0C7),
+                        color: AppColors.textOnDarkMuted,
                         height: 1.45,
                       ),
                     ),
@@ -335,14 +335,14 @@ class _BiometricGateScreen extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.verified_user_outlined,
-                            color: Color(0xFFE7D39A),
+                            color: AppColors.goldLight,
                           ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'Usamos la seguridad del dispositivo para proteger tu cuenta.',
                               style: TextStyle(
-                                color: Color(0xFFD6D0C7),
+                                color: AppColors.textOnDarkMuted,
                                 height: 1.35,
                               ),
                             ),
@@ -357,7 +357,7 @@ class _BiometricGateScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: isAuthenticating ? null : onRetry,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD4AF37),
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: Colors.black,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -377,7 +377,7 @@ class _BiometricGateScreen extends StatelessWidget {
                                 'Usar huella digital',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                                  fontSize: AppTextSize.titleSmall,
                                 ),
                               ),
                       ),
@@ -427,7 +427,7 @@ class _BrandMark extends StatelessWidget {
       height: 76,
       errorBuilder: (_, __, ___) => const Icon(
         Icons.content_cut_rounded,
-        color: Color(0xFFE7D39A),
+        color: AppColors.goldLight,
         size: 52,
       ),
     );
