@@ -254,16 +254,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     );
   }
 
-  String get _defaultDeletionWebUrl {
-    final apiUri = Uri.parse(AppConfig.apiBaseUrl);
-    return apiUri
-        .replace(
-          path: '/',
-          queryParameters: const {'habito_delete_account': '1'},
-          fragment: null,
-        )
-        .toString();
-  }
+  String get _defaultDeletionWebUrl => AppConfig.accountDeletionUrl;
 }
 
 class _DeleteAccountPoint extends StatelessWidget {

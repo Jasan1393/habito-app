@@ -1597,37 +1597,6 @@ class _BookingsPageState extends State<BookingsPage> {
         .replaceAll('\n', r'\n');
   }
 
-  Future<void> _openWhatsAppContact({
-    required String phone,
-    required String serviceName,
-    required String dateLabel,
-    required String time,
-    required String branch,
-  }) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    if (cleanPhone.isEmpty) {
-      _showMessage('No hay número de WhatsApp disponible para esta sucursal.');
-      return;
-    }
-
-    final message = Uri.encodeComponent(
-      'Hola 👋, tengo una cita agendada en HÁBITO.\n\n'
-      'Servicio: $serviceName\n'
-      'Sucursal: $branch\n'
-      'Fecha: $dateLabel\n'
-      'Hora: $time\n\n'
-      'Necesito ayuda con mi reserva.',
-    );
-
-    final url = Uri.parse('https://wa.me/$cleanPhone?text=$message');
-
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      _showMessage('No se pudo abrir WhatsApp');
-    }
-  }
-
   Future<void> _openLocation({
     String? address,
     double? latitude,
@@ -2129,8 +2098,6 @@ END:VCALENDAR
         paymentStatus: response['payment_status']?.toString(),
         paymentMethodTitle: response['payment_title']?.toString() ??
             selectedPaymentMethod.title,
-        locationPhone:
-            (response['location_phone'] ?? location['phone'])?.toString(),
         locationAddress:
             (response['location_address'] ?? location['address'])?.toString(),
         locationDescription:
@@ -2384,7 +2351,6 @@ END:VCALENDAR
     String? statusLabel,
     String? paymentStatus,
     String? paymentMethodTitle,
-    String? locationPhone,
     String? locationAddress,
     String? locationDescription,
     double? locationLatitude,
@@ -2480,22 +2446,23 @@ END:VCALENDAR
                       ),
                     const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                     _actionButton(
-                      icon: Icons.chat_rounded,
-                      label: 'Contactar por WhatsApp',
+                      icon: Icons.share_rounded,
+                      label: 'Compartir por WhatsApp',
                       onTap: () async {
-                        await _openWhatsAppContact(
-                          phone: locationPhone ?? '',
+                        await _shareAppointmentOnWhatsApp(
+                          reservationCode: reservationCode ?? '0',
                           serviceName: serviceName,
+                          barberName: barberName,
+                          branch: locationName,
                           dateLabel: dateLabel,
                           time: time,
-                          branch: locationName,
                         );
                       },
                     ),
                     const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.location_on_rounded,
-                      label: 'Ver ubicación / Cómo llegar',
+                      label: 'Cómo llegar',
                       onTap: () async {
                         await _openLocation(
                           address: locationAddress,
@@ -2523,21 +2490,6 @@ END:VCALENDAR
                         );
                       },
                     ),
-                    const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
-                    _actionButton(
-                      icon: Icons.share_rounded,
-                      label: 'Compartir cita por WhatsApp',
-                      onTap: () async {
-                        await _shareAppointmentOnWhatsApp(
-                          reservationCode: reservationCode ?? '0',
-                          serviceName: serviceName,
-                          barberName: barberName,
-                          branch: locationName,
-                          dateLabel: dateLabel,
-                          time: time,
-                        );
-                      },
-                    ),
                     const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
                     SizedBox(
                       width: double.infinity,
@@ -2554,7 +2506,7 @@ END:VCALENDAR
                           ),
                         ),
                         child: const Text(
-                          'Cerrar e ir a mis citas',
+                          'Cerrar y ver mis citas',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: AppTextSize.titleMedium,

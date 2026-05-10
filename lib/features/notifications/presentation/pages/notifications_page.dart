@@ -367,6 +367,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     final now = DateTime.now();
     final local = parsed.toLocal();
+    if (local.isBefore(DateTime(2024)) ||
+        local.isAfter(now.add(const Duration(days: 1)))) {
+      return '';
+    }
 
     if (now.year == local.year &&
         now.month == local.month &&

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/services/location_launcher_service.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
@@ -733,6 +734,113 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     return int.tryParse(value.toString());
   }
 
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+
+    final normalized = value.toString().trim().replaceAll(',', '.');
+    if (normalized.isEmpty) return null;
+
+    return double.tryParse(normalized);
+  }
+
+  String? _cleanLocationValue(dynamic value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty || text == '-') return null;
+
+    final normalized = text.toLowerCase();
+    if (normalized == 'sin sucursal' ||
+        normalized == 'sin ubicacion' ||
+        normalized == 'sin ubicación') {
+      return null;
+    }
+
+    return text;
+  }
+
+  Future<void> _openAppointmentLocation(
+    Map<String, dynamic> appointment,
+  ) async {
+    final rawLocation = appointment['location'];
+    final locationMap = rawLocation is Map
+        ? Map<String, dynamic>.from(rawLocation)
+        : <String, dynamic>{};
+
+    final description = _cleanLocationValue(
+      _firstNonEmpty([
+        appointment['locationDescription']?.toString(),
+        appointment['location_description']?.toString(),
+        locationMap['description']?.toString(),
+      ]),
+    );
+    final coordinates = LocationLauncherService.extractCoordinatesFromText(
+          description,
+        ) ??
+        LocationLauncherService.extractCoordinatesFromText(
+          appointment['locationAddress']?.toString(),
+        );
+    final latitude = _parseDouble(
+          appointment['locationLatitude'] ??
+              appointment['location_latitude'] ??
+              locationMap['latitude'],
+        ) ??
+        coordinates?.latitude;
+    final longitude = _parseDouble(
+          appointment['locationLongitude'] ??
+              appointment['location_longitude'] ??
+              locationMap['longitude'],
+        ) ??
+        coordinates?.longitude;
+    final address = _cleanLocationValue(
+      _firstNonEmpty([
+        appointment['locationAddress']?.toString(),
+        appointment['location_address']?.toString(),
+        locationMap['address']?.toString(),
+      ]),
+    );
+    final branchName = _cleanLocationValue(
+      _firstNonEmpty([
+        appointment['branch']?.toString(),
+        appointment['location_name']?.toString(),
+        locationMap['name']?.toString(),
+      ]),
+    );
+
+    final hasLocation = LocationLauncherService.hasUsableCoordinates(
+          latitude,
+          longitude,
+        ) ||
+        address != null ||
+        branchName != null ||
+        description != null;
+
+    if (!hasLocation) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Esta cita no tiene ubicación del local.'),
+        ),
+      );
+      return;
+    }
+
+    final opened = await LocationLauncherService.openMap(
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      branchName: branchName,
+      description: description,
+    );
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos abrir Google Maps para esta sucursal.'),
+        ),
+      );
+    }
+  }
+
   bool? _readBoolValue(dynamic value) {
     if (value == null) return null;
     if (value is bool) return value;
@@ -1412,7 +1520,9 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
   Widget _buildAppointmentCard(Map<String, dynamic> appointment) {
     final statusColor = _appointmentStatusColor(appointment);
-    final canRebook = _appointmentStatusKey(appointment) == 'confirmed';
+    final statusKey = _appointmentStatusKey(appointment);
+    final canRebook = statusKey == 'confirmed';
+    final canOpenLocation = canRebook && !_isHistoricalAppointment(appointment);
 
     return GestureDetector(
       onTap: () async {
@@ -1478,6 +1588,32 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
             const SizedBox(height: AppSpacing.sm),
             _infoRow(Icons.access_time_outlined, _displayTime(appointment)),
             const SizedBox(height: AppSpacing.lg),
+            if (canOpenLocation) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openAppointmentLocation(appointment),
+                  icon: const Icon(
+                    Icons.directions_rounded,
+                    size: AppIconSize.action,
+                  ),
+                  label: const Text('Cómo llegar al local'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.medium,
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: AppTextSize.bodyStrong,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
+            ],
             Row(
               children: [
                 Expanded(

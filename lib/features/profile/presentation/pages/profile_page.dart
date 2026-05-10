@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/app_update_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -15,6 +17,11 @@ import '../../../auth/provider/auth_provider.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +204,11 @@ class ProfilePage extends StatelessWidget {
                       },
                     ),
                     _ProfileOptionCard(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Política de privacidad',
+                      onTap: () => _openExternalUrl(AppConfig.privacyPolicyUrl),
+                    ),
+                    _ProfileOptionCard(
                       icon: Icons.delete_outline_rounded,
                       title: 'Eliminar cuenta',
                       onTap: () {
@@ -352,6 +364,12 @@ class ProfilePage extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _ProfileOptionCard(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Política de privacidad',
+                      onTap: () => _openExternalUrl(AppConfig.privacyPolicyUrl),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     const _AppVersionCard(),

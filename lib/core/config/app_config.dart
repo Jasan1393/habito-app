@@ -11,6 +11,16 @@ class AppConfig {
     defaultValue: 'https://habitobarberia.com/wp-json/wc/store/v1',
   );
 
+  static const String privacyPolicyUrl = String.fromEnvironment(
+    'HABITO_PRIVACY_POLICY_URL',
+    defaultValue: 'https://habitobarberia.com/politica-de-privacidad/',
+  );
+
+  static const String accountDeletionUrl = String.fromEnvironment(
+    'HABITO_ACCOUNT_DELETION_URL',
+    defaultValue: 'https://habitobarberia.com/eliminacion-de-datos/',
+  );
+
   static const int authTimeoutSeconds = int.fromEnvironment(
     'HABITO_AUTH_TIMEOUT_SECONDS',
     defaultValue: 20,

@@ -15,6 +15,7 @@ class NotificationInboxService {
   static const String categorySchedule = 'schedule';
   static const String categoryAccount = 'account';
   static const String categoryGeneral = 'general';
+  static final DateTime _minimumValidReceivedAt = DateTime(2024);
   static final ValueNotifier<int> unreadCountNotifier = ValueNotifier<int>(0);
 
   static Future<List<Map<String, dynamic>>> load() async {
@@ -31,10 +32,24 @@ class NotificationInboxService {
         return <Map<String, dynamic>>[];
       }
 
-      final items = decoded
-          .whereType<Map>()
-          .map((item) => _normalizeStoredItem(Map<String, dynamic>.from(item)))
-          .toList();
+      var shouldRewrite = false;
+      final items = <Map<String, dynamic>>[];
+
+      for (final rawItem in decoded.whereType<Map>()) {
+        final item = Map<String, dynamic>.from(rawItem);
+        final normalized = _normalizeStoredItem(item);
+
+        if (!_isMeaningfulItem(normalized)) {
+          shouldRewrite = true;
+          continue;
+        }
+
+        if (_receivedAtNeedsRepair(item['received_at'])) {
+          shouldRewrite = true;
+        }
+
+        items.add(normalized);
+      }
 
       items.sort((a, b) {
         final aDate = DateTime.tryParse((a['received_at'] ?? '').toString());
@@ -44,8 +59,13 @@ class NotificationInboxService {
         return bMs.compareTo(aMs);
       });
 
-      _setUnreadCount(items);
-      return items;
+      final normalizedItems = items.take(_maxItems).toList();
+      if (shouldRewrite || normalizedItems.length != items.length) {
+        await _save(normalizedItems);
+      } else {
+        _setUnreadCount(normalizedItems);
+      }
+      return normalizedItems;
     } catch (_) {
       _setUnreadCount(const <Map<String, dynamic>>[]);
       return <Map<String, dynamic>>[];
@@ -66,6 +86,16 @@ class NotificationInboxService {
     final normalizedTitle = title.trim().isEmpty ? 'Habito' : title.trim();
     final normalizedBody = body.trim();
     final normalizedData = _normalizeData(data);
+
+    if (!_isMeaningfulPayload(
+      title: normalizedTitle,
+      body: normalizedBody,
+      data: normalizedData,
+    )) {
+      return;
+    }
+
+    final storedAt = _safeReceivedAt(receivedAt);
     final category = inferCategory(
       title: normalizedTitle,
       body: normalizedBody,
@@ -76,7 +106,7 @@ class NotificationInboxService {
       title: normalizedTitle,
       body: normalizedBody,
       data: normalizedData,
-      receivedAt: receivedAt,
+      receivedAt: storedAt,
     );
 
     final items = await load();
@@ -87,7 +117,7 @@ class NotificationInboxService {
       'body': normalizedBody,
       'data': normalizedData,
       'category': category,
-      'received_at': (receivedAt ?? DateTime.now()).toIso8601String(),
+      'received_at': storedAt.toIso8601String(),
       'read': false,
     });
 
@@ -194,12 +224,14 @@ class NotificationInboxService {
     final title = (item['title'] ?? 'Habito').toString().trim();
     final body = (item['body'] ?? '').toString().trim();
     final data = _normalizeData(item['data']);
+    final receivedAt = _safeReceivedAt(_parseReceivedAt(item['received_at']));
 
     return {
       ...item,
       'title': title.isEmpty ? 'Habito' : title,
       'body': body,
       'data': data,
+      'received_at': receivedAt.toIso8601String(),
       'category': _normalizeCategory(
         item['category'],
         title: title,
@@ -222,6 +254,74 @@ class NotificationInboxService {
       );
     }
     return <String, dynamic>{};
+  }
+
+  static bool _isMeaningfulItem(Map<String, dynamic> item) {
+    return _isMeaningfulPayload(
+      title: (item['title'] ?? '').toString(),
+      body: (item['body'] ?? '').toString(),
+      data: _normalizeData(item['data']),
+    );
+  }
+
+  static bool _isMeaningfulPayload({
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) {
+    if (body.trim().isNotEmpty || data.isNotEmpty) return true;
+
+    final normalizedTitle = _foldForLooseCompare(title.trim());
+    return normalizedTitle.isNotEmpty &&
+        normalizedTitle != 'habito' &&
+        normalizedTitle != 'hábito' &&
+        normalizedTitle != 'habito barberia' &&
+        normalizedTitle != 'hábito barbería';
+  }
+
+  static String _foldForLooseCompare(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll('\u00e1', 'a')
+        .replaceAll('\u00e9', 'e')
+        .replaceAll('\u00ed', 'i')
+        .replaceAll('\u00f3', 'o')
+        .replaceAll('\u00fa', 'u')
+        .replaceAll('\u00fc', 'u')
+        .replaceAll('\u00f1', 'n')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  static DateTime _safeReceivedAt(DateTime? receivedAt) {
+    final now = DateTime.now();
+    if (receivedAt == null) return now;
+
+    final local = receivedAt.toLocal();
+    if (local.isBefore(_minimumValidReceivedAt)) return now;
+    if (local.isAfter(now.add(const Duration(days: 1)))) return now;
+
+    return local;
+  }
+
+  static bool _receivedAtNeedsRepair(dynamic value) {
+    final parsed = _parseReceivedAt(value);
+    if (parsed == null) return true;
+
+    final local = parsed.toLocal();
+    final now = DateTime.now();
+    return local.isBefore(_minimumValidReceivedAt) ||
+        local.isAfter(now.add(const Duration(days: 1)));
+  }
+
+  static DateTime? _parseReceivedAt(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+
+    return DateTime.tryParse(text);
   }
 
   static String inferCategory({

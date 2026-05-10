@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/ecuador_data.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -113,6 +115,11 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         );
     }
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(AppConfig.privacyPolicyUrl);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -571,6 +578,17 @@ class _RegisterPageState extends State<RegisterPage> {
                                           fontSize: AppTextSize.titleMedium,
                                         ),
                                       ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: _openPrivacyPolicy,
+                                icon: const Icon(Icons.privacy_tip_outlined),
+                                label: const Text('Ver política de privacidad'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.goldLight,
+                                ),
                               ),
                             ),
                           ],
