@@ -92,6 +92,7 @@ class _BookingsPageState extends State<BookingsPage> {
   bool _showAllTimeSlots = true;
   bool _wantsServiceExtras = false;
   bool _usePoints = false;
+  bool _useBirthdayBonus = false;
   int _availabilityRequestId = 0;
 
   bool get _isEditing => widget.appointmentId != null;
@@ -1948,12 +1949,39 @@ END:VCALENDAR
       final totalPrice = _getGrandTotalPrice();
       var redeemPoints = 0.0;
       var redeemDiscount = 0.0;
+      var birthdayBonusPoints = 0.0;
+      var birthdayBonusDiscount = 0.0;
 
       setState(() {
         _isSubmittingBooking = true;
       });
 
-      if (_usePoints) {
+      if (_useBirthdayBonus) {
+        await pointsProvider.refresh();
+        if (!mounted) return;
+
+        final birthdayQuote =
+            await pointsProvider.quoteBirthdayBookingPromotion(
+          amount: totalPrice,
+        );
+
+        if (!birthdayQuote.canRedeem) {
+          setState(() {
+            _useBirthdayBonus = false;
+          });
+          _showMessage(
+            birthdayQuote.message.isNotEmpty
+                ? birthdayQuote.message
+                : 'Tu bono de cumpleanos ya no esta disponible.',
+          );
+          return;
+        }
+
+        birthdayBonusPoints = birthdayQuote.points;
+        birthdayBonusDiscount = birthdayQuote.discount;
+      }
+
+      if (_usePoints && !_useBirthdayBonus) {
         await pointsProvider.refresh();
         if (!mounted) return;
 
@@ -1995,7 +2023,14 @@ END:VCALENDAR
         }
       }
 
-      if (_usePoints && redeemPoints <= 0) {
+      if (_useBirthdayBonus && birthdayBonusPoints <= 0) {
+        _showMessage(
+          'Tu bono de cumpleanos ya no esta disponible. Revisa tus puntos e intenta nuevamente.',
+        );
+        return;
+      }
+
+      if (_usePoints && !_useBirthdayBonus && redeemPoints <= 0) {
         _showMessage(
           'Tus puntos ya no están disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
         );
@@ -2058,6 +2093,8 @@ END:VCALENDAR
         paymentMethod: selectedPaymentMethod,
         redeemPoints: redeemPoints,
         redeemAmount: redeemDiscount,
+        birthdayBonusPoints: birthdayBonusPoints,
+        birthdayBonusAmount: birthdayBonusDiscount,
       );
 
       final int? appointmentId = _safeInt(response['appointment_id']);
@@ -2079,7 +2116,7 @@ END:VCALENDAR
       final String backendLocationName =
           (response['location_name'] ?? location['name'] ?? '').toString();
 
-      if (redeemPoints > 0) {
+      if (redeemPoints > 0 || birthdayBonusPoints > 0) {
         unawaited(authProvider.refreshProfile());
         unawaited(pointsProvider.refresh());
       }
@@ -2821,13 +2858,33 @@ END:VCALENDAR
   ) {
     final methods = _enabledPaymentMethods(shop);
     final selectedPaymentMethod = _selectedPaymentMethod(methods);
+    final birthdayPromotion = pointsProvider.birthdayPromotion;
+    final birthdayBalance = birthdayPromotion?.pointsAvailable ?? 0;
+    final birthdayRate = pointsState.rate <= 0 ? 100.0 : pointsState.rate;
+    final birthdayMaxPoints = totalPrice * birthdayRate;
+    final birthdayPointsToUse = birthdayBalance < birthdayMaxPoints
+        ? birthdayBalance
+        : birthdayMaxPoints;
+    final birthdayDiscount = birthdayPointsToUse <= 0
+        ? 0.0
+        : (birthdayPointsToUse / birthdayRate > totalPrice
+            ? totalPrice
+            : birthdayPointsToUse / birthdayRate);
     final pointsToUse = _bookingPointsToUse(auth, totalPrice, pointsProvider);
     final pointsDiscount =
         _bookingPointsDiscount(auth, totalPrice, pointsProvider);
     final projectedPayableTotal =
-        (totalPrice - pointsDiscount).clamp(0, double.infinity).toDouble();
+        (totalPrice - (_useBirthdayBonus ? birthdayDiscount : pointsDiscount))
+            .clamp(0, double.infinity)
+            .toDouble();
+    final canShowBirthdayBonus = auth.isLoggedIn &&
+        !_isEditing &&
+        (birthdayPromotion?.enabled ?? false) &&
+        (birthdayPromotion?.active ?? false) &&
+        birthdayPointsToUse > 0;
     final canShowPointsModule = auth.isLoggedIn &&
         !_isEditing &&
+        !_useBirthdayBonus &&
         pointsState.enabled &&
         pointsState.redeemEnabled &&
         PointsCalculator.isContextEnabled(
@@ -2870,6 +2927,69 @@ END:VCALENDAR
             ),
           ),
         ),
+        if (canShowBirthdayBonus) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.goldSurface,
+              borderRadius: AppRadius.tile,
+              border: Border.all(color: AppColors.goldSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.cake_rounded,
+                      color: AppColors.goldDeep,
+                      size: AppIconSize.spinner,
+                    ),
+                    SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
+                    Expanded(
+                      child: Text(
+                        'Bono de cumpleanos disponible',
+                        style: TextStyle(
+                          color: AppColors.goldDeep,
+                          fontWeight: FontWeight.w900,
+                          fontSize: AppTextSize.baseLarge,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
+                Text(
+                  'Puedes usar ${birthdayPromotion!.pointsFormatted} puntos promocionales solo en reservas.',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                    fontSize: AppTextSize.bodyCompact,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _BookingPointsRedeemTile(
+                  enabled: _useBirthdayBonus,
+                  pointsLabel: 'Puntos cumpleanos',
+                  points: birthdayPointsToUse,
+                  discount: birthdayDiscount,
+                  total: totalPrice,
+                  payableTotal: projectedPayableTotal,
+                  balance: birthdayBalance,
+                  interactive: canTogglePoints,
+                  onChanged: (value) {
+                    setState(() {
+                      _useBirthdayBonus = value;
+                      if (value) _usePoints = false;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
         if (canShowPointsModule) ...[
           const SizedBox(height: AppSpacing.xs),
           Container(
@@ -2929,6 +3049,7 @@ END:VCALENDAR
                     onChanged: (value) {
                       setState(() {
                         _usePoints = value;
+                        if (value) _useBirthdayBonus = false;
                       });
                     },
                   ),
@@ -3029,11 +3150,24 @@ END:VCALENDAR
     final canConfirmBooking = isReadyForSubmit && !_isSubmittingBooking;
     final String title = _selectedService?['title'] ?? 'Selecciona un servicio';
     final totalPrice = _getGrandTotalPrice();
+    final birthdayPromotion = pointsProvider.birthdayPromotion;
+    final birthdayRate = pointsState.rate <= 0 ? 100.0 : pointsState.rate;
+    final birthdayBalance = birthdayPromotion?.pointsAvailable ?? 0;
+    final birthdayMaxPoints = totalPrice * birthdayRate;
+    final birthdayPointsToUse = birthdayBalance < birthdayMaxPoints
+        ? birthdayBalance
+        : birthdayMaxPoints;
+    final birthdayDiscount = _useBirthdayBonus && birthdayPointsToUse > 0
+        ? (birthdayPointsToUse / birthdayRate > totalPrice
+            ? totalPrice
+            : birthdayPointsToUse / birthdayRate)
+        : 0.0;
     final pointsDiscount = _usePoints
         ? _bookingPointsDiscount(auth, totalPrice, pointsProvider)
         : 0.0;
-    final payableTotal =
-        (totalPrice - pointsDiscount).clamp(0, double.infinity).toDouble();
+    final payableTotal = (totalPrice - birthdayDiscount - pointsDiscount)
+        .clamp(0, double.infinity)
+        .toDouble();
     final String price =
         _selectedService != null ? _formatCurrency(payableTotal) : '-';
     final String? image = _selectedService?['image'];
@@ -3483,6 +3617,11 @@ END:VCALENDAR
                           _infoLine(
                             'Extras',
                             _formatCurrency(_getSelectedExtrasPriceTotal()),
+                          ),
+                        if (birthdayDiscount > 0)
+                          _infoLine(
+                            'Bono cumpleanos',
+                            '-${_formatCurrency(birthdayDiscount)}',
                           ),
                         if (pointsDiscount > 0)
                           _infoLine(

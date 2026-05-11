@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../../../core/errors/friendly_errors.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/points_api.dart';
+import '../models/birthday_promotion_summary.dart';
 import '../models/points_history_entry.dart';
 import '../models/points_quote.dart';
 import '../models/points_summary.dart';
+import '../models/referrals_summary.dart';
 
 class PointsProvider extends ChangeNotifier {
   static const Duration _cacheTtl = Duration(minutes: 5);
@@ -17,6 +19,8 @@ class PointsProvider extends ChangeNotifier {
   String? _token;
   AuthUser? _authUser;
   PointsSummary? _summary;
+  BirthdayPromotionSummary? _birthdayPromotion;
+  ReferralsSummary? _referrals;
   List<PointsHistoryEntry> _history = const [];
   bool _isLoading = false;
   bool _isLoadingMoreHistory = false;
@@ -30,6 +34,8 @@ class PointsProvider extends ChangeNotifier {
   double _reservedPoints = 0;
 
   PointsSummary? get summary => _summary;
+  BirthdayPromotionSummary? get birthdayPromotion => _birthdayPromotion;
+  ReferralsSummary? get referrals => _referrals;
   List<PointsHistoryEntry> get history => List.unmodifiable(_history);
   bool get isLoading => _isLoading;
   bool get isLoadingMoreHistory => _isLoadingMoreHistory;
@@ -58,6 +64,8 @@ class PointsProvider extends ChangeNotifier {
 
     if (user == null || token == null || token.isEmpty) {
       _summary = null;
+      _birthdayPromotion = null;
+      _referrals = null;
       _history = const [];
       _historyTotal = 0;
       _historyPage = 1;
@@ -100,6 +108,16 @@ class PointsProvider extends ChangeNotifier {
       bookingPointsEnabled: user.pointsEnabled,
       orderPointsEnabled: user.pointsEnabled,
     );
+    _birthdayPromotion = null;
+    _referrals = ReferralsSummary(
+      enabled: false,
+      code: user.referralCode,
+      link: user.referralLink,
+      asReferred: null,
+      metrics: ReferralMetrics.empty(),
+      referrerPoints: 0,
+      referredPoints: 0,
+    );
     _error = null;
     notifyListeners();
   }
@@ -128,6 +146,24 @@ class PointsProvider extends ChangeNotifier {
       _historyPage = 1;
       _hasMoreHistory =
           _history.length < _historyTotal && overview.history.isNotEmpty;
+      try {
+        _birthdayPromotion = await _api.getPromotionsSummary(token: token);
+      } catch (_) {
+        _birthdayPromotion = null;
+      }
+      try {
+        _referrals = await _api.getReferralsSummary(token: token);
+      } catch (_) {
+        _referrals ??= ReferralsSummary(
+          enabled: false,
+          code: _authUser?.referralCode ?? '',
+          link: _authUser?.referralLink ?? '',
+          asReferred: null,
+          metrics: ReferralMetrics.empty(),
+          referrerPoints: 0,
+          referredPoints: 0,
+        );
+      }
       _lastLoadedAt = DateTime.now();
     } catch (e) {
       _error = FriendlyErrors.points(e);
@@ -226,5 +262,45 @@ class PointsProvider extends ChangeNotifier {
       amount: amount,
       requestedPoints: requestedPoints,
     );
+  }
+
+  Future<PointsQuote> quoteBirthdayBookingPromotion({
+    required double amount,
+    double requestedPoints = 0,
+  }) {
+    final token = _token;
+    if (token == null || token.isEmpty) {
+      throw Exception('Inicia sesion para usar tu bono de cumpleanos.');
+    }
+
+    return _api.quoteBirthdayBookingPromotion(
+      token: token,
+      amount: amount,
+      requestedPoints: requestedPoints,
+    );
+  }
+
+  Future<bool> applyReferralCode(String code) async {
+    final token = _token;
+    if (token == null || token.isEmpty) {
+      _error = 'Inicia sesion para usar un codigo de referido.';
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _referrals = await _api.applyReferral(token: token, code: code);
+      return true;
+    } catch (e) {
+      _error = FriendlyErrors.points(e);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

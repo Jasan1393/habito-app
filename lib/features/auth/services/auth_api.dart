@@ -36,6 +36,7 @@ class AuthApi {
     required String lastName,
     required String email,
     required String phone,
+    required String birthday,
     required String contactType,
     required String businessName,
     required String identificationType,
@@ -44,6 +45,7 @@ class AuthApi {
     required String city,
     required String address,
     required String password,
+    String referralCode = '',
   }) async {
     final response = await _postJson(
       '/auth/register',
@@ -53,6 +55,7 @@ class AuthApi {
         'last_name': lastName.trim(),
         'email': email.trim(),
         'phone': phone.trim(),
+        'birthday': birthday.trim(),
         'contact_type': contactType.trim(),
         'business_name': businessName.trim(),
         'identification_type': identificationType.trim(),
@@ -61,6 +64,8 @@ class AuthApi {
         'city': city.trim(),
         'address': address.trim(),
         'password': password,
+        if (referralCode.trim().isNotEmpty)
+          'referral_code': referralCode.trim().toUpperCase(),
       },
     );
 

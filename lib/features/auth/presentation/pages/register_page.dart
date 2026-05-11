@@ -10,6 +10,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/services/referral_link_service.dart';
 import '../../../../core/validators/ecuador_id_validator.dart';
 import '../../../../core/validators/form_validators.dart';
 import '../../provider/auth_provider.dart';
@@ -33,6 +34,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _middleNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _birthdayCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _businessNameCtrl = TextEditingController();
   final _taxNumberCtrl = TextEditingController();
@@ -40,6 +42,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _addressCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  final _referralCodeCtrl = TextEditingController();
 
   String _contactType = 'individual';
   String _identificationType = 'cedula';
@@ -48,11 +51,18 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _loadPendingReferralCode();
+  }
+
+  @override
   void dispose() {
     _firstNameCtrl.dispose();
     _middleNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _phoneCtrl.dispose();
+    _birthdayCtrl.dispose();
     _emailCtrl.dispose();
     _businessNameCtrl.dispose();
     _taxNumberCtrl.dispose();
@@ -60,7 +70,17 @@ class _RegisterPageState extends State<RegisterPage> {
     _addressCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _referralCodeCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPendingReferralCode() async {
+    final code = await ReferralLinkService.getPendingReferralCode();
+    if (!mounted || code == null || code.isEmpty) return;
+
+    setState(() {
+      _referralCodeCtrl.text = code;
+    });
   }
 
   Future<void> _submit() async {
@@ -75,6 +95,7 @@ class _RegisterPageState extends State<RegisterPage> {
       lastName: _lastNameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
+      birthday: _birthdayCtrl.text.trim(),
       contactType: _contactType,
       businessName: _businessNameCtrl.text.trim(),
       identificationType: _identificationType,
@@ -83,6 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
       city: _cityCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
       password: _passwordCtrl.text,
+      referralCode: _referralCodeCtrl.text.trim(),
     );
 
     if (!mounted) return;
@@ -98,6 +120,7 @@ class _RegisterPageState extends State<RegisterPage> {
         );
 
       Navigator.pop(context, true);
+      await ReferralLinkService.consumePendingReferralCode();
       return;
     }
 
@@ -120,6 +143,43 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _openPrivacyPolicy() async {
     final uri = Uri.parse(AppConfig.privacyPolicyUrl);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final initialDate = _parseDate(_birthdayCtrl.text) ??
+        DateTime(now.year - 25, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(now.year - 5, now.month, now.day),
+      helpText: 'Fecha de nacimiento',
+      cancelText: 'Cancelar',
+      confirmText: 'Usar fecha',
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _birthdayCtrl.text = _formatDateForApi(picked);
+    });
+  }
+
+  DateTime? _parseDate(String value) {
+    final parts = value.trim().split('-');
+    if (parts.length != 3) return null;
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (year == null || month == null || day == null) return null;
+    return DateTime(year, month, day);
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 
   @override
@@ -226,6 +286,33 @@ class _RegisterPageState extends State<RegisterPage> {
                                 icon: Icons.phone_outlined,
                               ),
                               validator: FormValidators.phone,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            TextFormField(
+                              controller: _birthdayCtrl,
+                              readOnly: true,
+                              onTap: _pickBirthday,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.birthday],
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration(
+                                label: 'Fecha de nacimiento',
+                                icon: Icons.cake_outlined,
+                                suffix: const Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              validator: (value) {
+                                final text = value?.trim() ?? '';
+                                if (text.isEmpty) {
+                                  return 'Selecciona tu fecha de nacimiento';
+                                }
+                                if (_parseDate(text) == null) {
+                                  return 'Usa una fecha valida';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             TextFormField(
@@ -466,6 +553,17 @@ class _RegisterPageState extends State<RegisterPage> {
                             const SizedBox(height: AppSpacing.xl),
                             _sectionTitle('Acceso'),
                             const SizedBox(height: AppSpacing.formNotice),
+                            TextFormField(
+                              controller: _referralCodeCtrl,
+                              textCapitalization: TextCapitalization.characters,
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration(
+                                label: 'Codigo de referido (opcional)',
+                                icon: Icons.diversity_3_outlined,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscurePassword,

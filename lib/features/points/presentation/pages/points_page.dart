@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
+import '../../../../core/services/referral_link_service.dart';
 import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_error_state.dart';
@@ -15,6 +19,7 @@ import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
 import '../../models/points_history_entry.dart';
+import '../../models/referrals_summary.dart';
 import '../../provider/points_provider.dart';
 
 class PointsPage extends StatefulWidget {
@@ -26,6 +31,7 @@ class PointsPage extends StatefulWidget {
 
 class _PointsPageState extends State<PointsPage> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _referralCodeController = TextEditingController();
   bool _didLoad = false;
 
   @override
@@ -44,6 +50,7 @@ class _PointsPageState extends State<PointsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<PointsProvider>().load();
+      _prefillPendingReferralCode();
     });
   }
 
@@ -52,6 +59,7 @@ class _PointsPageState extends State<PointsPage> {
     _scrollController
       ..removeListener(_handleHistoryScroll)
       ..dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -62,6 +70,40 @@ class _PointsPageState extends State<PointsPage> {
     if (position.pixels >= position.maxScrollExtent - 280) {
       context.read<PointsProvider>().loadMoreHistory();
     }
+  }
+
+  Future<void> _applyReferralCode() async {
+    final code = _referralCodeController.text.trim();
+    if (code.isEmpty) return;
+
+    final ok = await context.read<PointsProvider>().applyReferralCode(code);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          content: Text(
+            ok
+                ? 'Codigo de referido vinculado.'
+                : context.read<PointsProvider>().error ??
+                    'No pudimos vincular el codigo.',
+          ),
+        ),
+      );
+
+    if (ok) {
+      await ReferralLinkService.consumePendingReferralCode();
+      _referralCodeController.clear();
+    }
+  }
+
+  Future<void> _prefillPendingReferralCode() async {
+    final code = await ReferralLinkService.getPendingReferralCode();
+    if (!mounted || code == null || code.isEmpty) return;
+    _referralCodeController.text = code;
   }
 
   @override
@@ -213,6 +255,35 @@ class _PointsPageState extends State<PointsPage> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
+                if ((points.referrals?.enabled ?? false) &&
+                    (points.referrals?.link ?? '').isNotEmpty) ...[
+                  _ReferralInviteCard(
+                    referrals: points.referrals!,
+                    applyController: _referralCodeController,
+                    onCopy: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: points.referrals!.link),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(seconds: 2),
+                            content: Text('Link de referido copiado.'),
+                          ),
+                        );
+                    },
+                    onShare: () {
+                      Share.share(
+                        'Reserva en Habito con mi codigo ${points.referrals!.code}: ${points.referrals!.link}',
+                      );
+                    },
+                    onApplyCode: _applyReferralCode,
+                  ),
+                  const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
+                ],
                 Row(
                   children: [
                     const Text(
@@ -345,6 +416,169 @@ class _MetricRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _ReferralInviteCard extends StatelessWidget {
+  final ReferralsSummary referrals;
+  final TextEditingController applyController;
+  final VoidCallback onCopy;
+  final VoidCallback onShare;
+  final VoidCallback onApplyCode;
+
+  const _ReferralInviteCard({
+    required this.referrals,
+    required this.applyController,
+    required this.onCopy,
+    required this.onShare,
+    required this.onApplyCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: AppRadius.extraLarge,
+        boxShadow: AppShadows.cardSoft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Invita y gana',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: AppTextSize.section,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Comparte tu link. Cuando tu referido instale la app, se registre, agende y facture su primera cita, ambos ganan beneficios.',
+            style: const TextStyle(
+              color: Colors.white70,
+              height: 1.4,
+              fontSize: AppTextSize.bodyStrong,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm + AppSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: AppRadius.tile,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Text(
+              referrals.code.isEmpty ? referrals.link : referrals.code,
+              style: const TextStyle(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCopy,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.tile,
+                    ),
+                  ),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copiar'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onShare,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.tile,
+                    ),
+                  ),
+                  icon: const Icon(Icons.ios_share_rounded),
+                  label: const Text('Compartir'),
+                ),
+              ),
+            ],
+          ),
+          if (referrals.metrics.total > 0) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              '${referrals.metrics.rewarded} premiado(s) de ${referrals.metrics.total} referido(s).',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+          if (referrals.asReferred == null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: applyController,
+              textCapitalization: TextCapitalization.characters,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Tengo un codigo de referido',
+                hintStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.tile,
+                  borderSide: BorderSide.none,
+                ),
+                suffixIcon: TextButton(
+                  onPressed: onApplyCode,
+                  child: const Text(
+                    'Aplicar',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              _statusLabel(referrals.asReferred!.status),
+              style: const TextStyle(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'registered':
+      case 'app_installed':
+        return 'Tu referido esta vinculado. Falta crear y facturar la primera cita.';
+      case 'appointment_created':
+        return 'Ya tienes una cita referida. El premio se libera al facturarla.';
+      case 'rewarded':
+        return 'Referido premiado correctamente.';
+      case 'reversed':
+        return 'El premio fue reversado por anulacion de factura.';
+      default:
+        return 'Referido en seguimiento.';
+    }
   }
 }
 

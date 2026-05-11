@@ -31,6 +31,9 @@ class AuthUser {
   final double pointsRedeemPointsPerUsd;
   final double pointsRedeemMinPoints;
   final double pointsRedeemMaxPercent;
+  final String referralCode;
+  final String referralLink;
+  final int? referredById;
 
   const AuthUser({
     required this.id,
@@ -65,6 +68,9 @@ class AuthUser {
     this.pointsRedeemPointsPerUsd = 100,
     this.pointsRedeemMinPoints = 1,
     this.pointsRedeemMaxPercent = 50,
+    this.referralCode = '',
+    this.referralLink = '',
+    this.referredById,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
@@ -211,6 +217,9 @@ class AuthUser {
             json['points_redeem_max_percent'] ?? json['pointsRedeemMaxPercent'],
           ) ??
           50,
+      referralCode: readString(['referral_code', 'referralCode']),
+      referralLink: readString(['referral_link', 'referralLink']),
+      referredById: _parseInt(json['referred_by_id'] ?? json['referredById']),
     );
   }
 
@@ -247,6 +256,9 @@ class AuthUser {
     double? pointsRedeemPointsPerUsd,
     double? pointsRedeemMinPoints,
     double? pointsRedeemMaxPercent,
+    String? referralCode,
+    String? referralLink,
+    int? referredById,
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -287,6 +299,9 @@ class AuthUser {
           pointsRedeemMinPoints ?? this.pointsRedeemMinPoints,
       pointsRedeemMaxPercent:
           pointsRedeemMaxPercent ?? this.pointsRedeemMaxPercent,
+      referralCode: referralCode ?? this.referralCode,
+      referralLink: referralLink ?? this.referralLink,
+      referredById: referredById ?? this.referredById,
     );
   }
 
@@ -324,6 +339,9 @@ class AuthUser {
       'points_redeem_points_per_usd': pointsRedeemPointsPerUsd,
       'points_redeem_min_points': pointsRedeemMinPoints,
       'points_redeem_max_percent': pointsRedeemMaxPercent,
+      'referral_code': referralCode,
+      'referral_link': referralLink,
+      'referred_by_id': referredById,
     };
   }
 

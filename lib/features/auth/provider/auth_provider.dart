@@ -94,6 +94,7 @@ class AuthProvider extends ChangeNotifier {
     required String lastName,
     required String email,
     required String phone,
+    required String birthday,
     required String contactType,
     required String businessName,
     required String identificationType,
@@ -102,6 +103,7 @@ class AuthProvider extends ChangeNotifier {
     required String city,
     required String address,
     required String password,
+    String referralCode = '',
   }) async {
     return _runAuthAction(() async {
       final result = await _api.register(
@@ -110,6 +112,7 @@ class AuthProvider extends ChangeNotifier {
         lastName: lastName,
         email: email,
         phone: phone,
+        birthday: birthday,
         contactType: contactType,
         businessName: businessName,
         identificationType: identificationType,
@@ -118,6 +121,7 @@ class AuthProvider extends ChangeNotifier {
         city: city,
         address: address,
         password: password,
+        referralCode: referralCode,
       );
       await _persistSession(result.token, result.user);
       await _refreshProfileAfterAuth(result.token);

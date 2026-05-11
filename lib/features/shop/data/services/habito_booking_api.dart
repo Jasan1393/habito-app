@@ -541,6 +541,8 @@ class HabitoBookingApi {
     ShopPaymentMethod? paymentMethod,
     double redeemPoints = 0,
     double redeemAmount = 0,
+    double birthdayBonusPoints = 0,
+    double birthdayBonusAmount = 0,
   }) async {
     final uri = Uri.parse('$baseUrl/bookings');
 
@@ -572,7 +574,14 @@ class HabitoBookingApi {
       'notify_participants': notifyParticipants,
       'extras': normalizedExtras,
       if (redeemPoints > 0) 'redeem_points': _amountNumber(redeemPoints),
-      if (redeemAmount > 0) 'redeem_amount': _amountNumber(redeemAmount),
+      if (redeemAmount > 0 || birthdayBonusAmount > 0)
+        'redeem_amount': _amountNumber(
+          redeemAmount > 0 ? redeemAmount : birthdayBonusAmount,
+        ),
+      if (birthdayBonusPoints > 0)
+        'birthday_bonus_points': _amountNumber(birthdayBonusPoints),
+      if (birthdayBonusAmount > 0)
+        'birthday_bonus_amount': _amountNumber(birthdayBonusAmount),
       if (paymentMethod != null) ...{
         'payment_method': paymentMethod.id,
         'payment_method_title': paymentMethod.title,

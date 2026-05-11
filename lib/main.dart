@@ -6,6 +6,7 @@ import 'core/navigation/app_navigator.dart';
 import 'core/routes/app_routes.dart';
 import 'core/services/app_logger.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/referral_link_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/provider/auth_provider.dart';
 import 'features/points/provider/points_provider.dart';
@@ -23,6 +24,12 @@ Future<void> main() async {
     await PushNotificationService.initialize();
   } catch (e) {
     AppLogger.error('Error inicializando PushNotificationService', error: e);
+  }
+
+  try {
+    await ReferralLinkService.initialize();
+  } catch (e) {
+    AppLogger.error('Error inicializando ReferralLinkService', error: e);
   }
 
   runApp(const HabitoApp());

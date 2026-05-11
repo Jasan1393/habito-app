@@ -7,6 +7,8 @@ import '../../../../core/errors/friendly_errors.dart';
 import '../../models/points_history_entry.dart';
 import '../../models/points_quote.dart';
 import '../../models/points_summary.dart';
+import '../../models/birthday_promotion_summary.dart';
+import '../../models/referrals_summary.dart';
 
 class PointsApi {
   static const String _baseUrl = AppConfig.apiBaseUrl;
@@ -103,6 +105,73 @@ class PointsApi {
     final data = _unwrapSuccess(_decodeResponse(response));
     final payload = _asMap(data['data']);
     return PointsQuote.fromJson(_asMap(payload['quote']));
+  }
+
+  Future<BirthdayPromotionSummary> getPromotionsSummary({
+    required String token,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$_baseUrl/points/promotions/summary'),
+          headers: _headers(token),
+        )
+        .timeout(_timeout);
+    final data = _unwrapSuccess(_decodeResponse(response));
+    final payload = _asMap(data['data']);
+    final promotions = _asMap(payload['promotions']);
+    return BirthdayPromotionSummary.fromJson(
+      _asMap(promotions['birthday_bonus'] ?? promotions['birthdayBonus']),
+    );
+  }
+
+  Future<PointsQuote> quoteBirthdayBookingPromotion({
+    required String token,
+    required double amount,
+    double requestedPoints = 0,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$_baseUrl/points/promotions/quote-booking'),
+          headers: _headers(token),
+          body: jsonEncode({
+            'amount': _formatAmount(amount),
+            if (requestedPoints > 0)
+              'requested_points': _formatAmount(requestedPoints),
+          }),
+        )
+        .timeout(_timeout);
+    final data = _unwrapSuccess(_decodeResponse(response));
+    final payload = _asMap(data['data']);
+    return PointsQuote.fromJson(_asMap(payload['quote']));
+  }
+
+  Future<ReferralsSummary> getReferralsSummary({
+    required String token,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$_baseUrl/referrals/summary'),
+          headers: _headers(token),
+        )
+        .timeout(_timeout);
+    final data = _unwrapSuccess(_decodeResponse(response));
+    final payload = _asMap(data['data']);
+    return ReferralsSummary.fromPayload(payload);
+  }
+
+  Future<ReferralsSummary> applyReferral({
+    required String token,
+    required String code,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$_baseUrl/referrals/apply'),
+          headers: _headers(token),
+          body: jsonEncode({'code': code.trim().toUpperCase()}),
+        )
+        .timeout(_timeout);
+    _unwrapSuccess(_decodeResponse(response));
+    return getReferralsSummary(token: token);
   }
 
   Map<String, String> _headers(String token) {
