@@ -203,11 +203,22 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     if (!mounted) return;
 
     if (response == null) {
-      final message = context.read<AuthProvider>().error ??
-          'No pudimos iniciar la solicitud de eliminación.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+      final message = _friendlyDeletionErrorMessage(
+        context.read<AuthProvider>().error,
       );
+
+      setState(() {
+        _lastWebUrl = _defaultDeletionWebUrl;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       return;
     }
 
@@ -252,6 +263,23 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         content: Text('No pudimos abrir la página web de eliminación.'),
       ),
     );
+  }
+
+  String _friendlyDeletionErrorMessage(String? error) {
+    final normalizedError = (error ?? '').toLowerCase();
+    final isRouteMissing = normalizedError.contains('ninguna ruta') ||
+        normalizedError.contains('no route') ||
+        normalizedError.contains('not found');
+
+    if (isRouteMissing) {
+      return 'No pudimos iniciar la solicitud desde la app. Puedes continuar desde la página web de eliminación.';
+    }
+
+    if (error != null && error.trim().isNotEmpty) {
+      return error.trim();
+    }
+
+    return 'No pudimos iniciar la solicitud de eliminación.';
   }
 
   String get _defaultDeletionWebUrl => AppConfig.accountDeletionUrl;

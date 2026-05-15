@@ -266,8 +266,10 @@ class ShopCartItem {
 
 class ShopProvider extends ChangeNotifier {
   static const double fixedShippingTotal = 3.50;
-  static const String _cartStorageKey = 'habito_shop_cart_v1';
+  static const int _cartStorageVersion = 2;
+  static const String _cartStorageKey = 'habito_shop_cart_v2';
   static const Duration _cartPersistDebounce = Duration(seconds: 1);
+  static const Duration _cartStorageTtl = Duration(days: 7);
 
   final List<ShopCartItem> _cartItems = [];
   final List<Map<String, dynamic>> _orders = [];
@@ -632,6 +634,24 @@ class ShopProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> repairLocalCheckoutState() async {
+    _cartItems.clear();
+    _resetCartContextIfEmpty();
+    _checkoutError = null;
+    _paymentMethodsError = null;
+    _hasLoadedPaymentMethods = false;
+    _paymentMethods
+      ..clear()
+      ..add(ShopPaymentMethod.bankTransfer);
+
+    await Future.wait([
+      _clearPersistedCart(),
+      HabitoShopApi.clearCache(),
+    ]);
+
+    notifyListeners();
+  }
+
   Future<void> loadOrders({
     required String token,
     bool forceRefresh = false,
@@ -965,6 +985,13 @@ class ShopProvider extends ChangeNotifier {
       }
 
       final payload = _shopMapFrom(decoded);
+      final storedVersion = _shopParseInt(payload['version']);
+      if (storedVersion != _cartStorageVersion ||
+          _isStoredCartExpired(payload['updated_at'])) {
+        await _clearPersistedCart();
+        return;
+      }
+
       final storedItems = payload['items'];
       final hydratedItems = storedItems is Iterable
           ? storedItems
@@ -973,6 +1000,13 @@ class ShopProvider extends ChangeNotifier {
               .whereType<ShopCartItem>()
               .toList()
           : <ShopCartItem>[];
+
+      if (hydratedItems.isEmpty) {
+        _cartItems.clear();
+        _resetCartContextIfEmpty();
+        await _clearPersistedCart();
+        return;
+      }
 
       final fulfillmentMethod = _fulfillmentMethodFromStorage(
         payload['fulfillment_method'] ?? payload['fulfillmentMethod'],
@@ -983,6 +1017,14 @@ class ShopProvider extends ChangeNotifier {
                   payload['pickup_location'] ?? payload['pickupLocation']),
             )
           : null;
+
+      if (fulfillmentMethod == ShopFulfillmentMethod.pickup &&
+          pickupLocation == null) {
+        _cartItems.clear();
+        _resetCartContextIfEmpty();
+        await _clearPersistedCart();
+        return;
+      }
 
       _cartItems
         ..clear()
@@ -1020,7 +1062,7 @@ class ShopProvider extends ChangeNotifier {
       }
 
       final payload = {
-        'version': 1,
+        'version': _cartStorageVersion,
         'updated_at': DateTime.now().toIso8601String(),
         'fulfillment_method': _fulfillmentMethod.payloadValue,
         'pickup_location': _pickupLocation == null
@@ -1045,6 +1087,12 @@ class ShopProvider extends ChangeNotifier {
     } catch (_) {
       // Si falla el storage local, el estado en memoria ya queda limpio.
     }
+  }
+
+  static bool _isStoredCartExpired(dynamic updatedAt) {
+    final updated = DateTime.tryParse(updatedAt?.toString() ?? '');
+    if (updated == null) return true;
+    return DateTime.now().difference(updated) > _cartStorageTtl;
   }
 
   static ShopFulfillmentMethod _fulfillmentMethodFromStorage(dynamic value) {

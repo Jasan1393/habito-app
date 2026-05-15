@@ -11,6 +11,7 @@ class PointsQuote {
   final double maxPercent;
   final double remainingBalance;
   final String message;
+  final String verificationNotice;
 
   const PointsQuote({
     required this.enabled,
@@ -23,6 +24,7 @@ class PointsQuote {
     required this.maxPercent,
     required this.remainingBalance,
     required this.message,
+    this.verificationNotice = '',
   });
 
   bool get canRedeem => enabled && points > 0 && discount > 0;
@@ -42,6 +44,10 @@ class PointsQuote {
           ) ??
           0,
       message: (json['message'] ?? '').toString(),
+      verificationNotice:
+          (json['verification_notice'] ?? json['verificationNotice'] ?? '')
+              .toString()
+              .trim(),
     );
   }
 

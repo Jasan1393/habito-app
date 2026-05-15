@@ -156,6 +156,54 @@ class _CartPageState extends State<CartPage> {
     _showCartContextFeedback(result);
   }
 
+  Future<void> _confirmClearCart(ShopProvider shop) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.extraLarge),
+        title: const Text(
+          'Vaciar carrito',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: const Text(
+          'Esto solo limpia los productos guardados en este telefono. Tu cuenta y tus pedidos no se modifican.',
+          style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Vaciar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await shop.repairLocalCheckoutState();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+              'Carrito local reiniciado. Puedes armar el pedido otra vez.'),
+        ),
+      );
+  }
+
   Future<void> _goToMainTab(int index) async {
     if (!mounted) return;
     await Navigator.pushAndRemoveUntil(
@@ -208,6 +256,7 @@ class _CartPageState extends State<CartPage> {
                           _CartSectionHeader(
                             itemCount: shop.cartCount,
                             subtotal: _formatPrice(shop.subtotal),
+                            onClearCart: () => _confirmClearCart(shop),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           for (var index = 0; index < cartItems.length; index++)
@@ -395,10 +444,12 @@ class _CartPageState extends State<CartPage> {
 class _CartSectionHeader extends StatelessWidget {
   final int itemCount;
   final String subtotal;
+  final VoidCallback onClearCart;
 
   const _CartSectionHeader({
     required this.itemCount,
     required this.subtotal,
+    required this.onClearCart,
   });
 
   @override
@@ -441,6 +492,20 @@ class _CartSectionHeader extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               _CompactInfoPill(label: 'Subtotal $subtotal'),
+              const SizedBox(width: AppSpacing.sm),
+              TextButton.icon(
+                onPressed: onClearCart,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.dangerDeep,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                label: const Text(
+                  'Vaciar',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ],
           ),
         ],

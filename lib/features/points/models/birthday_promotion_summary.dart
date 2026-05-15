@@ -4,12 +4,14 @@ class BirthdayPromotionSummary {
   final double pointsAvailable;
   final String pointsFormatted;
   final String? expiresAt;
+  final String verificationNotice;
 
   const BirthdayPromotionSummary({
     required this.enabled,
     required this.active,
     required this.pointsAvailable,
     required this.pointsFormatted,
+    required this.verificationNotice,
     this.expiresAt,
   });
 
@@ -19,6 +21,7 @@ class BirthdayPromotionSummary {
       active: false,
       pointsAvailable: 0,
       pointsFormatted: '0',
+      verificationNotice: '',
     );
   }
 
@@ -38,6 +41,12 @@ class BirthdayPromotionSummary {
                   0))
           .toString(),
       expiresAt: (json['expires_at'] ?? json['expiresAt'])?.toString(),
+      verificationNotice: (json['verification_notice'] ??
+              json['verificationNotice'] ??
+              json['birthday_bonus_verification_notice'] ??
+              '')
+          .toString()
+          .trim(),
     );
   }
 

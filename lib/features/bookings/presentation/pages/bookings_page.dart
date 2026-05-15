@@ -1951,6 +1951,7 @@ END:VCALENDAR
       var redeemDiscount = 0.0;
       var birthdayBonusPoints = 0.0;
       var birthdayBonusDiscount = 0.0;
+      var birthdayVerificationNotice = '';
 
       setState(() {
         _isSubmittingBooking = true;
@@ -1979,6 +1980,9 @@ END:VCALENDAR
 
         birthdayBonusPoints = birthdayQuote.points;
         birthdayBonusDiscount = birthdayQuote.discount;
+        birthdayVerificationNotice = birthdayQuote.verificationNotice.isNotEmpty
+            ? birthdayQuote.verificationNotice
+            : (pointsProvider.birthdayPromotion?.verificationNotice ?? '');
       }
 
       if (_usePoints && !_useBirthdayBonus) {
@@ -2147,6 +2151,8 @@ END:VCALENDAR
           response['location_longitude'] ?? location['longitude'],
         ),
         durationSeconds: totalDuration > 0 ? totalDuration : 3600,
+        birthdayVerificationNotice:
+            birthdayBonusPoints > 0 ? birthdayVerificationNotice : null,
       );
     } catch (e) {
       if (!mounted) return;
@@ -2392,6 +2398,7 @@ END:VCALENDAR
     String? locationDescription,
     double? locationLatitude,
     double? locationLongitude,
+    String? birthdayVerificationNotice,
     int durationSeconds = 3600,
   }) {
     showModalBottomSheet(
@@ -2481,6 +2488,13 @@ END:VCALENDAR
                         'Pago',
                         _normalizeStatusLabel(paymentStatus),
                       ),
+                    if (birthdayVerificationNotice != null &&
+                        birthdayVerificationNotice.trim().isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _birthdayVerificationNoticeCard(
+                        birthdayVerificationNotice.trim(),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
                     _actionButton(
                       icon: Icons.share_rounded,
@@ -2558,6 +2572,40 @@ END:VCALENDAR
           ),
         );
       },
+    );
+  }
+
+  Widget _birthdayVerificationNoticeCard(String notice) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.goldSurface,
+        borderRadius: AppRadius.tile,
+        border: Border.all(color: AppColors.goldSoft),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.badge_outlined,
+            color: AppColors.goldDeep,
+            size: AppIconSize.md,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              notice,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: AppTextSize.bodyCompact,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2969,6 +3017,40 @@ END:VCALENDAR
                     fontSize: AppTextSize.bodyCompact,
                   ),
                 ),
+                if (birthdayPromotion.verificationNotice.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: AppRadius.card,
+                      border: Border.all(color: AppColors.goldSoft),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.badge_outlined,
+                          color: AppColors.goldDeep,
+                          size: AppIconSize.md,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            birthdayPromotion.verificationNotice,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              height: 1.35,
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppTextSize.bodyCompact,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 _BookingPointsRedeemTile(
                   enabled: _useBirthdayBonus,

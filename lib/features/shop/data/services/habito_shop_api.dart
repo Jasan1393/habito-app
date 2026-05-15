@@ -2067,6 +2067,23 @@ class HabitoShopApi {
     return _loadFuture!;
   }
 
+  static Future<void> clearCache() async {
+    _listCache.clear();
+    _productCache.clear();
+    _refreshingListKeys.clear();
+    _refreshingProductIds.clear();
+    _loadFuture = null;
+
+    try {
+      final file = await _cacheFile();
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Limpiar cache es una ayuda local; nunca debe bloquear la compra.
+    }
+  }
+
   static void _refreshListInBackground(
     String key,
     Future<void> Function() refresh,

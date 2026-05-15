@@ -869,7 +869,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
       stopSubmitting();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 8),
+          content: Text(error),
+          action: SnackBarAction(
+            label: 'Reiniciar carrito',
+            onPressed: () {
+              unawaited(
+                  context.read<ShopProvider>().repairLocalCheckoutState());
+            },
+          ),
+        ),
       );
       return;
     }
