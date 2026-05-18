@@ -49,6 +49,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String _province = 'Guayas';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _referralCodeFromLink = false;
 
   @override
   void initState() {
@@ -80,6 +81,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() {
       _referralCodeCtrl.text = code;
+      _referralCodeFromLink = true;
     });
   }
 
@@ -89,6 +91,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final auth = context.read<AuthProvider>();
+    final referralCode = _referralCodeCtrl.text.trim();
     final ok = await auth.register(
       firstName: _firstNameCtrl.text.trim(),
       middleName: _middleNameCtrl.text.trim(),
@@ -104,7 +107,7 @@ class _RegisterPageState extends State<RegisterPage> {
       city: _cityCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
       password: _passwordCtrl.text,
-      referralCode: _referralCodeCtrl.text.trim(),
+      referralCode: referralCode,
     );
 
     if (!mounted) return;
@@ -113,9 +116,13 @@ class _RegisterPageState extends State<RegisterPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
+          SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Cuenta creada correctamente.'),
+            content: Text(
+              referralCode.isEmpty
+                  ? 'Cuenta creada correctamente.'
+                  : 'Cuenta creada correctamente. Tu invitacion quedo vinculada; los puntos se liberan al facturar la primera cita.',
+            ),
           ),
         );
 
@@ -559,10 +566,23 @@ class _RegisterPageState extends State<RegisterPage> {
                               textInputAction: TextInputAction.next,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Codigo de referido (opcional)',
+                                label: _referralCodeFromLink
+                                    ? 'Codigo de referido aplicado'
+                                    : 'Codigo de referido (opcional)',
                                 icon: Icons.diversity_3_outlined,
                               ),
                             ),
+                            if (_referralCodeFromLink) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              const Text(
+                                'Codigo cargado desde tu invitacion. Se vinculara al crear tu cuenta.',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: AppTextSize.bodySmall,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.lg),
                             TextFormField(
                               controller: _passwordCtrl,

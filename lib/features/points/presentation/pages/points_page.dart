@@ -139,17 +139,6 @@ class _PointsPageState extends State<PointsPage> {
           final label = summary?.label ?? authUser?.pointsLabel ?? 'Puntos';
           final balanceText = summary?.formattedBalance ??
               _formatPoints(authUser?.pointsBalance ?? 0);
-          final totalEarnedText = summary?.formattedTotalEarned ??
-              _formatPoints(authUser?.pointsTotalEarned ?? 0);
-          final nextGoal = summary?.nextGoal ?? authUser?.pointsNextGoal ?? 0;
-          final toNextGoal = summary?.formattedToNextGoal ??
-              _formatPoints(
-                nextGoal > 0
-                    ? (nextGoal - (authUser?.pointsBalance ?? 0))
-                        .clamp(0, double.infinity)
-                        .toDouble()
-                    : 0,
-              );
           final moduleEnabled =
               summary?.enabled ?? authUser?.pointsEnabled ?? false;
           final history = points.history;
@@ -166,92 +155,14 @@ class _PointsPageState extends State<PointsPage> {
                 AppSpacing.xl,
               ),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(
-                    AppSpacing.xl - AppSpacing.xxs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: AppRadius.display,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm - AppSpacing.xxs / 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.14),
-                          borderRadius: AppRadius.full,
-                        ),
-                        child: Text(
-                          moduleEnabled ? 'Saldo actual' : 'Programa de puntos',
-                          style: const TextStyle(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
-                      Text(
-                        '$balanceText $label',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: AppTextSize.headlineLarge + AppSpacing.xxs,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        _buildHeroMessage(
-                          moduleEnabled: moduleEnabled,
-                          mycredAvailable:
-                              summary?.mycredAvailable ?? moduleEnabled,
-                          error: points.error,
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
-                Container(
-                  padding: const EdgeInsets.all(
-                    AppSpacing.lg + AppSpacing.xxs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: AppRadius.extraLarge,
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _MetricRow(
-                        label: 'Total acumulado',
-                        value: '$totalEarnedText $label',
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Divider(height: AppSpacing.xxs / 2),
-                      const SizedBox(height: AppSpacing.md),
-                      _MetricRow(
-                        label: nextGoal > 0 ? 'Meta siguiente' : 'Estado',
-                        value: nextGoal > 0 ? '$nextGoal $label' : 'Activo',
-                      ),
-                      if (nextGoal > 0) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        const Divider(height: AppSpacing.xxs / 2),
-                        const SizedBox(height: AppSpacing.md),
-                        _MetricRow(
-                          label: 'Te faltan',
-                          value: '$toNextGoal $label',
-                        ),
-                      ],
-                    ],
+                _PointsBalanceHero(
+                  balanceText: balanceText,
+                  label: label,
+                  title: moduleEnabled ? 'Saldo actual' : 'Programa de puntos',
+                  message: _buildHeroMessage(
+                    moduleEnabled: moduleEnabled,
+                    mycredAvailable: summary?.mycredAvailable ?? moduleEnabled,
+                    error: points.error,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
@@ -277,7 +188,7 @@ class _PointsPageState extends State<PointsPage> {
                     },
                     onShare: () {
                       Share.share(
-                        'Reserva en Habito con mi codigo ${points.referrals!.code}: ${points.referrals!.link}',
+                        'Reserva en Hábito con mi código ${points.referrals!.code}. Abre mi invitación aquí: ${points.referrals!.link}',
                       );
                     },
                     onApplyCode: _applyReferralCode,
@@ -383,38 +294,147 @@ class _PointsPageState extends State<PointsPage> {
   }
 }
 
-class _MetricRow extends StatelessWidget {
+class _PointsBalanceHero extends StatelessWidget {
+  final String balanceText;
   final String label;
-  final String value;
+  final String title;
+  final String message;
 
-  const _MetricRow({
+  const _PointsBalanceHero({
+    required this.balanceText,
     required this.label,
-    required this.value,
+    required this.title,
+    required this.message,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+    return ClipRRect(
+      borderRadius: AppRadius.display,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -44,
+            right: -28,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.secondary.withValues(alpha: 0.12),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Text(
-          value,
-          textAlign: TextAlign.right,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w800,
+          Positioned(
+            bottom: -58,
+            left: -38,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
           ),
-        ),
-      ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,
+                  AppColors.darkPanel,
+                  AppColors.primarySoft,
+                ],
+              ),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.18),
+              ),
+              borderRadius: AppRadius.display,
+              boxShadow: AppShadows.strong,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withValues(alpha: 0.14),
+                        borderRadius: AppRadius.full,
+                        border: Border.all(
+                          color: AppColors.secondary.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.stars_rounded,
+                            size: AppIconSize.sm,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  spacing: AppSpacing.sm,
+                  children: [
+                    Text(
+                      balanceText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: AppTextSize.headlineLarge + AppSpacing.sm,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.textOnDarkMuted,
+                          fontSize: AppTextSize.titleSmall,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppColors.textOnDarkMuted,
+                    height: 1.45,
+                    fontSize: AppTextSize.bodyStrong,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -436,52 +456,130 @@ class _ReferralInviteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final referralLink =
+        referrals.link.isEmpty ? referrals.code : referrals.link;
+    final referrerPoints = _formatRewardPoints(referrals.referrerPoints);
+    final referredPoints = _formatRewardPoints(referrals.referredPoints);
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: AppRadius.extraLarge,
-        boxShadow: AppShadows.cardSoft,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.darkPanel,
+          ],
+        ),
+        borderRadius: AppRadius.display,
+        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.16)),
+        boxShadow: AppShadows.strong,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Invita y gana',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: AppTextSize.section,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: AppIconSize.xxl,
+                height: AppIconSize.xxl,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.14),
+                  borderRadius: AppRadius.large,
+                  border: Border.all(
+                    color: AppColors.secondary.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.group_add_rounded,
+                  color: AppColors.secondary,
+                  size: AppIconSize.lg,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Invita y gana',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: AppTextSize.section,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Comparte tu link personal. Cuando tu referido se registre, reserve y facture su primera cita, ambos ganan.',
+                      style: TextStyle(
+                        color: AppColors.textOnDarkMuted,
+                        height: 1.4,
+                        fontSize: AppTextSize.bodyStrong,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Comparte tu link. Cuando tu referido instale la app, se registre, agende y facture su primera cita, ambos ganan beneficios.',
-            style: const TextStyle(
-              color: Colors.white70,
-              height: 1.4,
-              fontSize: AppTextSize.bodyStrong,
+          if (referrerPoints.isNotEmpty || referredPoints.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                if (referrerPoints.isNotEmpty)
+                  Expanded(
+                    child: _ReferralRewardPill(
+                      title: 'Tú ganas',
+                      value: '$referrerPoints pts',
+                    ),
+                  ),
+                if (referrerPoints.isNotEmpty && referredPoints.isNotEmpty)
+                  const SizedBox(width: AppSpacing.sm),
+                if (referredPoints.isNotEmpty)
+                  Expanded(
+                    child: _ReferralRewardPill(
+                      title: 'Tu referido',
+                      value: '$referredPoints pts',
+                    ),
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
+          ],
+          const SizedBox(height: AppSpacing.lg),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm + AppSpacing.xxs,
-            ),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: AppRadius.tile,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            child: Text(
-              referrals.code.isEmpty ? referrals.link : referrals.code,
-              style: const TextStyle(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.3,
+              color: Colors.white.withValues(alpha: 0.07),
+              borderRadius: AppRadius.large,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
               ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Link para compartir',
+                  style: TextStyle(
+                    color: AppColors.textOnDarkMuted,
+                    fontSize: AppTextSize.label,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                SelectableText(
+                  referralLink,
+                  style: const TextStyle(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w900,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -492,9 +590,14 @@ class _ReferralInviteCard extends StatelessWidget {
                   onPressed: onCopy,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
+                    minimumSize: const Size.fromHeight(
+                      AppSpacing.actionHeight,
+                    ),
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.24),
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.tile,
+                      borderRadius: AppRadius.large,
                     ),
                   ),
                   icon: const Icon(Icons.copy_rounded),
@@ -509,8 +612,11 @@ class _ReferralInviteCard extends StatelessWidget {
                     backgroundColor: AppColors.secondary,
                     foregroundColor: AppColors.primary,
                     elevation: 0,
+                    minimumSize: const Size.fromHeight(
+                      AppSpacing.actionHeight,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.tile,
+                      borderRadius: AppRadius.large,
                     ),
                   ),
                   icon: const Icon(Icons.ios_share_rounded),
@@ -522,30 +628,51 @@ class _ReferralInviteCard extends StatelessWidget {
           if (referrals.metrics.total > 0) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
-              '${referrals.metrics.rewarded} premiado(s) de ${referrals.metrics.total} referido(s).',
+              '${referrals.metrics.rewarded} premiado(s). ${referrals.metrics.total} invitacion(es) en seguimiento.',
               style: const TextStyle(color: Colors.white70),
             ),
           ],
           if (referrals.asReferred == null) ...[
             const SizedBox(height: AppSpacing.lg),
+            const Text(
+              '¿Te invitaron?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: applyController,
               textCapitalization: TextCapitalization.characters,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Tengo un codigo de referido',
+                hintText: 'Tengo un código de referido',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.08),
                 border: OutlineInputBorder(
-                  borderRadius: AppRadius.tile,
+                  borderRadius: AppRadius.large,
                   borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.large,
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: AppRadius.large,
+                  borderSide: BorderSide(color: AppColors.secondary),
                 ),
                 suffixIcon: TextButton(
                   onPressed: onApplyCode,
                   child: const Text(
                     'Aplicar',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -565,20 +692,81 @@ class _ReferralInviteCard extends StatelessWidget {
     );
   }
 
+  String _formatRewardPoints(double value) {
+    if (value <= 0) return '';
+    if ((value - value.roundToDouble()).abs() < 0.00001) {
+      return value.round().toString();
+    }
+
+    return value
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
   String _statusLabel(String status) {
     switch (status) {
       case 'registered':
+        return 'Tu referido está vinculado. Falta que abra la app, reserve y facture su primera cita.';
       case 'app_installed':
-        return 'Tu referido esta vinculado. Falta crear y facturar la primera cita.';
+        return 'Tu referido ya abrió la app. Falta que reserve y facture su primera cita.';
       case 'appointment_created':
-        return 'Ya tienes una cita referida. El premio se libera al facturarla.';
+        return 'Tu referido ya reservó. El premio se libera cuando la cita sea facturada.';
       case 'rewarded':
         return 'Referido premiado correctamente.';
       case 'reversed':
-        return 'El premio fue reversado por anulacion de factura.';
+        return 'El premio fue reversado por anulación de factura.';
       default:
         return 'Referido en seguimiento.';
     }
+  }
+}
+
+class _ReferralRewardPill extends StatelessWidget {
+  final String title;
+  final String value;
+
+  const _ReferralRewardPill({
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withValues(alpha: 0.12),
+        borderRadius: AppRadius.large,
+        border: Border.all(
+          color: AppColors.secondary.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textOnDarkMuted,
+              fontSize: AppTextSize.label,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.secondary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

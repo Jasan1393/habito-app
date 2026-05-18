@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/errors/friendly_errors.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/habito_shop_api.dart';
 import '../models/cart_validation.dart';
@@ -805,6 +806,7 @@ class ShopProvider extends ChangeNotifier {
     }
 
     _scopeOrdersToToken(token);
+    final orderLineCount = _cartItems.length;
     _isCreatingOrder = true;
     _checkoutError = null;
     notifyListeners();
@@ -880,8 +882,27 @@ class ShopProvider extends ChangeNotifier {
       _cartItems.clear();
       _resetCartContextIfEmpty();
       unawaited(_clearPersistedCart());
+      unawaited(
+        AnalyticsService.logOrderCreated(
+          itemCount: orderLineCount,
+          fulfillmentMethod: fulfillmentMethod.payloadValue,
+          paymentMethod: paymentMethod.id,
+          total: selectedOrderTotal,
+          redeemedPoints: redeemPoints,
+        ),
+      );
       return order;
     } catch (e) {
+      unawaited(
+        AnalyticsService.logFailure(
+          'order_create',
+          error: e,
+          parameters: {
+            'item_count': orderLineCount,
+            'fulfillment_method': fulfillmentMethod.payloadValue,
+          },
+        ),
+      );
       _checkoutError = FriendlyErrors.checkout(e);
       return null;
     } finally {
@@ -921,8 +942,18 @@ class ShopProvider extends ChangeNotifier {
         ..clear()
         ..addAll(mergedOrders);
       _paymentProofError = null;
+      unawaited(
+        AnalyticsService.logPaymentProofUploaded(orderId: orderId),
+      );
       return true;
     } catch (e) {
+      unawaited(
+        AnalyticsService.logFailure(
+          'payment_proof_upload',
+          error: e,
+          parameters: {'order_id': orderId},
+        ),
+      );
       _paymentProofError = FriendlyErrors.paymentProof(e);
       return false;
     } finally {

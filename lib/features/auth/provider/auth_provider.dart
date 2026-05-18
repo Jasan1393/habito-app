@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../bookings/presentation/pages/my_appointments_page.dart';
 import '../../shop/data/services/habito_booking_api.dart';
@@ -66,6 +67,7 @@ class AuthProvider extends ChangeNotifier {
         }
 
         await PushNotificationService.registerToken(authToken: savedToken);
+        await _identifyAnalyticsUser(_user);
       }
     } catch (_) {
       _error = 'No se pudo restaurar la sesión.';
@@ -84,6 +86,8 @@ class AuthProvider extends ChangeNotifier {
       final result = await _api.login(email: email, password: password);
       await _persistSession(result.token, result.user);
       await _refreshProfileAfterAuth(result.token);
+      await _identifyAnalyticsUser(_user);
+      await AnalyticsService.logLogin();
       return true;
     });
   }
@@ -125,6 +129,13 @@ class AuthProvider extends ChangeNotifier {
       );
       await _persistSession(result.token, result.user);
       await _refreshProfileAfterAuth(result.token);
+      await _identifyAnalyticsUser(_user);
+      await AnalyticsService.logSignUp(
+        hasReferral: referralCode.trim().isNotEmpty,
+      );
+      if (referralCode.trim().isNotEmpty) {
+        await AnalyticsService.logReferralCodeApplied(source: 'register');
+      }
       return true;
     });
   }
@@ -186,6 +197,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = updatedUser;
       await _storage.saveSession(token: currentToken, user: updatedUser);
+      await _identifyAnalyticsUser(updatedUser);
       return true;
     });
   }
@@ -247,6 +259,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = updatedUser;
       await _storage.saveSession(token: currentToken, user: updatedUser);
+      await _identifyAnalyticsUser(updatedUser);
 
       if (enabled) {
         await PushNotificationService.registerToken(authToken: currentToken);
@@ -408,6 +421,17 @@ class AuthProvider extends ChangeNotifier {
     PushNotificationService.clearSession();
     HabitoBookingApi.clearMyBookingsCache();
     MyAppointmentsPage.clearCachedState();
+    await _identifyAnalyticsUser(null);
+  }
+
+  Future<void> _identifyAnalyticsUser(AuthUser? user) {
+    return AnalyticsService.identifyUser(
+      userId: user?.id,
+      hasAmeliaLink: ((user?.ameliaCustomerId ?? 0) > 0),
+      hasWooLink: ((user?.wooCustomerId ?? 0) > 0),
+      contactType: user?.contactType ?? 'unknown',
+      pointsEnabled: user?.pointsEnabled ?? false,
+    );
   }
 
   bool _hasPendingAmeliaSync(AuthUser user) {

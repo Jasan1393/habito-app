@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/constants/ecuador_data.dart';
+import '../../../../core/services/analytics_service.dart';
 import '../../../../core/services/location_launcher_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
@@ -2120,6 +2121,18 @@ END:VCALENDAR
       final String backendLocationName =
           (response['location_name'] ?? location['name'] ?? '').toString();
 
+      unawaited(
+        AnalyticsService.logBookingCreated(
+          serviceId: serviceId,
+          employeeId: employeeId,
+          locationId: locationId,
+          paymentMethod: selectedPaymentMethod.id,
+          total: _getGrandTotalPrice(),
+          redeemedPoints: redeemPoints,
+          birthdayPoints: birthdayBonusPoints,
+        ),
+      );
+
       if (redeemPoints > 0 || birthdayBonusPoints > 0) {
         unawaited(authProvider.refreshProfile());
         unawaited(pointsProvider.refresh());
@@ -2155,6 +2168,12 @@ END:VCALENDAR
             birthdayBonusPoints > 0 ? birthdayVerificationNotice : null,
       );
     } catch (e) {
+      unawaited(
+        AnalyticsService.logFailure(
+          'booking_create',
+          error: e,
+        ),
+      );
       if (!mounted) return;
       _showMessage('No se pudo crear la reserva: ${_friendlyBookingError(e)}');
     } finally {

@@ -112,14 +112,18 @@ class ReferralProgress {
 
 class ReferralMetrics {
   final int total;
+  final int linkOpened;
   final int registered;
+  final int appInstalled;
   final int appointmentCreated;
   final int rewarded;
   final int reversed;
 
   const ReferralMetrics({
     required this.total,
+    required this.linkOpened,
     required this.registered,
+    required this.appInstalled,
     required this.appointmentCreated,
     required this.rewarded,
     required this.reversed,
@@ -128,7 +132,9 @@ class ReferralMetrics {
   factory ReferralMetrics.empty() {
     return const ReferralMetrics(
       total: 0,
+      linkOpened: 0,
       registered: 0,
+      appInstalled: 0,
       appointmentCreated: 0,
       rewarded: 0,
       reversed: 0,
@@ -138,7 +144,10 @@ class ReferralMetrics {
   factory ReferralMetrics.fromJson(Map<String, dynamic> json) {
     return ReferralMetrics(
       total: _parseInt(json['total']) ?? 0,
+      linkOpened: _parseInt(json['link_opened'] ?? json['linkOpened']) ?? 0,
       registered: _parseInt(json['registered']) ?? 0,
+      appInstalled:
+          _parseInt(json['app_installed'] ?? json['appInstalled']) ?? 0,
       appointmentCreated: _parseInt(
             json['appointment_created'] ?? json['appointmentCreated'],
           ) ??

@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/navigation/app_navigator.dart';
 import 'core/routes/app_routes.dart';
+import 'core/services/analytics_service.dart';
 import 'core/services/app_logger.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/referral_link_service.dart';
@@ -19,6 +23,28 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  try {
+    await AnalyticsService.initialize();
+  } catch (e, stackTrace) {
+    AppLogger.error(
+      'Error inicializando AnalyticsService',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(AnalyticsService.recordFlutterError(details, fatal: true));
+  };
+
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    unawaited(
+      AnalyticsService.recordError(error, stackTrace, fatal: true),
+    );
+    return true;
+  };
 
   try {
     await PushNotificationService.initialize();
@@ -60,6 +86,7 @@ class HabitoApp extends StatelessWidget {
         title: 'Hábito',
         debugShowCheckedModeBanner: false,
         navigatorKey: appNavigatorKey,
+        navigatorObservers: [AnalyticsService.observer],
         theme: AppTheme.lightTheme,
         initialRoute: AppRoutes.main,
         routes: AppRoutes.routes,

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/errors/friendly_errors.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../auth/models/auth_user.dart';
 import '../data/services/points_api.dart';
 import '../models/birthday_promotion_summary.dart';
@@ -294,8 +295,13 @@ class PointsProvider extends ChangeNotifier {
 
     try {
       _referrals = await _api.applyReferral(token: token, code: code);
+      await AnalyticsService.logReferralCodeApplied(source: 'points_page');
       return true;
     } catch (e) {
+      await AnalyticsService.logFailure(
+        'referral_apply',
+        error: e,
+      );
       _error = FriendlyErrors.points(e);
       return false;
     } finally {
