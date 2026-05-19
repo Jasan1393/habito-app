@@ -15,6 +15,7 @@ import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_error_state.dart';
 import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../auth/provider/auth_provider.dart';
+import '../../../bookings/presentation/pages/bookings_page.dart';
 import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
@@ -142,6 +143,11 @@ class _PointsPageState extends State<PointsPage> {
           final moduleEnabled =
               summary?.enabled ?? authUser?.pointsEnabled ?? false;
           final history = points.history;
+          final birthdayPromotion = points.birthdayPromotion;
+          final showBirthdayBonus = moduleEnabled &&
+              (birthdayPromotion?.enabled ?? false) &&
+              (birthdayPromotion?.active ?? false) &&
+              (birthdayPromotion?.pointsAvailable ?? 0) > 0;
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -166,6 +172,23 @@ class _PointsPageState extends State<PointsPage> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
+                if (showBirthdayBonus) ...[
+                  _BirthdayBonusCard(
+                    pointsText: birthdayPromotion!.pointsFormatted,
+                    expiresAt: birthdayPromotion.expiresAt,
+                    verificationNotice:
+                        birthdayPromotion.verificationNotice.trim(),
+                    onReserve: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BookingsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
+                ],
                 if ((points.referrals?.enabled ?? false) &&
                     (points.referrals?.link ?? '').isNotEmpty) ...[
                   _ReferralInviteCard(
@@ -436,6 +459,138 @@ class _PointsBalanceHero extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _BirthdayBonusCard extends StatelessWidget {
+  final String pointsText;
+  final String? expiresAt;
+  final String verificationNotice;
+  final VoidCallback onReserve;
+
+  const _BirthdayBonusCard({
+    required this.pointsText,
+    required this.expiresAt,
+    required this.verificationNotice,
+    required this.onReserve,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final expiresLabel = _formatExpiry(expiresAt);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.secondary,
+            AppColors.goldLight,
+          ],
+        ),
+        borderRadius: AppRadius.display,
+        boxShadow: AppShadows.medium,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: AppRadius.full,
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.14),
+              ),
+            ),
+            child: const Text(
+              'Bono de cumpleaños activo',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            '$pointsText puntos para reservar',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: AppTextSize.headlineLarge,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            expiresLabel == null
+                ? 'Usa este beneficio únicamente en reservas durante tu cumpleaños.'
+                : 'Disponible hasta $expiresLabel. Úsalo únicamente en reservas.',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: AppTextSize.bodyStrong,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (verificationNotice.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.42),
+                borderRadius: AppRadius.large,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Text(
+                verificationNotice,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  height: 1.35,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          ElevatedButton.icon(
+            onPressed: onReserve,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              minimumSize: const Size.fromHeight(AppSpacing.actionHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadius.large,
+              ),
+            ),
+            icon: const Icon(Icons.calendar_month_rounded),
+            label: const Text('Reservar con mi bono'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String? _formatExpiry(String? rawValue) {
+    final raw = rawValue?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final normalized = raw.contains('T') ? raw : raw.replaceFirst(' ', 'T');
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed == null) return raw;
+
+    final day = parsed.day.toString().padLeft(2, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    return '$day/$month/${parsed.year}';
   }
 }
 

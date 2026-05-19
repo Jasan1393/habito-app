@@ -29,5 +29,9 @@
 -keep class com.baseflow.geolocator.** { *; }
 -dontwarn com.baseflow.geolocator.**
 
+# Meta / Facebook App Events.
+-keep class com.facebook.** { *; }
+-dontwarn com.facebook.**
+
 # Mantener clases nativas propias referenciadas desde AndroidManifest.
 -keep class com.habitobarberia.app.** { *; }

@@ -17,6 +17,18 @@ if (hasReleaseKeystore) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
+val facebookAppId = providers.gradleProperty("FACEBOOK_APP_ID").orNull
+    ?: System.getenv("FACEBOOK_APP_ID")
+    ?: ""
+val facebookClientToken = providers.gradleProperty("FACEBOOK_CLIENT_TOKEN").orNull
+    ?: System.getenv("FACEBOOK_CLIENT_TOKEN")
+    ?: ""
+val facebookLoginProtocolScheme = if (facebookAppId.isNotBlank()) {
+    "fb$facebookAppId"
+} else {
+    "fb"
+}
+
 android {
     namespace = "com.habitobarberia.app"
     compileSdk = flutter.compileSdkVersion
@@ -40,6 +52,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        resValue("string", "facebook_app_id", facebookAppId)
+        resValue("string", "facebook_client_token", facebookClientToken)
+        resValue("string", "fb_login_protocol_scheme", facebookLoginProtocolScheme)
     }
 
     signingConfigs {

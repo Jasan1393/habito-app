@@ -33,6 +33,7 @@ dependencies:
   shared_preferences: ^2.5.5
   firebase_analytics: ^11.6.0
   firebase_crashlytics: ^4.3.10
+  facebook_app_events: ^0.27.2
 
 dev_dependencies:
   flutter_test:

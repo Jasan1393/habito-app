@@ -1,3 +1,4 @@
+import 'package:facebook_app_events/facebook_app_events.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -8,12 +9,22 @@ class AnalyticsService {
   static final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
   static final FirebaseAnalyticsObserver observer =
       FirebaseAnalyticsObserver(analytics: analytics);
+  static final FacebookAppEvents _facebook = FacebookAppEvents();
 
   static const bool _forceCrashlyticsInDebug =
       bool.fromEnvironment('HABITO_CRASHLYTICS_DEBUG');
+  static const bool _facebookEventsEnabled =
+      bool.fromEnvironment('HABITO_FACEBOOK_EVENTS_ENABLED');
+  static const bool _facebookAdTrackingEnabled =
+      bool.fromEnvironment('HABITO_FACEBOOK_AD_TRACKING_ENABLED');
+  static const String _facebookAppId =
+      String.fromEnvironment('HABITO_FACEBOOK_APP_ID');
+  static const String _currency = 'USD';
 
   static Future<void> initialize() async {
     await analytics.setAnalyticsCollectionEnabled(true);
+    await _initializeFacebook();
+
     if (kIsWeb) return;
 
     await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
@@ -31,6 +42,8 @@ class AnalyticsService {
     final analyticsUserId = userId != null && userId > 0 ? '$userId' : null;
 
     await analytics.setUserId(id: analyticsUserId);
+    await _syncFacebookUser(analyticsUserId);
+
     if (!kIsWeb) {
       await FirebaseCrashlytics.instance.setUserIdentifier(
         analyticsUserId ?? '',
@@ -59,17 +72,30 @@ class AnalyticsService {
     ]);
   }
 
-  static Future<void> logLogin({String method = 'email'}) {
-    return analytics.logLogin(loginMethod: method);
+  static Future<void> logLogin({String method = 'email'}) async {
+    final safeMethod = _safeText(method);
+    await Future.wait([
+      analytics.logLogin(loginMethod: safeMethod),
+      _logFacebookEvent('login', parameters: {'method': safeMethod}),
+    ]);
   }
 
   static Future<void> logSignUp({
     String method = 'email',
     bool hasReferral = false,
-  }) {
-    return analytics.logSignUp(
-      signUpMethod: hasReferral ? '${method}_referral' : method,
-    );
+  }) async {
+    final signUpMethod = hasReferral ? '${method}_referral' : method;
+    final safeMethod = _safeText(signUpMethod);
+
+    await Future.wait([
+      analytics.logSignUp(signUpMethod: safeMethod),
+      _safeFacebook(
+        () => _facebook.logCompletedRegistration(
+          registrationMethod: safeMethod,
+          parameters: {'has_referral': hasReferral ? 1 : 0},
+        ),
+      ),
+    ]);
   }
 
   static Future<void> logReferralCodeSaved({
@@ -110,6 +136,7 @@ class AnalyticsService {
         'redeemed_points': redeemedPoints.round(),
         'birthday_points': birthdayPoints.round(),
       },
+      facebookValueToSum: _roundMoney(total),
     );
   }
 
@@ -129,6 +156,7 @@ class AnalyticsService {
         'value': _roundMoney(total),
         'redeemed_points': redeemedPoints.round(),
       },
+      facebookValueToSum: _roundMoney(total),
     );
   }
 
@@ -180,11 +208,84 @@ class AnalyticsService {
   static Future<void> logEvent(
     String name, {
     Map<String, Object?> parameters = const {},
+    double? facebookValueToSum,
+  }) async {
+    final safeName = _safeEventName(name);
+    final sanitized = _sanitizeParameters(parameters);
+
+    await Future.wait([
+      analytics.logEvent(name: safeName, parameters: sanitized),
+      _logFacebookEvent(
+        safeName,
+        parameters: sanitized,
+        valueToSum: facebookValueToSum,
+      ),
+    ]);
+  }
+
+  static bool get _isFacebookAvailable => !kIsWeb && _facebookEventsEnabled;
+
+  static Future<void> _initializeFacebook() async {
+    if (!_isFacebookAvailable) return;
+
+    final appId = _facebookAppId.trim();
+    if (appId.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+          'Meta App Events disabled: missing HABITO_FACEBOOK_APP_ID.',
+        );
+      }
+      return;
+    }
+
+    await _safeFacebook(() async {
+      await _facebook.setGraphApiVersion('v24.0');
+      await _facebook.setAdvertiserTracking(
+        enabled: _facebookAdTrackingEnabled,
+        collectId: _facebookAdTrackingEnabled,
+      );
+      await _facebook.setAutoLogAppEventsEnabled(true);
+      await _facebook.activateApp(applicationId: appId);
+    });
+  }
+
+  static Future<void> _syncFacebookUser(String? userId) {
+    return _safeFacebook(() {
+      if (userId == null) return _facebook.clearUserID();
+      return _facebook.setUserID(userId);
+    });
+  }
+
+  static Future<void> _logFacebookEvent(
+    String name, {
+    Map<String, Object?> parameters = const {},
+    double? valueToSum,
   }) {
-    return analytics.logEvent(
-      name: name,
-      parameters: _sanitizeParameters(parameters),
-    );
+    return _safeFacebook(() {
+      final sanitized = _sanitizeParameters(parameters);
+      if (valueToSum != null) {
+        sanitized[FacebookAppEvents.paramNameCurrency] = _currency;
+      }
+
+      return _facebook.logEvent(
+        name: _safeEventName(name),
+        parameters: sanitized,
+        valueToSum: valueToSum,
+      );
+    });
+  }
+
+  static Future<void> _safeFacebook(Future<void> Function() action) async {
+    if (!_isFacebookAvailable) return;
+
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Meta App Events ignored: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
   }
 
   static Map<String, Object> _sanitizeParameters(
@@ -203,6 +304,12 @@ class AnalyticsService {
       sanitized[key] = _safeText(text);
     });
     return sanitized;
+  }
+
+  static String _safeEventName(String value) {
+    final safeName = _safeText(value, fallback: 'app_event');
+    if (safeName.length <= 40) return safeName;
+    return safeName.substring(0, 40);
   }
 
   static String _safeText(String value, {String fallback = 'unknown'}) {
