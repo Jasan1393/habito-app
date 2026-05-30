@@ -41,13 +41,13 @@ class EcuadorIdValidator {
     if (type == 'cedula') {
       final digits = digitsOnly(text);
       if (!_hasOnlyDigits(text)) {
-        return 'La cedula debe contener solo numeros.';
+        return 'La cédula debe contener solo números.';
       }
       if (digits.length != 10) {
-        return 'La cedula debe tener 10 digitos.';
+        return 'La cédula debe tener 10 dígitos.';
       }
       if (!isValidCedula(text)) {
-        return 'La cedula ingresada no es valida.';
+        return 'La cédula ingresada no es válida.';
       }
       return null;
     }
@@ -55,10 +55,10 @@ class EcuadorIdValidator {
     if (type == 'ruc') {
       final digits = digitsOnly(text);
       if (!_hasOnlyDigits(text)) {
-        return 'El RUC debe contener solo numeros.';
+        return 'El RUC debe contener solo números.';
       }
       if (digits.length != 13) {
-        return 'El RUC debe tener 13 digitos.';
+        return 'El RUC debe tener 13 dígitos.';
       }
       if (!isValidRuc(text)) {
         return 'El RUC ingresado no es valido.';

@@ -62,7 +62,7 @@ class PointsRedemptionResult {
         : 'este pedido';
 
     if (!state.enabled || !state.redeemEnabled || !contextEnabled) {
-      return 'El canje de $lowerLabel no esta disponible para $contextLabel.';
+      return 'El canje de $lowerLabel no está disponible para $contextLabel.';
     }
 
     if (total <= 0) {
@@ -72,7 +72,7 @@ class PointsRedemptionResult {
     }
 
     if (state.balance <= 0) {
-      return 'Aun no tienes $lowerLabel disponibles para aplicar en $contextLabel.';
+      return 'Aún no tienes $lowerLabel disponibles para aplicar en $contextLabel.';
     }
 
     if (pointsToUse <= 0) {

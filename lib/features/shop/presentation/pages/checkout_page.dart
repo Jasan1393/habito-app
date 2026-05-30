@@ -680,7 +680,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Inicia sesion para confirmar tu pedido.'),
+          content: Text('Inicia sesión para confirmar tu pedido.'),
         ),
       );
       return;
@@ -747,7 +747,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               content: Text(
                 quote.message.isNotEmpty
                     ? quote.message
-                    : 'Tus puntos ya no estan disponibles para este pedido.',
+                    : 'Tus puntos ya no están disponibles para este pedido.',
               ),
             ),
           );
@@ -2590,7 +2590,7 @@ class _ShippingAddressForm extends StatelessWidget {
             ),
             validator: (value) => FormValidators.requiredMaxLength(
               value,
-              field: 'la direccion de entrega',
+              field: 'la dirección de entrega',
             ),
           ),
           const SizedBox(height: AppSpacing.md),

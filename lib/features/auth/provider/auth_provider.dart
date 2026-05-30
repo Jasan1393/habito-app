@@ -246,7 +246,7 @@ class AuthProvider extends ChangeNotifier {
         currentToken.isEmpty ||
         currentUser == null ||
         !isLoggedIn) {
-      _error = 'Tu sesion ya no esta disponible.';
+      _error = 'Tu sesión ya no está disponible.';
       notifyListeners();
       return false;
     }
@@ -273,7 +273,7 @@ class AuthProvider extends ChangeNotifier {
     final currentToken = _token;
 
     if (currentToken == null || currentToken.isEmpty || !isLoggedIn) {
-      _error = 'Tu sesion ya no esta disponible.';
+      _error = 'Tu sesión ya no está disponible.';
       notifyListeners();
       return null;
     }

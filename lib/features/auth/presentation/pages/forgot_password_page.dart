@@ -79,7 +79,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Recuperar contrasena',
+          'Recuperar contraseña',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
@@ -157,7 +157,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         const Text(
-                          'Ingresa tu correo y te enviaremos un enlace para recuperar tu contrasena.',
+                          'Ingresa tu correo y te enviaremos un enlace para recuperar tu contraseña.',
                           style: TextStyle(
                             color: AppColors.textOnDarkMuted,
                             height: 1.45,

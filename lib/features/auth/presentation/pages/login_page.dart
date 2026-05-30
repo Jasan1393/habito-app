@@ -279,12 +279,12 @@ class _LoginPageState extends State<LoginPage> {
                               },
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Contrasena',
+                                label: 'Contraseña',
                                 icon: Icons.lock_outline_rounded,
                                 suffix: IconButton(
                                   tooltip: _obscurePassword
-                                      ? 'Mostrar contrasena'
-                                      : 'Ocultar contrasena',
+                                      ? 'Mostrar contraseña'
+                                      : 'Ocultar contraseña',
                                   onPressed: () {
                                     setState(() {
                                       _obscurePassword = !_obscurePassword;
@@ -300,8 +300,8 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               validator: (value) {
                                 final v = value ?? '';
-                                if (v.isEmpty) return 'Ingresa tu contrasena';
-                                if (v.length < 6) return 'Minimo 6 caracteres';
+                                if (v.isEmpty) return 'Ingresa tu contraseña';
+                                if (v.length < 6) return 'Mínimo 6 caracteres';
                                 return null;
                               },
                             ),
@@ -312,7 +312,7 @@ class _LoginPageState extends State<LoginPage> {
                                 onPressed:
                                     auth.isLoading ? null : _openForgotPassword,
                                 child: const Text(
-                                  'Olvide mi contrasena',
+                                  'Olvidé mi contraseña',
                                   style: TextStyle(
                                     color: gold,
                                     fontWeight: FontWeight.w700,
@@ -371,7 +371,7 @@ class _LoginPageState extends State<LoginPage> {
                               child: Column(
                                 children: [
                                   const Text(
-                                    'Aun no tienes cuenta?',
+                                    '¿Aún no tienes cuenta?',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: AppColors.textOnDarkMuted,

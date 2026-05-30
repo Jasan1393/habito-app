@@ -808,7 +808,7 @@ class HabitoShopApi {
       attempts: 1,
       idempotencyKey: newIdempotencyKey(prefix: 'habito-cart-validate'),
       timeoutMessage:
-          'No pudimos validar tu carrito a tiempo. Revisa tu conexion e intenta nuevamente.',
+          'No pudimos validar tu carrito a tiempo. Revisa tu conexión e intenta nuevamente.',
       connectionMessage:
           'No pudimos conectar para validar el carrito. Revisa tu internet e intenta nuevamente.',
     );

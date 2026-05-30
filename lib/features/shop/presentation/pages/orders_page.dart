@@ -414,7 +414,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       ),
                       const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
                       const Text(
-                        'Inicia sesion para ver tus pedidos',
+                        'Inicia sesión para ver tus pedidos',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: AppTextSize.headlineMedium,
@@ -424,7 +424,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       ),
                       const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
                       const Text(
-                        'Aqui veras el historial completo de compras realizadas en la tienda.',
+                        'Aquí verás el historial completo de compras realizadas en la tienda.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
@@ -457,7 +457,7 @@ class _OrdersPageState extends State<OrdersPage> {
                             ),
                           ),
                           child: const Text(
-                            'Iniciar sesion',
+                            'Iniciar sesión',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -647,13 +647,13 @@ extension _OrdersFilterInfo on _OrdersFilter {
   String get emptyMessage {
     switch (this) {
       case _OrdersFilter.all:
-        return 'Cuando completes una compra en la tienda, la veras aqui con todo su detalle.';
+        return 'Cuando completes una compra en la tienda, la verás aquí con todo su detalle.';
       case _OrdersFilter.active:
         return 'Aquí aparecerán los pedidos pendientes, en validación o en preparación.';
       case _OrdersFilter.completed:
         return 'Aqui se guardan las compras que ya terminaron correctamente.';
       case _OrdersFilter.closed:
-        return 'Aqui veras pedidos cancelados, fallidos o reembolsados.';
+        return 'Aquí verás pedidos cancelados, fallidos o reembolsados.';
     }
   }
 }

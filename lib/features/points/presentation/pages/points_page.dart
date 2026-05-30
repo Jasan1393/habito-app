@@ -88,9 +88,9 @@ class _PointsPageState extends State<PointsPage> {
           duration: const Duration(seconds: 2),
           content: Text(
             ok
-                ? 'Codigo de referido vinculado.'
+                ? 'Código de referido vinculado.'
                 : context.read<PointsProvider>().error ??
-                    'No pudimos vincular el codigo.',
+                    'No pudimos vincular el código.',
           ),
         ),
       );
@@ -783,7 +783,7 @@ class _ReferralInviteCard extends StatelessWidget {
           if (referrals.metrics.total > 0) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
-              '${referrals.metrics.rewarded} premiado(s). ${referrals.metrics.total} invitacion(es) en seguimiento.',
+              '${referrals.metrics.rewarded} premiado(s). ${referrals.metrics.total} invitación(es) en seguimiento.',
               style: const TextStyle(color: Colors.white70),
             ),
           ],

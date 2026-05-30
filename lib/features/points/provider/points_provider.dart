@@ -254,7 +254,7 @@ class PointsProvider extends ChangeNotifier {
   }) {
     final token = _token;
     if (token == null || token.isEmpty) {
-      throw Exception('Inicia sesion para usar tus puntos.');
+      throw Exception('Inicia sesión para usar tus puntos.');
     }
 
     return _api.quoteRedemption(
@@ -271,7 +271,7 @@ class PointsProvider extends ChangeNotifier {
   }) {
     final token = _token;
     if (token == null || token.isEmpty) {
-      throw Exception('Inicia sesion para usar tu bono de cumpleanos.');
+      throw Exception('Inicia sesión para usar tu bono de cumpleaños.');
     }
 
     return _api.quoteBirthdayBookingPromotion(
@@ -284,7 +284,7 @@ class PointsProvider extends ChangeNotifier {
   Future<bool> applyReferralCode(String code) async {
     final token = _token;
     if (token == null || token.isEmpty) {
-      _error = 'Inicia sesion para usar un codigo de referido.';
+      _error = 'Inicia sesión para usar un código de referido.';
       notifyListeners();
       return false;
     }

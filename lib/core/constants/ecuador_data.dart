@@ -26,7 +26,7 @@ const List<String> kEcuadorProvinces = <String>[
 ];
 
 const Map<String, String> kIdentificationTypeLabels = <String, String>{
-  'cedula': 'Cedula',
+  'cedula': 'Cédula',
   'ruc': 'RUC',
   'pasaporte': 'Pasaporte',
   'consumidor_final': 'Consumidor final',

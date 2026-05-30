@@ -1868,7 +1868,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                 ? 'No hay citas pendientes, pero si tienes reservas en otra categoria.'
                 : isFiltered
                     ? 'No hay citas pendientes para $filterLabel.'
-                    : 'Cuando hagas una nueva reserva, aparecera aqui.',
+                    : 'Cuando hagas una nueva reserva, aparecerá aquí.',
             suggestedTabIndex: suggestedTabIndex,
           );
         case 1:
@@ -1879,7 +1879,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                 ? 'No hay citas confirmadas ahora. Puedes revisar otra categoria.'
                 : isFiltered
                     ? 'No hay citas confirmadas para $filterLabel.'
-                    : 'Tus proximas citas confirmadas apareceran aqui.',
+                    : 'Tus próximas citas confirmadas aparecerán aquí.',
             suggestedTabIndex: suggestedTabIndex,
           );
         case 2:
@@ -1890,7 +1890,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
                 ? 'No hay citas historicas. Tus citas activas estan en otra categoria.'
                 : isFiltered
                     ? 'No hay citas historicas para $filterLabel.'
-                    : 'Las citas pasadas o cerradas se mostraran aqui.',
+                    : 'Las citas pasadas o cerradas se mostrarán aquí.',
             suggestedTabIndex: suggestedTabIndex,
           );
         default:

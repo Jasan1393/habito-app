@@ -506,13 +506,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             maxLength: FormValidators.longTextMaxLength,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: 'Direccion principal',
+                              label: 'Dirección principal',
                               icon: Icons.home_outlined,
                             ),
                             validator: (value) =>
                                 FormValidators.requiredMaxLength(
                               value,
-                              field: 'la direccion principal',
+                              field: 'la dirección principal',
                             ),
                           ),
                         ],
@@ -543,7 +543,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               label: 'Cumpleanos',
                               icon: Icons.cake_outlined,
                               suffix: IconButton(
-                                tooltip: 'Seleccionar fecha de cumpleanos',
+                                tooltip: 'Seleccionar fecha de cumpleaños',
                                 onPressed:
                                     auth.isLoading ? null : _pickBirthday,
                                 icon: const Icon(
@@ -556,7 +556,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               final raw = (value ?? '').trim();
                               if (raw.isEmpty) return null;
                               if (_parseDate(raw) == null) {
-                                return 'Usa una fecha valida';
+                                return 'Usa una fecha válida';
                               }
                               return null;
                             },

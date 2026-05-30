@@ -1084,7 +1084,7 @@ class _BookingsPageState extends State<BookingsPage> {
         _cityController.text.trim().isNotEmpty &&
         FormValidators.requiredMaxLength(
               _addressController.text,
-              field: 'la direccion principal',
+              field: 'la dirección principal',
             ) ==
             null;
   }
@@ -1880,7 +1880,7 @@ END:VCALENDAR
 
     final addressError = FormValidators.requiredMaxLength(
       _addressController.text,
-      field: 'la direccion principal',
+      field: 'la dirección principal',
     );
     if (addressError != null) {
       _showMessage(addressError);
@@ -1974,7 +1974,7 @@ END:VCALENDAR
           _showMessage(
             birthdayQuote.message.isNotEmpty
                 ? birthdayQuote.message
-                : 'Tu bono de cumpleanos ya no esta disponible.',
+                : 'Tu bono de cumpleaños ya no está disponible.',
           );
           return;
         }
@@ -2002,7 +2002,7 @@ END:VCALENDAR
           _showMessage(
             quote.message.isNotEmpty
                 ? quote.message
-                : 'Tus puntos ya no estan disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
+                : 'Tus puntos ya no están disponibles para esta reserva. Revisa tu saldo e intenta nuevamente.',
           );
           return;
         }
@@ -2030,7 +2030,7 @@ END:VCALENDAR
 
       if (_useBirthdayBonus && birthdayBonusPoints <= 0) {
         _showMessage(
-          'Tu bono de cumpleanos ya no esta disponible. Revisa tus puntos e intenta nuevamente.',
+          'Tu bono de cumpleaños ya no está disponible. Revisa tus puntos e intenta nuevamente.',
         );
         return;
       }
@@ -2353,7 +2353,7 @@ END:VCALENDAR
 
     if (_containsAny(lower, [
       'fecha/hora de la reserva es inválida',
-      'fecha/hora de la reserva es invalida',
+      'fecha/hora de la reserva es inválida',
       'booking_start',
       'fecha y hora',
     ])) {
@@ -3017,7 +3017,7 @@ END:VCALENDAR
                     SizedBox(width: AppSpacing.sm + AppSpacing.xxs),
                     Expanded(
                       child: Text(
-                        'Bono de cumpleanos disponible',
+                        'Bono de cumpleaños disponible',
                         style: TextStyle(
                           color: AppColors.goldDeep,
                           fontWeight: FontWeight.w900,
@@ -3073,7 +3073,7 @@ END:VCALENDAR
                 const SizedBox(height: AppSpacing.md),
                 _BookingPointsRedeemTile(
                   enabled: _useBirthdayBonus,
-                  pointsLabel: 'Puntos cumpleanos',
+                  pointsLabel: 'Puntos cumpleaños',
                   points: birthdayPointsToUse,
                   discount: birthdayDiscount,
                   total: totalPrice,
@@ -3612,7 +3612,7 @@ END:VCALENDAR
                         const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _addressController,
-                          label: 'Direccion principal',
+                          label: 'Dirección principal',
                           icon: Icons.home_outlined,
                           keyboardType: TextInputType.streetAddress,
                           textInputAction: TextInputAction.newline,
@@ -3721,7 +3721,7 @@ END:VCALENDAR
                           ),
                         if (birthdayDiscount > 0)
                           _infoLine(
-                            'Bono cumpleanos',
+                            'Bono cumpleaños',
                             '-${_formatCurrency(birthdayDiscount)}',
                           ),
                         if (pointsDiscount > 0)

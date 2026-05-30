@@ -121,7 +121,7 @@ class _RegisterPageState extends State<RegisterPage> {
             content: Text(
               referralCode.isEmpty
                   ? 'Cuenta creada correctamente.'
-                  : 'Cuenta creada correctamente. Tu invitacion quedo vinculada; los puntos se liberan al facturar la primera cita.',
+                  : 'Cuenta creada correctamente. Tu invitación quedó vinculada; los puntos se liberan al facturar la primera cita.',
             ),
           ),
         );
@@ -316,7 +316,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   return 'Selecciona tu fecha de nacimiento';
                                 }
                                 if (_parseDate(text) == null) {
-                                  return 'Usa una fecha valida';
+                                  return 'Usa una fecha válida';
                                 }
                                 return null;
                               },
@@ -548,13 +548,13 @@ class _RegisterPageState extends State<RegisterPage> {
                               maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Direccion principal',
+                                label: 'Dirección principal',
                                 icon: Icons.home_outlined,
                               ),
                               validator: (value) =>
                                   FormValidators.requiredMaxLength(
                                 value,
-                                field: 'la direccion principal',
+                                field: 'la dirección principal',
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xl),
@@ -567,15 +567,15 @@ class _RegisterPageState extends State<RegisterPage> {
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
                                 label: _referralCodeFromLink
-                                    ? 'Codigo de referido aplicado'
-                                    : 'Codigo de referido (opcional)',
+                                    ? 'Código de referido aplicado'
+                                    : 'Código de referido (opcional)',
                                 icon: Icons.diversity_3_outlined,
                               ),
                             ),
                             if (_referralCodeFromLink) ...[
                               const SizedBox(height: AppSpacing.sm),
                               const Text(
-                                'Codigo cargado desde tu invitacion. Se vinculara al crear tu cuenta.',
+                                'Código cargado desde tu invitación. Se vinculará al crear tu cuenta.',
                                 style: TextStyle(
                                   color: Colors.white70,
                                   fontSize: AppTextSize.bodySmall,
@@ -592,12 +592,12 @@ class _RegisterPageState extends State<RegisterPage> {
                               autofillHints: const [AutofillHints.newPassword],
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Contrasena',
+                                label: 'Contraseña',
                                 icon: Icons.lock_outline_rounded,
                                 suffix: IconButton(
                                   tooltip: _obscurePassword
-                                      ? 'Mostrar contrasena'
-                                      : 'Ocultar contrasena',
+                                      ? 'Mostrar contraseña'
+                                      : 'Ocultar contraseña',
                                   onPressed: () {
                                     setState(() {
                                       _obscurePassword = !_obscurePassword;
@@ -613,9 +613,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                               validator: (value) {
                                 final v = value ?? '';
-                                if (v.isEmpty) return 'Ingresa una contrasena';
+                                if (v.isEmpty) return 'Ingresa una contraseña';
                                 if (v.length < 8) {
-                                  return 'Minimo 8 caracteres';
+                                  return 'Mínimo 8 caracteres';
                                 }
                                 return null;
                               },
@@ -632,7 +632,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               },
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Confirmar contrasena',
+                                label: 'Confirmar contraseña',
                                 icon: Icons.lock_person_outlined,
                                 suffix: IconButton(
                                   tooltip: _obscureConfirmPassword
@@ -654,10 +654,10 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                               validator: (value) {
                                 if ((value ?? '').isEmpty) {
-                                  return 'Confirma tu contrasena';
+                                  return 'Confirma tu contraseña';
                                 }
                                 if (value != _passwordCtrl.text) {
-                                  return 'Las contrasenas no coinciden';
+                                  return 'Las contraseñas no coinciden';
                                 }
                                 return null;
                               },
