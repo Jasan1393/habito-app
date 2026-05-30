@@ -427,6 +427,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _identifyAnalyticsUser(AuthUser? user) {
     return AnalyticsService.identifyUser(
       userId: user?.id,
+      email: user?.email ?? '',
+      phone: user?.phone ?? '',
+      displayName: user?.displayName ?? '',
       hasAmeliaLink: ((user?.ameliaCustomerId ?? 0) > 0),
       hasWooLink: ((user?.wooCustomerId ?? 0) > 0),
       contactType: user?.contactType ?? 'unknown',

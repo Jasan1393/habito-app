@@ -74,22 +74,24 @@
 		<string>Selecciona una foto del comprobante para validar tu pedido en Hábito</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Usamos tu ubicación para mostrarte la sucursal de Hábito más cercana</string>
+		<key>NSUserTrackingUsageDescription</key>
+		<string>Usamos datos de publicidad para medir campañas y mejorar la experiencia de Hábito.</string>
 		<key>FacebookAppID</key>
-		<string>$(FACEBOOK_APP_ID)</string>
+		<string>13459473576995552</string>
 		<key>FacebookClientToken</key>
-		<string>$(FACEBOOK_CLIENT_TOKEN)</string>
+		<string>c4803e6b72a71152099e736c2f90bae8</string>
 		<key>FacebookDisplayName</key>
 		<string>Hábito Barbería</string>
 		<key>FacebookAutoLogAppEventsEnabled</key>
-		<false/>
+		<true/>
 		<key>FacebookAdvertiserIDCollectionEnabled</key>
-		<false/>
+		<true/>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>fb$(FACEBOOK_APP_ID)</string>
+					<string>fb13459473576995552</string>
 				</array>
 			</dict>
 		</array>

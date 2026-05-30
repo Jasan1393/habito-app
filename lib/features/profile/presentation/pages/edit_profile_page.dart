@@ -44,7 +44,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   String _contactType = 'individual';
   String _identificationType = 'cedula';
-  String _province = 'Guayas';
+  String _province = 'Azuay';
   String? _photoPath;
   bool _removePhoto = false;
 
@@ -60,12 +60,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _addressCtrl.text = user?.address ?? '';
     _businessNameCtrl.text = user?.businessName ?? '';
     _taxNumberCtrl.text = user?.taxNumber ?? '';
-    _cityCtrl.text = user?.city ?? '';
+    _cityCtrl.text =
+        (user?.city.trim().isNotEmpty ?? false) ? user!.city.trim() : 'Cuenca';
     _contactType = _normalizeContactType(user?.contactType);
     _identificationType =
         _normalizeIdentificationType(user?.identificationType);
     _province =
-        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Guayas';
+        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Azuay';
   }
 
   @override

@@ -38,7 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailCtrl = TextEditingController();
   final _businessNameCtrl = TextEditingController();
   final _taxNumberCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController(text: 'Cuenca');
   final _addressCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
@@ -46,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   String _contactType = 'individual';
   String _identificationType = 'cedula';
-  String _province = 'Guayas';
+  String _province = 'Azuay';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _referralCodeFromLink = false;

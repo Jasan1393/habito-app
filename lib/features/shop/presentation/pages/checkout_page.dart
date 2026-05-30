@@ -327,8 +327,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _isSubmittingCheckout = false;
   bool _usePoints = false;
   String _documentType = 'cedula';
-  String _selectedProvince = 'Guayas';
-  String _selectedCanton = 'Guayaquil';
+  String _selectedProvince = 'Azuay';
+  String _selectedCanton = 'Cuenca';
   String _selectedPaymentMethodId = ShopPaymentMethod.bankTransfer.id;
 
   @override
@@ -341,7 +341,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _documentType = _normalizeDocumentType(user?.identificationType);
     _documentController.text = user?.taxNumber ?? '';
     _selectedProvince =
-        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Guayas';
+        kEcuadorProvinces.contains(user?.province) ? user!.province : 'Azuay';
     _selectedCanton = _resolveInitialCanton(
       province: _selectedProvince,
       city: user?.city ?? '',

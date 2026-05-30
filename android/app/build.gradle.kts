@@ -9,6 +9,10 @@ plugins {
 
 import java.util.Properties
 
+fun truthy(value: String?): Boolean {
+    return value?.trim()?.lowercase() in setOf("1", "true", "yes", "y", "on", "si")
+}
+
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKeystore = keystorePropertiesFile.exists()
@@ -19,15 +23,45 @@ if (hasReleaseKeystore) {
 
 val facebookAppId = providers.gradleProperty("FACEBOOK_APP_ID").orNull
     ?: System.getenv("FACEBOOK_APP_ID")
-    ?: ""
+    ?: "13459473576995552"
 val facebookClientToken = providers.gradleProperty("FACEBOOK_CLIENT_TOKEN").orNull
     ?: System.getenv("FACEBOOK_CLIENT_TOKEN")
-    ?: ""
+    ?: "c4803e6b72a71152099e736c2f90bae8"
+val facebookEventsEnabled = truthy(
+    providers.gradleProperty("HABITO_FACEBOOK_EVENTS_ENABLED").orNull
+        ?: System.getenv("HABITO_FACEBOOK_EVENTS_ENABLED")
+        ?: "true"
+)
+val facebookAdTrackingEnabled = truthy(
+    providers.gradleProperty("HABITO_FACEBOOK_AD_TRACKING_ENABLED").orNull
+        ?: System.getenv("HABITO_FACEBOOK_AD_TRACKING_ENABLED")
+        ?: "true"
+)
 val facebookLoginProtocolScheme = if (facebookAppId.isNotBlank()) {
     "fb$facebookAppId"
 } else {
     "fb"
 }
+val tiktokAppId = providers.gradleProperty("TIKTOK_APP_ID").orNull
+    ?: System.getenv("TIKTOK_APP_ID")
+    ?: "7645715146475700242"
+val tiktokPackageAppId = providers.gradleProperty("TIKTOK_PACKAGE_APP_ID").orNull
+    ?: System.getenv("TIKTOK_PACKAGE_APP_ID")
+    ?: "com.habitobarberia.app"
+val tiktokAccessToken = providers.gradleProperty("TIKTOK_ACCESS_TOKEN").orNull
+    ?: System.getenv("TIKTOK_ACCESS_TOKEN")
+    ?: keystoreProperties.getProperty("tiktokAccessToken")
+    ?: ""
+val tiktokEventsEnabled = truthy(
+    providers.gradleProperty("HABITO_TIKTOK_EVENTS_ENABLED").orNull
+        ?: System.getenv("HABITO_TIKTOK_EVENTS_ENABLED")
+        ?: "true"
+)
+val tiktokAdTrackingEnabled = truthy(
+    providers.gradleProperty("HABITO_TIKTOK_AD_TRACKING_ENABLED").orNull
+        ?: System.getenv("HABITO_TIKTOK_AD_TRACKING_ENABLED")
+        ?: "true"
+)
 
 android {
     namespace = "com.habitobarberia.app"
@@ -55,6 +89,14 @@ android {
         resValue("string", "facebook_app_id", facebookAppId)
         resValue("string", "facebook_client_token", facebookClientToken)
         resValue("string", "fb_login_protocol_scheme", facebookLoginProtocolScheme)
+        resValue("string", "tiktok_app_id", tiktokAppId)
+        resValue("string", "tiktok_package_app_id", tiktokPackageAppId)
+        resValue("string", "tiktok_access_token", tiktokAccessToken)
+        resValue("string", "tiktok_events_enabled", tiktokEventsEnabled.toString())
+        resValue("string", "tiktok_ad_tracking_enabled", tiktokAdTrackingEnabled.toString())
+        manifestPlaceholders["facebookAutoInitEnabled"] = facebookEventsEnabled.toString()
+        manifestPlaceholders["facebookAutoLogEnabled"] = facebookEventsEnabled.toString()
+        manifestPlaceholders["facebookAdTrackingEnabled"] = facebookAdTrackingEnabled.toString()
     }
 
     signingConfigs {
@@ -87,6 +129,9 @@ android {
 
 dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("com.github.tiktok:tiktok-business-android-sdk:1.5.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.3.1")
+    implementation("androidx.lifecycle:lifecycle-common-java8:2.3.1")
     implementation("com.android.installreferrer:installreferrer:2.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

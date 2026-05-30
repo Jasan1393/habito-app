@@ -1,6 +1,10 @@
 # Meta / Facebook App Events
 
-La app ya tiene el SDK instalado y conectado al servicio central de analitica, pero queda apagado por defecto para no afectar releases existentes.
+La app ya tiene el SDK instalado y conectado al servicio central de analitica. Meta App Events queda activo por defecto con el App ID de Hábito:
+
+```text
+13459473576995552
+```
 
 ## Eventos Enviados
 
@@ -17,40 +21,40 @@ No se envia cedula, RUC, telefono, correo ni nombres a Meta. Solo se envia el ID
 
 ## Android
 
-Antes de compilar una version con Meta activo, define las credenciales de Meta:
+La version Android usa el App ID por defecto y activa eventos/ad tracking si no se pasan overrides:
 
 ```powershell
-$env:FACEBOOK_APP_ID="TU_FACEBOOK_APP_ID"
-$env:FACEBOOK_CLIENT_TOKEN="TU_FACEBOOK_CLIENT_TOKEN"
-flutter build appbundle --release `
-  --dart-define=HABITO_FACEBOOK_EVENTS_ENABLED=true `
-  --dart-define=HABITO_FACEBOOK_APP_ID=$env:FACEBOOK_APP_ID
+flutter build appbundle --release
 ```
 
-Si quieres habilitar recoleccion de Advertising ID para atribucion publicitaria:
+Puedes apagarlo o cambiar el App ID con `dart-define` si necesitas un build especial:
 
 ```powershell
 flutter build appbundle --release `
-  --dart-define=HABITO_FACEBOOK_EVENTS_ENABLED=true `
-  --dart-define=HABITO_FACEBOOK_AD_TRACKING_ENABLED=true `
-  --dart-define=HABITO_FACEBOOK_APP_ID=$env:FACEBOOK_APP_ID
+  --dart-define=HABITO_FACEBOOK_EVENTS_ENABLED=false
 ```
+
+El permiso `com.google.android.gms.permission.AD_ID` esta declarado porque `HABITO_FACEBOOK_AD_TRACKING_ENABLED` queda activo por defecto. En Google Play, la declaracion de ID de publicidad debe mantenerse como uso para publicidad o marketing.
+
+El `FACEBOOK_CLIENT_TOKEN` tambien queda configurado con el identificador de acceso del cliente de Meta. No uses la clave secreta de la app como client token.
 
 ## iOS
 
-Configura en Xcode las variables de build:
-
-- `FACEBOOK_APP_ID`
-- `FACEBOOK_CLIENT_TOKEN`
+El App ID y el client token tambien estan configurados en `Info.plist`.
 
 Y compila con:
 
 ```bash
-flutter build ipa --release \
-  --dart-define=HABITO_FACEBOOK_EVENTS_ENABLED=true \
-  --dart-define=HABITO_FACEBOOK_APP_ID="$FACEBOOK_APP_ID"
+flutter build ipa --release
 ```
 
 ## Modo Seguro
 
-Si no se pasan los `dart-define`, el SDK queda instalado pero no registra eventos. Esto permite seguir usando Firebase Analytics/Crashlytics normalmente.
+Para builds donde no quieres enviar eventos a Meta, compila con:
+
+```bash
+flutter build appbundle --release \
+  --dart-define=HABITO_FACEBOOK_EVENTS_ENABLED=false
+```
+
+Firebase Analytics/Crashlytics siguen funcionando aunque Meta este apagado.

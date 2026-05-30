@@ -33,5 +33,13 @@
 -keep class com.facebook.** { *; }
 -dontwarn com.facebook.**
 
+# TikTok Business SDK.
+-keep class com.tiktok.** { *; }
+-keep class com.android.billingclient.api.** { *; }
+-keep class androidx.lifecycle.** { *; }
+-dontwarn com.tiktok.**
+-dontwarn com.android.billingclient.api.**
+-dontwarn androidx.lifecycle.**
+
 # Mantener clases nativas propias referenciadas desde AndroidManifest.
 -keep class com.habitobarberia.app.** { *; }

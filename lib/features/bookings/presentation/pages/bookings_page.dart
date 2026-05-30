@@ -64,7 +64,8 @@ class _BookingsPageState extends State<BookingsPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _businessNameController = TextEditingController();
   final TextEditingController _taxNumberController = TextEditingController();
-  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _cityController =
+      TextEditingController(text: 'Cuenca');
   final TextEditingController _addressController = TextEditingController();
 
   List<Map<String, dynamic>> _services = [];
@@ -84,7 +85,7 @@ class _BookingsPageState extends State<BookingsPage> {
   String _selectedPaymentMethodId = ShopPaymentMethod.bankTransfer.id;
   String _contactType = 'individual';
   String _identificationType = 'cedula';
-  String _province = 'Guayas';
+  String _province = 'Azuay';
   DateTime? _selectedDate;
 
   bool _isLoading = true;
@@ -139,9 +140,34 @@ class _BookingsPageState extends State<BookingsPage> {
     _addressController.addListener(_refreshFormState);
 
     _prefillCustomerDataFromSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _redirectToLoginIfSessionMissing();
+    });
     _loadInitialData();
     Future.microtask(_loadPaymentMethods);
     Future.microtask(_loadPointsSummaryIfNeeded);
+  }
+
+  bool _hasValidBookingSession() {
+    final auth = context.read<AuthProvider>();
+    return auth.isLoggedIn &&
+        auth.user != null &&
+        (auth.token?.trim().isNotEmpty ?? false);
+  }
+
+  bool _requireBookingSession() {
+    if (_hasValidBookingSession()) return true;
+
+    _showMessage('Inicia sesión para reservar tu cita.');
+    Navigator.pushNamed(context, AppRoutes.login);
+    return false;
+  }
+
+  void _redirectToLoginIfSessionMissing() {
+    if (!mounted || _isEditing || _hasValidBookingSession()) return;
+
+    _showMessage('Inicia sesión para reservar tu cita.');
+    Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
   Future<void> _loadPointsSummaryIfNeeded() async {
@@ -197,7 +223,7 @@ class _BookingsPageState extends State<BookingsPage> {
         _identificationType = 'ruc';
       }
       _province =
-          kEcuadorProvinces.contains(user.province) ? user.province : 'Guayas';
+          kEcuadorProvinces.contains(user.province) ? user.province : 'Azuay';
 
       if (_businessNameController.text.trim().isEmpty &&
           user.businessName.trim().isNotEmpty) {
@@ -209,8 +235,10 @@ class _BookingsPageState extends State<BookingsPage> {
         _taxNumberController.text = user.taxNumber.trim();
       }
 
-      if (_cityController.text.trim().isEmpty && user.city.trim().isNotEmpty) {
+      if (user.city.trim().isNotEmpty) {
         _cityController.text = user.city.trim();
+      } else if (_cityController.text.trim().isEmpty) {
+        _cityController.text = 'Cuenca';
       }
 
       if (_addressController.text.trim().isEmpty &&
@@ -1834,6 +1862,8 @@ END:VCALENDAR
   Future<void> _confirmBooking() async {
     FocusScope.of(context).unfocus();
 
+    if (!_requireBookingSession()) return;
+
     if (_firstNameController.text.trim().isEmpty) {
       _showMessage('Ingresa el nombre de pila');
       return;
@@ -2044,8 +2074,8 @@ END:VCALENDAR
 
       final token = authProvider.token;
       final user = authProvider.user;
+      final authToken = token?.trim() ?? '';
 
-      final bool isLoggedIn = authProvider.isLoggedIn;
       final int? ameliaCustomerId = user?.ameliaCustomerId;
       final String firstNameToSend = _composeGivenNames(
         _firstNameController.text,
@@ -2055,7 +2085,7 @@ END:VCALENDAR
       final String emailToSend = _emailController.text.trim();
       final String phoneToSend = _phoneController.text.trim();
 
-      if (isLoggedIn && (token == null || token.trim().isEmpty)) {
+      if (!authProvider.isLoggedIn || user == null || authToken.isEmpty) {
         throw Exception(
           'La sesión está activa pero no se encontró el token de autenticación.',
         );
@@ -2093,7 +2123,7 @@ END:VCALENDAR
         locationId: locationId,
         bookingStart: _formatApiDateTime(selectedDate, selectedTime),
         duration: totalDuration > 0 ? totalDuration : 3600,
-        authToken: (token != null && token.trim().isNotEmpty) ? token : null,
+        authToken: authToken,
         extras: selectedExtras,
         paymentMethod: selectedPaymentMethod,
         redeemPoints: redeemPoints,

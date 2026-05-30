@@ -297,27 +297,43 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
-                    GridView.builder(
-                      itemCount: _barbers.length,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: 0.42,
-                      ),
-                      itemBuilder: (context, index) {
-                        final barber = _barbers[index];
-                        final isSelected = widget.selectedBarberId != null &&
-                            barber['id'] == widget.selectedBarberId;
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final crossAxisCount = width >= 900
+                            ? 3
+                            : width >= 560
+                                ? 2
+                                : 1;
+                        final isTabletGrid = width >= 560;
+                        final imageHeight = isTabletGrid ? 210.0 : 190.0;
+                        final cardHeight = isTabletGrid ? 500.0 : 475.0;
 
-                        return _BarberCard(
-                          barber: barber,
-                          isSelected: isSelected,
-                          onTapProfile: () => _openBarberProfile(barber),
-                          onTapReserve: () => _goToBooking(barber),
+                        return GridView.builder(
+                          itemCount: _barbers.length,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            mainAxisSpacing: AppSpacing.md,
+                            crossAxisSpacing: AppSpacing.md,
+                            mainAxisExtent: cardHeight,
+                          ),
+                          itemBuilder: (context, index) {
+                            final barber = _barbers[index];
+                            final isSelected =
+                                widget.selectedBarberId != null &&
+                                    barber['id'] == widget.selectedBarberId;
+
+                            return _BarberCard(
+                              barber: barber,
+                              imageHeight: imageHeight,
+                              isSelected: isSelected,
+                              onTapProfile: () => _openBarberProfile(barber),
+                              onTapReserve: () => _goToBooking(barber),
+                            );
+                          },
                         );
                       },
                     ),
@@ -329,12 +345,14 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
 
 class _BarberCard extends StatelessWidget {
   final Map<String, dynamic> barber;
+  final double imageHeight;
   final bool isSelected;
   final VoidCallback onTapProfile;
   final VoidCallback onTapReserve;
 
   const _BarberCard({
     required this.barber,
+    required this.imageHeight,
     required this.onTapProfile,
     required this.onTapReserve,
     this.isSelected = false,
@@ -377,7 +395,7 @@ class _BarberCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: AppRadius.large,
                       child: SizedBox(
-                        height: 136,
+                        height: imageHeight,
                         width: double.infinity,
                         child: imageUrl.isNotEmpty
                             ? HabitoCachedNetworkImage(

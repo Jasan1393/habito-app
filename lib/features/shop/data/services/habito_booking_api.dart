@@ -544,6 +544,11 @@ class HabitoBookingApi {
     double birthdayBonusPoints = 0,
     double birthdayBonusAmount = 0,
   }) async {
+    final normalizedAuthToken = authToken?.trim() ?? '';
+    if (normalizedAuthToken.isEmpty) {
+      throw Exception('Inicia sesión para crear tu reserva.');
+    }
+
     final uri = Uri.parse('$baseUrl/bookings');
 
     final normalizedExtras = extras
@@ -630,6 +635,21 @@ class HabitoBookingApi {
       } else if (customer['externalId'] != null) {
         normalizedCustomer['external_id'] = customer['externalId'];
       }
+
+      for (final key in <String>[
+        'middle_name',
+        'contact_type',
+        'identification_type',
+        'tax_number',
+        'province',
+        'city',
+        'address',
+        'business_name',
+      ]) {
+        if (customer[key] != null) {
+          normalizedCustomer[key] = customer[key];
+        }
+      }
     }
 
     if ((firstName ?? '').trim().isNotEmpty) {
@@ -674,9 +694,7 @@ class HabitoBookingApi {
       return false;
     });
 
-    final headers = authToken != null && authToken.trim().isNotEmpty
-        ? _jsonAuthHeaders(authToken)
-        : _jsonHeaders();
+    final headers = _jsonAuthHeaders(normalizedAuthToken);
 
     final requestBody = jsonEncode(body);
 
@@ -1638,13 +1656,6 @@ class HabitoBookingApi {
 
   static Map<String, String> _defaultHeaders() {
     return {
-      'Accept': 'application/json',
-    };
-  }
-
-  static Map<String, String> _jsonHeaders() {
-    return {
-      'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
   }
