@@ -29,7 +29,10 @@ class _TeamHabitoHomeSectionState extends State<TeamHabitoHomeSection> {
   @override
   void initState() {
     super.initState();
-    _loadBarbers();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadBarbers();
+    });
   }
 
   int? _safeInt(dynamic value) {

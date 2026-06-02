@@ -24,16 +24,6 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  try {
-    await AnalyticsService.initialize();
-  } catch (e, stackTrace) {
-    AppLogger.error(
-      'Error inicializando AnalyticsService',
-      error: e,
-      stackTrace: stackTrace,
-    );
-  }
-
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     unawaited(AnalyticsService.recordFlutterError(details, fatal: true));
@@ -46,19 +36,45 @@ Future<void> main() async {
     return true;
   };
 
+  runApp(const HabitoApp());
+  _initializeDeferredStartupServices();
+}
+
+void _initializeDeferredStartupServices() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(() async {
+      try {
+        await AnalyticsService.initialize();
+      } catch (e, stackTrace) {
+        AppLogger.error(
+          'Error inicializando AnalyticsService',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      }
+
+      await Future.wait([
+        _initializePushNotifications(),
+        _initializeReferralLinks(),
+      ]);
+    }());
+  });
+}
+
+Future<void> _initializePushNotifications() async {
   try {
     await PushNotificationService.initialize();
   } catch (e) {
     AppLogger.error('Error inicializando PushNotificationService', error: e);
   }
+}
 
+Future<void> _initializeReferralLinks() async {
   try {
     await ReferralLinkService.initialize();
   } catch (e) {
     AppLogger.error('Error inicializando ReferralLinkService', error: e);
   }
-
-  runApp(const HabitoApp());
 }
 
 class HabitoApp extends StatelessWidget {

@@ -79,13 +79,11 @@ class _AuthGatePageState extends State<AuthGatePage>
 
   Future<void> _bootstrapSession() async {
     final auth = context.read<AuthProvider>();
-    final hasSavedSession = await auth.hasSavedSession();
-
     await auth.init();
 
     if (!mounted) return;
 
-    if (hasSavedSession && auth.isLoggedIn) {
+    if (auth.restoredSavedSession && auth.isLoggedIn) {
       if (auth.biometricEnabled && auth.biometricAvailable) {
         setState(() {
           _needsBiometricGate = true;

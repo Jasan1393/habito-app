@@ -30,8 +30,11 @@ class AuthProvider extends ChangeNotifier {
   String? _error;
   bool _biometricEnabled = true;
   bool _biometricAvailable = false;
+  bool _restoredSavedSession = false;
+  bool _isSessionRestoreTasksRunning = false;
   DateTime? _lastPendingSyncRetryAt;
   bool _isPendingSyncRepairRunning = false;
+  bool _isDisposed = false;
 
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
@@ -41,6 +44,7 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get biometricEnabled => _biometricEnabled;
   bool get biometricAvailable => _biometricAvailable;
+  bool get restoredSavedSession => _restoredSavedSession;
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -60,16 +64,8 @@ class AuthProvider extends ChangeNotifier {
         _token = savedToken;
         _user = savedUser;
 
-        try {
-          final refreshedUser = await _api.getProfile(savedToken);
-          _user = refreshedUser;
-          await _storage.saveSession(token: savedToken, user: refreshedUser);
-        } catch (_) {
-          // Si falla el refresh, mantenemos la sesión local existente.
-        }
-
-        await PushNotificationService.registerToken(authToken: savedToken);
-        await _identifyAnalyticsUser(_user);
+        _restoredSavedSession = true;
+        _runSessionRestoreTasksInBackground(savedToken);
       }
     } catch (_) {
       _error = 'No se pudo restaurar la sesión.';
@@ -78,6 +74,52 @@ class AuthProvider extends ChangeNotifier {
       _isInitialized = true;
       notifyListeners();
     }
+  }
+
+  void _runSessionRestoreTasksInBackground(String token) {
+    if (_isSessionRestoreTasksRunning) return;
+
+    _isSessionRestoreTasksRunning = true;
+    unawaited(() async {
+      var shouldNotify = false;
+
+      try {
+        final refreshedUser = await _api.getProfile(token);
+        if (_token == token && _user != null) {
+          _user = refreshedUser;
+          await _storage.saveSession(token: token, user: refreshedUser);
+          shouldNotify = true;
+        }
+      } catch (_) {
+        // Si falla el refresh, mantenemos la sesion local existente.
+      }
+
+      try {
+        await PushNotificationService.registerToken(authToken: token);
+      } catch (_) {
+        // No critico: el proximo login o refresh volvera a registrarlo.
+      }
+
+      try {
+        if (_token == token) {
+          await _identifyAnalyticsUser(_user);
+        }
+      } catch (_) {
+        // Analytics no debe bloquear ni invalidar la sesion restaurada.
+      } finally {
+        _isSessionRestoreTasksRunning = false;
+      }
+
+      if (shouldNotify && !_isDisposed) {
+        notifyListeners();
+      }
+    }());
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 
   Future<bool> login({
@@ -362,6 +404,8 @@ class AuthProvider extends ChangeNotifier {
     _token = null;
     _user = null;
     _error = null;
+    _restoredSavedSession = false;
+    _isSessionRestoreTasksRunning = false;
     _lastPendingSyncRetryAt = null;
     _isPendingSyncRepairRunning = false;
     PushNotificationService.clearSession();
@@ -395,6 +439,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _persistSession(String token, AuthUser user) async {
     _token = token;
     _user = user;
+    _restoredSavedSession = false;
     await _storage.saveSession(token: token, user: user);
     _registerPushTokenInBackground(token);
   }
@@ -448,6 +493,8 @@ class AuthProvider extends ChangeNotifier {
     _token = null;
     _user = null;
     _error = null;
+    _restoredSavedSession = false;
+    _isSessionRestoreTasksRunning = false;
     _lastPendingSyncRetryAt = null;
     _isPendingSyncRepairRunning = false;
 

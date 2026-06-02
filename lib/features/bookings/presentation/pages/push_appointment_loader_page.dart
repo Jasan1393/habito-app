@@ -39,11 +39,8 @@ class _PushAppointmentLoaderPageState extends State<PushAppointmentLoaderPage> {
   Future<void> _openAppointment() async {
     final auth = context.read<AuthProvider>();
 
-    if (!auth.isLoggedIn) {
-      final hasSaved = await auth.hasSavedSession();
-      if (hasSaved) {
-        await auth.init();
-      }
+    if (!auth.isLoggedIn && !auth.isInitialized) {
+      await auth.init();
     }
 
     if (!mounted) return;
