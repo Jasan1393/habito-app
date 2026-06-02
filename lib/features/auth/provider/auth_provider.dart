@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/analytics_service.dart';
@@ -85,9 +87,10 @@ class AuthProvider extends ChangeNotifier {
     return _runAuthAction(() async {
       final result = await _api.login(email: email, password: password);
       await _persistSession(result.token, result.user);
-      await _refreshProfileAfterAuth(result.token);
-      await _identifyAnalyticsUser(_user);
-      await AnalyticsService.logLogin();
+      _runPostAuthTasks(
+        token: result.token,
+        action: _PostAuthAction.login,
+      );
       return true;
     });
   }
@@ -109,6 +112,8 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     String referralCode = '',
   }) async {
+    final hasReferral = referralCode.trim().isNotEmpty;
+
     return _runAuthAction(() async {
       final result = await _api.register(
         firstName: firstName,
@@ -128,14 +133,11 @@ class AuthProvider extends ChangeNotifier {
         referralCode: referralCode,
       );
       await _persistSession(result.token, result.user);
-      await _refreshProfileAfterAuth(result.token);
-      await _identifyAnalyticsUser(_user);
-      await AnalyticsService.logSignUp(
-        hasReferral: referralCode.trim().isNotEmpty,
+      _runPostAuthTasks(
+        token: result.token,
+        action: _PostAuthAction.register,
+        hasReferral: hasReferral,
       );
-      if (referralCode.trim().isNotEmpty) {
-        await AnalyticsService.logReferralCodeApplied(source: 'register');
-      }
       return true;
     });
   }
@@ -394,7 +396,42 @@ class AuthProvider extends ChangeNotifier {
     _token = token;
     _user = user;
     await _storage.saveSession(token: token, user: user);
-    await PushNotificationService.registerToken(authToken: token);
+    _registerPushTokenInBackground(token);
+  }
+
+  void _registerPushTokenInBackground(String token) {
+    unawaited(() async {
+      try {
+        await PushNotificationService.registerToken(authToken: token);
+      } catch (_) {
+        // El token push se puede reintentar luego; no debe frenar el login.
+      }
+    }());
+  }
+
+  void _runPostAuthTasks({
+    required String token,
+    required _PostAuthAction action,
+    bool hasReferral = false,
+  }) {
+    unawaited(() async {
+      try {
+        await _refreshProfileAfterAuth(token);
+        await _identifyAnalyticsUser(_user);
+
+        if (action == _PostAuthAction.register) {
+          await AnalyticsService.logSignUp(hasReferral: hasReferral);
+
+          if (hasReferral) {
+            await AnalyticsService.logReferralCodeApplied(source: 'register');
+          }
+        } else {
+          await AnalyticsService.logLogin();
+        }
+      } catch (_) {
+        // Las tareas post-auth no deben bloquear el acceso del usuario.
+      }
+    }());
   }
 
   Future<void> _refreshProfileAfterAuth(String token) async {
@@ -447,3 +484,5 @@ class AuthProvider extends ChangeNotifier {
         (missingAmeliaId && syncStatus != 'linked');
   }
 }
+
+enum _PostAuthAction { login, register }

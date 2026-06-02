@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -7,6 +9,7 @@ import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../auth/provider/auth_provider.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
 import '../pages/team_habito_page.dart';
@@ -530,7 +533,21 @@ class _BarberProfileModal extends StatelessWidget {
                   height: 48,
                   child: ElevatedButton(
                     onPressed: () {
+                      final auth = context.read<AuthProvider>();
                       Navigator.pop(context);
+
+                      if (!auth.isLoggedIn) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Inicia sesión para reservar tu cita.'),
+                            ),
+                          );
+                        Navigator.pushNamed(context, AppRoutes.login);
+                        return;
+                      }
 
                       Navigator.push(
                         context,

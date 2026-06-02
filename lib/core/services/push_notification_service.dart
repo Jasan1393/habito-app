@@ -55,6 +55,8 @@ class PushNotificationService {
       'Actualizaciones sobre el estado de tus reservas';
   static const String _deviceFileName = 'push_device_id.txt';
   static const String _pushImageFolderName = 'push_images';
+  static const String _androidNotificationIcon =
+      '@drawable/ic_stat_habito_notification';
 
   static String? _currentAuthToken;
   static String? _cachedDeviceId;
@@ -95,7 +97,7 @@ class PushNotificationService {
       sound: true,
     );
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings(_androidNotificationIcon);
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -218,7 +220,7 @@ class PushNotificationService {
       channelDescription: _channelDesc,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: _androidNotificationIcon,
       styleInformation: imagePath != null
           ? BigPictureStyleInformation(
               FilePathAndroidBitmap(imagePath),

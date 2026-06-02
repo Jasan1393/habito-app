@@ -28,6 +28,19 @@ class HomePage extends StatelessWidget {
   }
 
   void _openBookings(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Inicia sesión para reservar tu cita.'),
+          ),
+        );
+      Navigator.pushNamed(context, AppRoutes.login);
+      return;
+    }
+
     Navigator.pushNamed(context, AppRoutes.bookings);
   }
 

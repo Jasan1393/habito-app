@@ -332,128 +332,93 @@ class _PointsBalanceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: AppRadius.display,
-      child: Stack(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.darkPanel,
+          ],
+        ),
+        borderRadius: AppRadius.display,
+        border: Border.all(
+          color: AppColors.secondary.withValues(alpha: 0.22),
+        ),
+        boxShadow: AppShadows.strong,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: -44,
-            right: -28,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.secondary.withValues(alpha: 0.12),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -58,
-            left: -38,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.06),
-              ),
-            ),
-          ),
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primary,
-                  AppColors.darkPanel,
-                  AppColors.primarySoft,
-                ],
-              ),
-              border: Border.all(
-                color: AppColors.secondary.withValues(alpha: 0.18),
-              ),
-              borderRadius: AppRadius.display,
-              boxShadow: AppShadows.strong,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.12),
+              borderRadius: AppRadius.full,
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.14),
-                        borderRadius: AppRadius.full,
-                        border: Border.all(
-                          color: AppColors.secondary.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.stars_rounded,
-                            size: AppIconSize.sm,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                const Icon(
+                  Icons.stars_rounded,
+                  size: AppIconSize.sm,
+                  color: AppColors.secondary,
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  spacing: AppSpacing.sm,
-                  children: [
-                    Text(
-                      balanceText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: AppTextSize.headlineLarge + AppSpacing.sm,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: AppColors.textOnDarkMuted,
-                          fontSize: AppTextSize.titleSmall,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
-                  message,
+                  title,
                   style: const TextStyle(
-                    color: AppColors.textOnDarkMuted,
-                    height: 1.45,
-                    fontSize: AppTextSize.bodyStrong,
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              Text(
+                balanceText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: AppTextSize.headlineLarge + AppSpacing.sm,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textOnDarkMuted,
+                    fontSize: AppTextSize.titleSmall,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.textOnDarkMuted,
+              height: 1.45,
+              fontSize: AppTextSize.bodyStrong,
             ),
           ),
         ],
@@ -616,234 +581,297 @@ class _ReferralInviteCard extends StatelessWidget {
     final referrerPoints = _formatRewardPoints(referrals.referrerPoints);
     final referredPoints = _formatRewardPoints(referrals.referredPoints);
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
-            AppColors.darkPanel,
-          ],
-        ),
-        borderRadius: AppRadius.display,
-        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.16)),
-        boxShadow: AppShadows.strong,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackContent = constraints.maxWidth < 420;
+        final referrerValue = referrerPoints.isEmpty
+            ? 'Beneficio configurado'
+            : '$referrerPoints pts';
+        final referredValue = referredPoints.isEmpty
+            ? 'Beneficio configurado'
+            : '$referredPoints pts';
+        final rewardRow = stackContent
+            ? Column(
+                children: [
+                  _ReferralRewardPill(
+                    title: 'Tú ganas',
+                    value: referrerValue,
+                    subtitle: 'Cuando su primera cita sea facturada.',
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _ReferralRewardPill(
+                    title: 'Tu referido',
+                    value: referredValue,
+                    subtitle: 'Al completar su primera cita.',
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: _ReferralRewardPill(
+                      title: 'Tú ganas',
+                      value: referrerValue,
+                      subtitle: 'Cuando su primera cita sea facturada.',
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _ReferralRewardPill(
+                      title: 'Tu referido',
+                      value: referredValue,
+                      subtitle: 'Al completar su primera cita.',
+                    ),
+                  ),
+                ],
+              );
+        final copyButton = OutlinedButton.icon(
+          onPressed: onCopy,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(AppSpacing.actionHeight),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.28),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.large,
+            ),
+          ),
+          icon: const Icon(Icons.copy_rounded),
+          label: const Text('Copiar enlace'),
+        );
+        final shareButton = ElevatedButton.icon(
+          onPressed: onShare,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary,
+            foregroundColor: AppColors.primary,
+            elevation: 0,
+            minimumSize: const Size.fromHeight(AppSpacing.actionHeight),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.large,
+            ),
+          ),
+          icon: const Icon(Icons.ios_share_rounded),
+          label: const Text('Compartir'),
+        );
+
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary,
+                AppColors.darkPanel,
+              ],
+            ),
+            borderRadius: AppRadius.display,
+            border: Border.all(
+              color: AppColors.secondary.withValues(alpha: 0.22),
+            ),
+            boxShadow: AppShadows.strong,
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: AppIconSize.xxl,
-                height: AppIconSize.xxl,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.14),
-                  borderRadius: AppRadius.large,
+                  color: AppColors.secondary.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.full,
                   border: Border.all(
-                    color: AppColors.secondary.withValues(alpha: 0.18),
+                    color: AppColors.secondary.withValues(alpha: 0.22),
                   ),
                 ),
-                child: const Icon(
-                  Icons.group_add_rounded,
-                  color: AppColors.secondary,
-                  size: AppIconSize.lg,
+                child: const Text(
+                  'Programa de referidos',
+                  style: TextStyle(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              const Expanded(
+              const SizedBox(height: AppSpacing.lg),
+              const Text(
+                'Invita y gana',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: AppTextSize.section,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Comparte tu enlace personal. Cuando tu referido se registre, reserve y facture su primera cita, ambos reciben beneficios.',
+                style: TextStyle(
+                  color: AppColors.textOnDarkMuted,
+                  height: 1.42,
+                  fontSize: AppTextSize.bodyStrong,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              rewardRow,
+              const SizedBox(height: AppSpacing.lg),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  borderRadius: AppRadius.large,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Invita y gana',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: AppTextSize.section,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Comparte tu link personal. Cuando tu referido se registre, reserve y facture su primera cita, ambos ganan.',
+                    const Text(
+                      'Tu enlace para compartir',
                       style: TextStyle(
                         color: AppColors.textOnDarkMuted,
-                        height: 1.4,
-                        fontSize: AppTextSize.bodyStrong,
+                        fontSize: AppTextSize.label,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    SelectableText(
+                      referralLink,
+                      style: const TextStyle(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w900,
+                        height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          if (referrerPoints.isNotEmpty || referredPoints.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                if (referrerPoints.isNotEmpty)
-                  Expanded(
-                    child: _ReferralRewardPill(
-                      title: 'Tú ganas',
-                      value: '$referrerPoints pts',
+              const SizedBox(height: AppSpacing.md),
+              if (stackContent)
+                Column(
+                  children: [
+                    SizedBox(width: double.infinity, child: copyButton),
+                    const SizedBox(height: AppSpacing.sm),
+                    SizedBox(width: double.infinity, child: shareButton),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(child: copyButton),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: shareButton),
+                  ],
+                ),
+              if (referrals.metrics.total > 0) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: AppRadius.large,
+                  ),
+                  child: Text(
+                    '${referrals.metrics.rewarded} premiado(s). ${referrals.metrics.total} invitación(es) en seguimiento.',
+                    style: const TextStyle(
+                      color: AppColors.textOnDarkMuted,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
                     ),
                   ),
-                if (referrerPoints.isNotEmpty && referredPoints.isNotEmpty)
-                  const SizedBox(width: AppSpacing.sm),
-                if (referredPoints.isNotEmpty)
-                  Expanded(
-                    child: _ReferralRewardPill(
-                      title: 'Tu referido',
-                      value: '$referredPoints pts',
-                    ),
-                  ),
+                ),
               ],
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.07),
-              borderRadius: AppRadius.large,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              if (referrals.asReferred == null) ...[
+                const SizedBox(height: AppSpacing.lg),
                 const Text(
-                  'Link para compartir',
+                  '¿Te invitaron?',
                   style: TextStyle(
-                    color: AppColors.textOnDarkMuted,
-                    fontSize: AppTextSize.label,
-                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: AppTextSize.bodyStrong,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                SelectableText(
-                  referralLink,
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: applyController,
+                  textCapitalization: TextCapitalization.characters,
                   style: const TextStyle(
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.w900,
-                    height: 1.35,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Tengo un código de referido',
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.08),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.inputVertical,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.large,
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.large,
+                      borderSide: BorderSide(
+                        color: AppColors.secondary.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    focusedBorder: const OutlineInputBorder(
+                      borderRadius: AppRadius.large,
+                      borderSide: BorderSide(color: AppColors.secondary),
+                    ),
+                    suffixIconConstraints: const BoxConstraints(
+                      minWidth: 88,
+                      minHeight: AppSpacing.actionHeight,
+                    ),
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: AppSpacing.xs),
+                      child: TextButton(
+                        onPressed: onApplyCode,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        child: const Text('Aplicar'),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.large,
+                    border: Border.all(
+                      color: AppColors.secondary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    _statusLabel(referrals.asReferred!.status),
+                    style: const TextStyle(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onCopy,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(
-                      AppSpacing.actionHeight,
-                    ),
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.24),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.large,
-                    ),
-                  ),
-                  icon: const Icon(Icons.copy_rounded),
-                  label: const Text('Copiar'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onShare,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.primary,
-                    elevation: 0,
-                    minimumSize: const Size.fromHeight(
-                      AppSpacing.actionHeight,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.large,
-                    ),
-                  ),
-                  icon: const Icon(Icons.ios_share_rounded),
-                  label: const Text('Compartir'),
-                ),
-              ),
             ],
           ),
-          if (referrals.metrics.total > 0) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              '${referrals.metrics.rewarded} premiado(s). ${referrals.metrics.total} invitación(es) en seguimiento.',
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ],
-          if (referrals.asReferred == null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            const Text(
-              '¿Te invitaron?',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: applyController,
-              textCapitalization: TextCapitalization.characters,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Tengo un código de referido',
-                hintStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.08),
-                border: OutlineInputBorder(
-                  borderRadius: AppRadius.large,
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppRadius.large,
-                  borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                ),
-                focusedBorder: const OutlineInputBorder(
-                  borderRadius: AppRadius.large,
-                  borderSide: BorderSide(color: AppColors.secondary),
-                ),
-                suffixIcon: TextButton(
-                  onPressed: onApplyCode,
-                  child: const Text(
-                    'Aplicar',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              _statusLabel(referrals.asReferred!.status),
-              style: const TextStyle(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -880,19 +908,19 @@ class _ReferralInviteCard extends StatelessWidget {
 class _ReferralRewardPill extends StatelessWidget {
   final String title;
   final String value;
+  final String subtitle;
 
   const _ReferralRewardPill({
     required this.title,
     required this.value,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.secondary.withValues(alpha: 0.12),
         borderRadius: AppRadius.large,
@@ -916,7 +944,17 @@ class _ReferralRewardPill extends StatelessWidget {
             value,
             style: const TextStyle(
               color: AppColors.secondary,
+              fontSize: AppTextSize.titleSmall,
               fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: AppColors.textOnDarkMuted,
+              fontSize: AppTextSize.label,
+              height: 1.28,
             ),
           ),
         ],

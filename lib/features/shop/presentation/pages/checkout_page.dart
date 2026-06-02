@@ -666,7 +666,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (_isSubmittingCheckout || shop.isCreatingOrder) return;
 
-    if (!_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null) {
+      _showMissingCheckoutInfo([
+        'espera a que se carguen los datos de facturacion',
+      ]);
+      return;
+    }
+
+    if (!formState.validate()) {
       _showMissingCheckoutInfo(['revisa los datos marcados en rojo']);
       return;
     }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/routes/app_routes.dart';
@@ -22,11 +24,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _isLoading = true;
   _NotificationListFilter _selectedFilter = _NotificationListFilter.all;
   int _deleteSnackBarSerial = 0;
+  Timer? _deleteSnackBarTimer;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
+      _deleteSnackBarController;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_load);
+  }
+
+  @override
+  void dispose() {
+    _deleteSnackBarTimer?.cancel();
+    _deleteSnackBarController?.close();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -66,8 +78,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (!mounted || !showUndo) return;
 
     final snackBarSerial = ++_deleteSnackBarSerial;
-    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    messenger.showSnackBar(
+    _deleteSnackBarTimer?.cancel();
+    _deleteSnackBarController?.close();
+
+    final messenger = ScaffoldMessenger.of(context)..clearSnackBars();
+    late final ScaffoldFeatureController<SnackBar, SnackBarClosedReason>
+        controller;
+
+    controller = messenger.showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
@@ -75,7 +93,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         action: SnackBarAction(
           label: 'Deshacer',
           onPressed: () async {
-            messenger.hideCurrentSnackBar();
+            _deleteSnackBarTimer?.cancel();
+            controller.close();
             await NotificationInboxService.record(
               title: (snapshot['title'] ?? 'Hábito').toString(),
               body: (snapshot['body'] ?? '').toString(),
@@ -91,9 +110,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
     );
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted || snackBarSerial != _deleteSnackBarSerial) return;
-      messenger.hideCurrentSnackBar(reason: SnackBarClosedReason.timeout);
+    _deleteSnackBarController = controller;
+    _deleteSnackBarTimer = Timer(const Duration(seconds: 3), () {
+      if (snackBarSerial != _deleteSnackBarSerial) return;
+      controller.close();
+    });
+
+    controller.closed.whenComplete(() {
+      if (_deleteSnackBarController != controller) return;
+      _deleteSnackBarTimer?.cancel();
+      _deleteSnackBarTimer = null;
+      _deleteSnackBarController = null;
     });
   }
 
