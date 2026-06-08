@@ -13,10 +13,12 @@ import '../../../../core/utils/uuid.dart';
 class HabitoBookingApi {
   static const String baseUrl = AppConfig.apiBaseUrl;
   static const _timeout = AppConfig.bookingTimeout;
+  static const _availabilityTimeout = AppConfig.availabilityTimeout;
   static const _myBookingsTimeout = AppConfig.myBookingsTimeout;
   static const _retryDelay = Duration(milliseconds: 650);
   static const _catalogRetryDelay = Duration(milliseconds: 450);
   static const _availabilityCacheTtl = Duration(seconds: 45);
+  static const _myBookingsCacheTtl = Duration(seconds: 60);
 
   // ── Caché en memoria ────────────────────────────────────────────────────────
   static const _cacheTtl = Duration(minutes: 10);
@@ -35,6 +37,9 @@ class HabitoBookingApi {
   static Future<void>? _employeesRefreshFuture;
   static Future<void>? _locationsRefreshFuture;
   static final Map<String, _AvailabilityCacheEntry> _availabilityCache = {};
+  static final Map<String, _MyBookingsCacheEntry> _myBookingsCache = {};
+  static final Map<String, Future<Map<String, dynamic>>> _myBookingsInflight =
+      {};
 
   static bool _isCacheFresh(DateTime? cachedAt) {
     if (cachedAt == null) return false;
@@ -58,6 +63,7 @@ class HabitoBookingApi {
     _employeesRefreshFuture = null;
     _locationsRefreshFuture = null;
     _clearAvailabilityCache();
+    clearMyBookingsCache();
     unawaited(_deleteCacheFile());
   }
 
@@ -93,8 +99,8 @@ class HabitoBookingApi {
   }
 
   static void clearMyBookingsCache() {
-    // La versión actual no mantiene una caché separada de mis reservas.
-    // Conservamos este método para permitir limpieza centralizada de sesión.
+    _myBookingsCache.clear();
+    _myBookingsInflight.clear();
   }
 
   static Future<List<dynamic>> getCachedServices() async {
@@ -423,8 +429,8 @@ class HabitoBookingApi {
     final data = await _getDecodedWithRetry(
       uri,
       headers: _defaultHeaders(),
-      timeout: _timeout,
-      attempts: 3,
+      timeout: _availabilityTimeout,
+      attempts: 2,
       retryDelay: _retryDelay,
       timeoutMessage:
           'No pudimos actualizar los horarios a tiempo. Revisa tu conexión e intenta nuevamente.',
@@ -719,6 +725,7 @@ class HabitoBookingApi {
     final normalized = _normalizeCreatedBookingResponse(payload, data);
 
     _clearAvailabilityCache();
+    clearMyBookingsCache();
 
     return {
       'success': true,
@@ -751,6 +758,7 @@ class HabitoBookingApi {
     }
 
     _clearAvailabilityCache();
+    clearMyBookingsCache();
   }
 
   static Future<Map<String, dynamic>> rescheduleAppointment({
@@ -778,6 +786,7 @@ class HabitoBookingApi {
     }
 
     _clearAvailabilityCache();
+    clearMyBookingsCache();
 
     return data['data'] is Map<String, dynamic>
         ? Map<String, dynamic>.from(data['data'])
@@ -822,6 +831,7 @@ class HabitoBookingApi {
     int page = 1,
     bool includeRaw = false,
     String view = 'all',
+    bool forceRefresh = false,
   }) async {
     final normalizedView = _normalizeView(view);
 
@@ -836,10 +846,60 @@ class HabitoBookingApi {
       queryParameters['status'] = status.trim();
     }
 
+    final cacheKey = _myBookingsCacheKey(
+      token: token,
+      status: status,
+      limit: limit,
+      page: page,
+      includeRaw: includeRaw,
+      view: normalizedView,
+    );
+    if (forceRefresh) {
+      _myBookingsCache.remove(cacheKey);
+      _myBookingsInflight.remove(cacheKey);
+    }
+
+    final cached = _myBookingsCache[cacheKey];
+    if (!forceRefresh && cached != null && cached.isFresh) {
+      return _cloneJsonMap(cached.data);
+    }
+
+    final inflight = _myBookingsInflight[cacheKey];
+    if (!forceRefresh && inflight != null) {
+      return _cloneJsonMap(await inflight);
+    }
+
     final uri = Uri.parse('$baseUrl/my-bookings').replace(
       queryParameters: queryParameters,
     );
 
+    final future = _fetchMyBookings(
+      uri: uri,
+      token: token,
+      page: page,
+      limit: limit,
+      includeRaw: includeRaw,
+      normalizedView: normalizedView,
+    );
+    _myBookingsInflight[cacheKey] = future;
+
+    try {
+      final result = await future;
+      _myBookingsCache[cacheKey] = _MyBookingsCacheEntry(result);
+      return _cloneJsonMap(result);
+    } finally {
+      _myBookingsInflight.remove(cacheKey);
+    }
+  }
+
+  static Future<Map<String, dynamic>> _fetchMyBookings({
+    required Uri uri,
+    required String token,
+    required int page,
+    required int limit,
+    required bool includeRaw,
+    required String normalizedView,
+  }) async {
     final data = await _getDecodedWithRetry(
       uri,
       headers: _authHeaders(token),
@@ -876,6 +936,28 @@ class HabitoBookingApi {
       'items': items,
       'raw': payload,
     };
+  }
+
+  static String _myBookingsCacheKey({
+    required String token,
+    required String? status,
+    required int limit,
+    required int page,
+    required bool includeRaw,
+    required String view,
+  }) {
+    return [
+      token.trim(),
+      status?.trim().toLowerCase() ?? '',
+      limit,
+      page,
+      includeRaw ? 1 : 0,
+      view,
+    ].join('|');
+  }
+
+  static Map<String, dynamic> _cloneJsonMap(Map<String, dynamic> value) {
+    return jsonDecode(jsonEncode(value)) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> _getDecodedWithRetry(
@@ -2015,4 +2097,16 @@ class _AvailabilityCacheEntry {
     required this.data,
     required this.cachedAt,
   });
+}
+
+class _MyBookingsCacheEntry {
+  final Map<String, dynamic> data;
+  final DateTime cachedAt;
+
+  _MyBookingsCacheEntry(this.data) : cachedAt = DateTime.now();
+
+  bool get isFresh {
+    return DateTime.now().difference(cachedAt) <
+        HabitoBookingApi._myBookingsCacheTtl;
+  }
 }

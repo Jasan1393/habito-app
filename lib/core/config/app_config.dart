@@ -31,6 +31,11 @@ class AppConfig {
     defaultValue: 20,
   );
 
+  static const int availabilityTimeoutSeconds = int.fromEnvironment(
+    'HABITO_AVAILABILITY_TIMEOUT_SECONDS',
+    defaultValue: 12,
+  );
+
   static const int myBookingsTimeoutSeconds = int.fromEnvironment(
     'HABITO_MY_BOOKINGS_TIMEOUT_SECONDS',
     defaultValue: 35,
@@ -44,6 +49,9 @@ class AppConfig {
   static const Duration authTimeout = Duration(seconds: authTimeoutSeconds);
   static const Duration bookingTimeout = Duration(
     seconds: bookingTimeoutSeconds,
+  );
+  static const Duration availabilityTimeout = Duration(
+    seconds: availabilityTimeoutSeconds,
   );
   static const Duration myBookingsTimeout = Duration(
     seconds: myBookingsTimeoutSeconds,

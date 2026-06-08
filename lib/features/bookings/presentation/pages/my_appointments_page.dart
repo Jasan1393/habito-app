@@ -168,6 +168,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
 
   Future<void> _loadAppointments({
     bool retryingFirstLoad = false,
+    bool forceRefresh = false,
   }) async {
     if (!mounted) return;
 
@@ -207,7 +208,10 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     });
 
     try {
-      final response = await _loadAllMyBookings(normalizedToken);
+      final response = await _loadAllMyBookings(
+        normalizedToken,
+        forceRefresh: forceRefresh,
+      );
       final rawList = _extractItemsFromResponse(response);
 
       final appointments = rawList
@@ -233,7 +237,6 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
         _focusFirstNonEmptyTab();
       });
       _tryOpenAppointmentFromPush();
-      unawaited(_loadHistoryAppointments(silent: true));
     } catch (e) {
       if (!mounted || requestId != _loadRequestId) return;
 
@@ -242,7 +245,10 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
           _isRetryableFirstLoadError(e)) {
         await Future<void>.delayed(const Duration(milliseconds: 900));
         if (!mounted || requestId != _loadRequestId) return;
-        await _loadAppointments(retryingFirstLoad: true);
+        await _loadAppointments(
+          retryingFirstLoad: true,
+          forceRefresh: forceRefresh,
+        );
         return;
       }
 
@@ -253,12 +259,16 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     }
   }
 
-  Future<Map<String, dynamic>> _loadAllMyBookings(String token) async {
+  Future<Map<String, dynamic>> _loadAllMyBookings(
+    String token, {
+    bool forceRefresh = false,
+  }) async {
     return _loadMyBookingsPages(
       token: token,
       view: 'upcoming',
       pageLimit: 80,
       maxPages: 4,
+      forceRefresh: forceRefresh,
     );
   }
 
@@ -267,6 +277,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     required String view,
     int pageLimit = 50,
     int maxPages = 6,
+    bool forceRefresh = false,
   }) async {
     final allItems = <dynamic>[];
     Map<String, dynamic> lastResponse = <String, dynamic>{};
@@ -278,6 +289,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
         page: page,
         includeRaw: false,
         view: view,
+        forceRefresh: forceRefresh,
       );
 
       lastResponse = response;
@@ -1901,7 +1913,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
     return RefreshIndicator(
       color: AppColors.secondary,
       backgroundColor: Colors.white,
-      onRefresh: _loadAppointments,
+      onRefresh: () => _loadAppointments(forceRefresh: true),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

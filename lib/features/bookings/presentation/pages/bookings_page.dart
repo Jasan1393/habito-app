@@ -96,6 +96,7 @@ class _BookingsPageState extends State<BookingsPage> {
   bool _usePoints = false;
   bool _useBirthdayBonus = false;
   int _availabilityRequestId = 0;
+  Timer? _availabilityDebounceTimer;
 
   bool get _isEditing => widget.appointmentId != null;
 
@@ -334,14 +335,16 @@ class _BookingsPageState extends State<BookingsPage> {
         return;
       }
 
-      final services = await _loadServicesWithFallback(cachedResults[0]);
-      final employees = await _loadEmployeesWithFallback(cachedResults[1]);
-      final locations = await _loadLocationsWithFallback(cachedResults[2]);
+      final freshResults = await Future.wait([
+        _loadServicesWithFallback(cachedResults[0]),
+        _loadEmployeesWithFallback(cachedResults[1]),
+        _loadLocationsWithFallback(cachedResults[2]),
+      ]);
 
       await _applyInitialCatalogData(
-        services: services,
-        employees: employees,
-        locations: locations,
+        services: freshResults[0],
+        employees: freshResults[1],
+        locations: freshResults[2],
       );
     } catch (e) {
       if (!mounted) return;
@@ -362,16 +365,18 @@ class _BookingsPageState extends State<BookingsPage> {
 
   Future<void> _refreshInitialCatalogData() async {
     try {
-      final services = await _loadServicesWithFallback(_services);
-      final employees = await _loadEmployeesWithFallback(_employees);
-      final locations = await _loadLocationsWithFallback(_locations);
+      final freshResults = await Future.wait([
+        _loadServicesWithFallback(_services),
+        _loadEmployeesWithFallback(_employees),
+        _loadLocationsWithFallback(_locations),
+      ]);
 
       if (!mounted) return;
 
       await _applyInitialCatalogData(
-        services: services,
-        employees: employees,
-        locations: locations,
+        services: freshResults[0],
+        employees: freshResults[1],
+        locations: freshResults[2],
         preserveAvailability: true,
       );
     } catch (_) {
@@ -821,7 +826,7 @@ class _BookingsPageState extends State<BookingsPage> {
       _showAllTimeSlots = true;
     });
 
-    _loadAvailabilityIfPossible(preserveSelectedTime: true);
+    _scheduleAvailabilityLoad(preserveSelectedTime: true);
   }
 
   List<Map<String, dynamic>> _getSelectedExtrasDetailed() {
@@ -1192,6 +1197,8 @@ class _BookingsPageState extends State<BookingsPage> {
     Map<String, dynamic>? locationOverride,
     DateTime? dateOverride,
   }) async {
+    _availabilityDebounceTimer?.cancel();
+
     final service = serviceOverride ?? _selectedService;
     final employee = employeeOverride ?? _selectedEmployee;
     final location = locationOverride ?? _selectedLocation;
@@ -1319,6 +1326,22 @@ class _BookingsPageState extends State<BookingsPage> {
         });
       }
     }
+  }
+
+  void _scheduleAvailabilityLoad({
+    bool preserveSelectedTime = false,
+    String? preferredTime,
+  }) {
+    _availabilityDebounceTimer?.cancel();
+    _availabilityDebounceTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      unawaited(
+        _loadAvailabilityIfPossible(
+          preserveSelectedTime: preserveSelectedTime,
+          preferredTime: preferredTime,
+        ),
+      );
+    });
   }
 
   List<String> _extractAvailableSlots(
@@ -1520,13 +1543,29 @@ class _BookingsPageState extends State<BookingsPage> {
   dynamic _findSlotsNode(dynamic data) {
     if (data is Map) {
       final map = Map<dynamic, dynamic>.from(data);
-      if (map.containsKey('slots')) return map['slots'];
+      for (final key in const [
+        'slots',
+        'availableSlots',
+        'available_slots',
+        'freeSlots',
+        'free_slots',
+        'times',
+        'timeSlots',
+        'time_slots',
+      ]) {
+        if (map.containsKey(key)) return map[key];
+      }
 
       for (final key in const ['data', 'availability', 'result']) {
         if (map.containsKey(key)) {
           final found = _findSlotsNode(map[key]);
           if (found != null) return found;
         }
+      }
+
+      if (map.keys.any((key) =>
+          RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(key.toString().trim()))) {
+        return map;
       }
     }
 
@@ -1770,6 +1809,8 @@ END:VCALENDAR
 
   @override
   void dispose() {
+    _availabilityDebounceTimer?.cancel();
+
     _firstNameController.removeListener(_refreshFormState);
     _middleNameController.removeListener(_refreshFormState);
     _lastNameController.removeListener(_refreshFormState);
