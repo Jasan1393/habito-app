@@ -60,11 +60,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDhqLrE8VNwUwP3TN8XNJxKeXxdWgFT44w',
-    appId: '1:577447468142:ios:6e9583198fa1f0e3191a7f',
+    appId: '1:577447468142:ios:77bea4d35d0a8354191a7f',
     messagingSenderId: '577447468142',
     projectId: 'habito-app-4e2de',
     storageBucket: 'habito-app-4e2de.firebasestorage.app',
-    iosBundleId: 'com.example.habito',
+    iosBundleId: 'com.habitobarberia.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '577447468142',
     projectId: 'habito-app-4e2de',
     storageBucket: 'habito-app-4e2de.firebasestorage.app',
-    iosBundleId: 'com.example.habito',
+    iosBundleId: 'com.habitobarberia.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

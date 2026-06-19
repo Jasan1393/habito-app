@@ -7,16 +7,14 @@
 - Descargar un `google-services.json` nuevo desde Firebase que coincida con `com.habitobarberia.app`
 - Crear `android/key.properties` a partir de `android/key.properties.example`
 - Guardar el `.jks` fuera del repo, por ejemplo en `keystores/habito-release.jks`
+- Confirmar que `targetSdk` sea 35 o superior. Con Flutter 3.44.2 el proyecto usa `targetSdk 36`.
+- Confirmar en Play Console la ficha Data safety para cuenta, reservas, compras, ubicación aproximada/precisa, fotos seleccionadas, analíticas y crash reports.
 
 ## Firma release
 
-La build release ya busca `android/key.properties`.
+La build release exige `android/key.properties`.
 
-Si el archivo existe:
-- usa firma release
-
-Si no existe:
-- cae temporalmente a firma debug para pruebas locales
+Si el archivo no existe, `flutter build appbundle --release` falla a propósito para evitar subir una build firmada con debug.
 
 ## Comandos
 

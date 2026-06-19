@@ -28,6 +28,7 @@ import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../points/points_calculator.dart';
 import '../../../points/provider/points_provider.dart';
+import '../../utils/availability_slot_parser.dart';
 import '../../../shop/models/shop_payment_method.dart';
 import '../../../shop/provider/shop_provider.dart';
 import 'package:habito/features/shop/data/services/habito_booking_api.dart';
@@ -1355,48 +1356,12 @@ class _BookingsPageState extends State<BookingsPage> {
     }
 
     final selectedDateKey = _formatApiDate(selectedDate);
-    final slotsNode = _findSlotsNode(data);
-
-    void collectSlots(dynamic node) {
-      if (node == null) return;
-
-      if (node is String) {
-        final time = _normalizeSlotTime(node, selectedDateKey: selectedDateKey);
-        if (time != null) slots.add(time);
-        return;
-      }
-
-      if (node is List) {
-        for (final item in node) {
-          collectSlots(item);
-        }
-        return;
-      }
-
-      if (node is Map) {
-        final map = Map<dynamic, dynamic>.from(node);
-
-        if (map.containsKey(selectedDateKey)) {
-          collectSlots(map[selectedDateKey]);
-          return;
-        }
-
-        for (final entry in map.entries) {
-          final keyTime = _normalizeSlotTime(
-            entry.key.toString(),
-            selectedDateKey: selectedDateKey,
-          );
-
-          if (keyTime != null) {
-            slots.add(keyTime);
-          } else {
-            collectSlots(entry.value);
-          }
-        }
-      }
-    }
-
-    collectSlots(slotsNode);
+    slots.addAll(
+      AvailabilitySlotParser.extractAvailableSlots(
+        data,
+        selectedDateKey: selectedDateKey,
+      ),
+    );
 
     final unique = slots.toSet().toList()..sort();
     return unique;
@@ -1471,30 +1436,7 @@ class _BookingsPageState extends State<BookingsPage> {
     required int durationSeconds,
     String? preferredTime,
   }) {
-    final stepMinutes = _preferredSlotStepMinutes(durationSeconds);
-    if (stepMinutes == null || slots.length <= 1) return slots;
-
-    final filtered = slots.where((slot) {
-      if (preferredTime != null && slot == preferredTime) {
-        return true;
-      }
-
-      return _isSlotAlignedToStep(slot, stepMinutes);
-    }).toList();
-
-    if (filtered.isEmpty) {
-      return slots;
-    }
-
-    return filtered.toSet().toList()..sort();
-  }
-
-  bool _isSlotAlignedToStep(String slot, int stepMinutes) {
-    final parts = slot.split(':');
-    if (parts.length < 2) return false;
-
-    final minute = int.tryParse(parts[1]) ?? 0;
-    return minute % stepMinutes == 0;
+    return slots.toSet().toList()..sort();
   }
 
   DateTime? _extractMinimumBookingCutoff(Map<String, dynamic> availability) {
@@ -1538,61 +1480,6 @@ class _BookingsPageState extends State<BookingsPage> {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
-  }
-
-  dynamic _findSlotsNode(dynamic data) {
-    if (data is Map) {
-      final map = Map<dynamic, dynamic>.from(data);
-      for (final key in const [
-        'slots',
-        'availableSlots',
-        'available_slots',
-        'freeSlots',
-        'free_slots',
-        'times',
-        'timeSlots',
-        'time_slots',
-      ]) {
-        if (map.containsKey(key)) return map[key];
-      }
-
-      for (final key in const ['data', 'availability', 'result']) {
-        if (map.containsKey(key)) {
-          final found = _findSlotsNode(map[key]);
-          if (found != null) return found;
-        }
-      }
-
-      if (map.keys.any((key) =>
-          RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(key.toString().trim()))) {
-        return map;
-      }
-    }
-
-    return null;
-  }
-
-  String? _normalizeSlotTime(
-    String value, {
-    required String selectedDateKey,
-  }) {
-    final text = value.trim();
-
-    final directMatch =
-        RegExp(r'^(\d{2}):(\d{2})(?::\d{2})?$').firstMatch(text);
-    if (directMatch != null) {
-      return '${directMatch.group(1)}:${directMatch.group(2)}';
-    }
-
-    if (text.startsWith(selectedDateKey)) {
-      final dateTimeMatch =
-          RegExp(r'^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})').firstMatch(text);
-      if (dateTimeMatch != null) {
-        return '${dateTimeMatch.group(1)}:${dateTimeMatch.group(2)}';
-      }
-    }
-
-    return null;
   }
 
   String _formatApiDate(DateTime date) {

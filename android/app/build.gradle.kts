@@ -16,6 +16,17 @@ fun truthy(value: String?): Boolean {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKeystore = keystorePropertiesFile.exists()
+val requestedReleaseBuild = gradle.startParameter.taskNames.any {
+    val task = it.lowercase()
+    task.contains("release") || task.contains("bundle")
+}
+
+if (requestedReleaseBuild && !hasReleaseKeystore) {
+    error(
+        "Release signing is not configured. Create android/key.properties " +
+            "from android/key.properties.example before building for Google Play."
+    )
+}
 
 if (hasReleaseKeystore) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
