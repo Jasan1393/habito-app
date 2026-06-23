@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '577447468142',
     projectId: 'habito-app-4e2de',
     storageBucket: 'habito-app-4e2de.firebasestorage.app',
-    iosBundleId: 'com.example.habito',
+    iosBundleId: 'com.habitobarberia.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

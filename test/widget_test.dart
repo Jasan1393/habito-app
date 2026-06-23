@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:habito/core/config/app_config.dart';
 import 'package:habito/features/auth/models/auth_user.dart';
+import 'package:habito/features/bookings/utils/availability_slot_parser.dart';
 import 'package:habito/features/points/models/points_history_entry.dart';
 import 'package:habito/features/points/models/points_summary.dart';
 import 'package:habito/features/points/provider/points_provider.dart';
@@ -115,6 +116,62 @@ void main() {
       expect(provider.summary?.enabled, isFalse);
       expect(provider.summary?.balance, 0);
       expect(provider.history, isEmpty);
+    });
+  });
+
+  group('AvailabilitySlotParser', () {
+    test('parsea horarios agrupados por fecha', () {
+      final slots = AvailabilitySlotParser.extractAvailableSlots(
+        {
+          'availability': {
+            '2026-06-18': ['09:00:00', '10:30'],
+          },
+        },
+        selectedDateKey: '2026-06-18',
+      );
+
+      expect(slots, ['09:00', '10:30']);
+    });
+
+    test('no se queda en slots vacios si otra rama trae disponibilidad', () {
+      final slots = AvailabilitySlotParser.extractAvailableSlots(
+        {
+          'slots': [],
+          'data': {
+            'availability': {
+              'days': {
+                '2026-06-18': [
+                  {'start': '2026-06-18 09:20:00'},
+                  {'start_time': '11:40'},
+                ],
+              },
+            },
+          },
+        },
+        selectedDateKey: '2026-06-18',
+      );
+
+      expect(slots, ['09:20', '11:40']);
+    });
+
+    test('ignora horarios marcados explicitamente como ocupados', () {
+      final slots = AvailabilitySlotParser.extractAvailableSlots(
+        {
+          'available_slots': {
+            '09:00': {'available': true},
+            '09:30': {'available': false},
+            '10:00': 'booked',
+            '10:30': 1,
+            '11:00': {
+              'start': '2026-06-18 11:00:00',
+              'available': false,
+            },
+          },
+        },
+        selectedDateKey: '2026-06-18',
+      );
+
+      expect(slots, ['09:00', '10:30']);
     });
   });
 }
