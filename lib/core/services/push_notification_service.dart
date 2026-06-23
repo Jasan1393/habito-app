@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -57,6 +58,8 @@ class PushNotificationService {
   static const String _pushImageFolderName = 'push_images';
   static const String _androidNotificationIcon =
       '@drawable/ic_stat_habito_notification';
+  static const int _tokenRegistrationMaxAttempts = 8;
+  static const Duration _tokenRegistrationRetryDelay = Duration(seconds: 2);
 
   static String? _currentAuthToken;
   static String? _cachedDeviceId;
@@ -138,10 +141,19 @@ class PushNotificationService {
         // No critico: el proximo login o refresh volvera a registrarlo.
       }
     });
+
+    final authToken = _currentAuthToken;
+    if (authToken != null && authToken.isNotEmpty) {
+      unawaited(registerToken(authToken: authToken));
+    }
   }
 
   static Future<String?> getToken() async {
     try {
+      if (Platform.isIOS || Platform.isMacOS) {
+        await _waitForApplePushToken();
+      }
+
       return await _fcm.getToken();
     } catch (_) {
       return null;
@@ -153,13 +165,18 @@ class PushNotificationService {
   }) async {
     _currentAuthToken = authToken;
 
-    final fcmToken = await getToken();
-    if (fcmToken == null || fcmToken.isEmpty) return;
+    for (var attempt = 0; attempt < _tokenRegistrationMaxAttempts; attempt++) {
+      final fcmToken = await getToken();
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        try {
+          await _saveToken(fcmToken, authToken);
+          return;
+        } catch (_) {
+          if (attempt == _tokenRegistrationMaxAttempts - 1) return;
+        }
+      }
 
-    try {
-      await _saveToken(fcmToken, authToken);
-    } catch (_) {
-      // No critico: el usuario puede seguir usando la app.
+      await Future<void>.delayed(_tokenRegistrationRetryDelay);
     }
   }
 
@@ -176,6 +193,15 @@ class PushNotificationService {
       deviceName: _buildDeviceName(),
       appVersion: await _getAppVersion(),
     );
+  }
+
+  static Future<void> _waitForApplePushToken() async {
+    for (var attempt = 0; attempt < _tokenRegistrationMaxAttempts; attempt++) {
+      final apnsToken = await _fcm.getAPNSToken();
+      if (apnsToken != null && apnsToken.isNotEmpty) return;
+
+      await Future<void>.delayed(_tokenRegistrationRetryDelay);
+    }
   }
 
   static Future<void> _handleForegroundMessage(RemoteMessage message) async {
