@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../features/shop/data/services/habito_booking_api.dart';
 import '../navigation/app_navigator.dart';
 import '../routes/app_routes.dart';
+import 'app_logger.dart';
 import 'notification_inbox_service.dart';
 
 @pragma('vm:entry-point')
@@ -57,6 +58,8 @@ class PushNotificationService {
   static const String _pushImageFolderName = 'push_images';
   static const String _androidNotificationIcon =
       '@drawable/ic_stat_habito_notification';
+  static const int _tokenRegistrationMaxAttempts = 6;
+  static const Duration _tokenRegistrationRetryDelay = Duration(seconds: 2);
 
   static String? _currentAuthToken;
   static String? _cachedDeviceId;
@@ -65,15 +68,7 @@ class PushNotificationService {
   static Future<void> initialize() async {
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
 
-    await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      announcement: false,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-    );
+    await _requestNotificationPermission();
 
     final androidNotifications =
         _localNotif.resolvePlatformSpecificImplementation<
@@ -134,16 +129,33 @@ class PushNotificationService {
 
       try {
         await _saveToken(newToken, authToken);
-      } catch (_) {
+      } catch (e, stackTrace) {
+        AppLogger.warning(
+          'No se pudo guardar el token FCM refrescado.',
+          error: e,
+          stackTrace: stackTrace,
+        );
         // No critico: el proximo login o refresh volvera a registrarlo.
       }
     });
   }
 
-  static Future<String?> getToken() async {
+  static Future<String?> getToken({bool waitForApns = false}) async {
     try {
+      if (waitForApns && Platform.isIOS) {
+        final apnsToken = await _waitForApnsToken();
+        if (apnsToken == null || apnsToken.isEmpty) {
+          return null;
+        }
+      }
+
       return await _fcm.getToken();
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.warning(
+        'No se pudo obtener el token FCM.',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return null;
     }
   }
@@ -153,12 +165,20 @@ class PushNotificationService {
   }) async {
     _currentAuthToken = authToken;
 
-    final fcmToken = await getToken();
-    if (fcmToken == null || fcmToken.isEmpty) return;
+    final fcmToken = await _getTokenWithRetry();
+    if (fcmToken == null || fcmToken.isEmpty) {
+      AppLogger.warning('No se obtuvo token FCM para registrar en backend.');
+      return;
+    }
 
     try {
       await _saveToken(fcmToken, authToken);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.warning(
+        'No se pudo guardar el token FCM en el backend.',
+        error: e,
+        stackTrace: stackTrace,
+      );
       // No critico: el usuario puede seguir usando la app.
     }
   }
@@ -176,6 +196,53 @@ class PushNotificationService {
       deviceName: _buildDeviceName(),
       appVersion: await _getAppVersion(),
     );
+  }
+
+  static Future<NotificationSettings> _requestNotificationPermission() {
+    return _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      announcement: false,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+    );
+  }
+
+  static Future<String?> _getTokenWithRetry() async {
+    await _requestNotificationPermission();
+
+    for (var attempt = 0; attempt < _tokenRegistrationMaxAttempts; attempt++) {
+      final token = await getToken(waitForApns: Platform.isIOS);
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+
+      if (attempt < _tokenRegistrationMaxAttempts - 1) {
+        await Future.delayed(_tokenRegistrationRetryDelay);
+      }
+    }
+
+    return null;
+  }
+
+  static Future<String?> _waitForApnsToken() async {
+    for (var attempt = 0; attempt < _tokenRegistrationMaxAttempts; attempt++) {
+      final token = await _fcm.getAPNSToken();
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+
+      if (attempt < _tokenRegistrationMaxAttempts - 1) {
+        await Future.delayed(_tokenRegistrationRetryDelay);
+      }
+    }
+
+    AppLogger.warning(
+      'iOS no entrego APNs token; FCM no se puede registrar todavia.',
+    );
+    return null;
   }
 
   static Future<void> _handleForegroundMessage(RemoteMessage message) async {
