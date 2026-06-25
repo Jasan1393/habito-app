@@ -479,7 +479,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<ShopProvider>().cartCount;
+    final cartCount = context.select<ShopProvider, int>(
+      (shop) => shop.cartCount,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,

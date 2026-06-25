@@ -43,6 +43,24 @@ Future<void> _onBackgroundMessage(RemoteMessage message) async {
   // No navegamos desde background para evitar abrir pantallas sin contexto.
 }
 
+class PushNotificationDiagnostics {
+  final String authorizationStatus;
+  final bool apnsTokenAvailable;
+  final bool fcmTokenAvailable;
+  final bool backendSaved;
+  final String? fcmToken;
+  final String? error;
+
+  const PushNotificationDiagnostics({
+    required this.authorizationStatus,
+    required this.apnsTokenAvailable,
+    required this.fcmTokenAvailable,
+    required this.backendSaved,
+    this.fcmToken,
+    this.error,
+  });
+}
+
 class PushNotificationService {
   PushNotificationService._();
 
@@ -181,6 +199,53 @@ class PushNotificationService {
       );
       // No critico: el usuario puede seguir usando la app.
     }
+  }
+
+  static Future<PushNotificationDiagnostics> runDiagnostics({
+    required String authToken,
+  }) async {
+    _currentAuthToken = authToken;
+
+    var authorizationStatus = 'unknown';
+    var apnsTokenAvailable = !Platform.isIOS;
+    var backendSaved = false;
+    String? fcmToken;
+    String? error;
+
+    try {
+      final settings = await _requestNotificationPermission();
+      authorizationStatus = settings.authorizationStatus.name;
+
+      if (Platform.isIOS) {
+        final apnsToken = await _waitForApnsToken();
+        apnsTokenAvailable = apnsToken != null && apnsToken.isNotEmpty;
+      }
+
+      if (apnsTokenAvailable) {
+        fcmToken = await getToken();
+      }
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        await _saveToken(fcmToken, authToken);
+        backendSaved = true;
+      }
+    } catch (e, stackTrace) {
+      error = e.toString().replaceFirst('Exception: ', '');
+      AppLogger.warning(
+        'Error ejecutando diagnostico de notificaciones push.',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return PushNotificationDiagnostics(
+      authorizationStatus: authorizationStatus,
+      apnsTokenAvailable: apnsTokenAvailable,
+      fcmTokenAvailable: fcmToken != null && fcmToken.isNotEmpty,
+      backendSaved: backendSaved,
+      fcmToken: fcmToken,
+      error: error,
+    );
   }
 
   static void clearSession() {

@@ -89,13 +89,19 @@ class HabitoApp extends StatelessWidget {
         ),
         ChangeNotifierProxyProvider<AuthProvider, PointsProvider>(
           create: (_) => PointsProvider(),
-          update: (_, auth, points) => (points ?? PointsProvider())
-            ..updateSession(token: auth.token, user: auth.user),
+          update: (_, auth, points) {
+            final provider = points ?? PointsProvider();
+            provider.updateSession(token: auth.token, user: auth.user);
+            return provider;
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, ShopProvider>(
           create: (_) => ShopProvider()..hydrate(),
-          update: (_, auth, shop) => (shop ?? (ShopProvider()..hydrate()))
-            ..updateAuthState(isLoggedIn: auth.isLoggedIn),
+          update: (_, auth, shop) {
+            final provider = shop ?? (ShopProvider()..hydrate());
+            provider.updateAuthState(isLoggedIn: auth.isLoggedIn);
+            return provider;
+          },
         ),
       ],
       child: MaterialApp(

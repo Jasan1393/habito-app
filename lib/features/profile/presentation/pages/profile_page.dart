@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,11 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/app_update_service.dart';
+import '../../../../core/services/push_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
+import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../../shared/widgets/main_navigation_scope.dart';
 import '../../../auth/presentation/pages/register_page.dart';
 import '../../../auth/provider/auth_provider.dart';
@@ -37,6 +40,7 @@ class ProfilePage extends StatelessWidget {
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: AppSpacing.none,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
           ),
           body: isLoggedIn
               ? ListView(
@@ -52,14 +56,9 @@ class ProfilePage extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const CircleAvatar(
+                          _ProfileAvatar(
+                            photoUrl: user?.photoUrl ?? '',
                             radius: AppIconSize.successIcon,
-                            backgroundColor: AppColors.secondary,
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.black,
-                              size: AppIconSize.successIcon,
-                            ),
                           ),
                           const SizedBox(width: AppSpacing.cartItemGap),
                           Expanded(
@@ -432,6 +431,34 @@ class _AppVersionCardState extends State<_AppVersionCard> {
   }
 }
 
+class _ProfileAvatar extends StatelessWidget {
+  final String photoUrl;
+  final double radius;
+
+  const _ProfileAvatar({
+    required this.photoUrl,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final image = habitoCachedImageProvider(photoUrl);
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.secondary,
+      backgroundImage: image,
+      child: image == null
+          ? Icon(
+              Icons.person,
+              color: Colors.black,
+              size: radius,
+            )
+          : null,
+    );
+  }
+}
+
 class _ProfileOptionCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -517,6 +544,91 @@ class _PushNotificationsOptionCard extends StatelessWidget {
 
   const _PushNotificationsOptionCard({required this.auth});
 
+  Future<void> _runDiagnostics(BuildContext context) async {
+    final authToken = auth.token?.trim() ?? '';
+    if (authToken.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Inicia sesión para verificar notificaciones.'),
+          ),
+        );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final diagnostics = await PushNotificationService.runDiagnostics(
+      authToken: authToken,
+    );
+
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final fcmToken = diagnostics.fcmToken?.trim() ?? '';
+        final tokenPreview = fcmToken.isEmpty
+            ? 'No disponible'
+            : fcmToken.length <= 24
+                ? fcmToken
+                : '${fcmToken.substring(0, 12)}...${fcmToken.substring(fcmToken.length - 8)}';
+
+        return AlertDialog(
+          title: const Text('Diagnóstico push'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Permiso: ${diagnostics.authorizationStatus}'),
+              Text(
+                'APNs: ${diagnostics.apnsTokenAvailable ? 'OK' : 'No disponible'}',
+              ),
+              Text(
+                'FCM: ${diagnostics.fcmTokenAvailable ? 'OK' : 'No disponible'}',
+              ),
+              Text(
+                'Backend: ${diagnostics.backendSaved ? 'Guardado' : 'No guardado'}',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SelectableText('Token: $tokenPreview'),
+              if ((diagnostics.error ?? '').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text('Error: ${diagnostics.error}'),
+              ],
+            ],
+          ),
+          actions: [
+            if (fcmToken.isNotEmpty)
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: fcmToken));
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      const SnackBar(content: Text('Token FCM copiado.')),
+                    );
+                },
+                child: const Text('Copiar token'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -525,46 +637,82 @@ class _PushNotificationsOptionCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.tile,
       ),
-      child: SwitchListTile(
-        value: auth.user?.pushNotificationsEnabled ?? true,
-        onChanged: auth.isLoading
-            ? null
-            : (value) async {
-                final ok = await context
-                    .read<AuthProvider>()
-                    .setPushNotificationsEnabled(value);
+      child: Column(
+        children: [
+          SwitchListTile(
+            value: auth.user?.pushNotificationsEnabled ?? true,
+            onChanged: auth.isLoading
+                ? null
+                : (value) async {
+                    final ok = await context
+                        .read<AuthProvider>()
+                        .setPushNotificationsEnabled(value);
 
-                if (!context.mounted || ok) return;
+                    if (!context.mounted || ok) return;
 
-                final error = context.read<AuthProvider>().error;
-                if (error == null || error.trim().isEmpty) return;
+                    final error = context.read<AuthProvider>().error;
+                    if (error == null || error.trim().isEmpty) return;
 
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(error),
-                      backgroundColor: AppColors.primaryMuted,
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(error),
+                          backgroundColor: AppColors.primaryMuted,
+                        ),
+                      );
+                  },
+            secondary: const Icon(
+              Icons.notifications_active_outlined,
+              color: AppColors.secondary,
+            ),
+            activeThumbColor: AppColors.secondary,
+            activeTrackColor: AppColors.secondary.withValues(alpha: 0.35),
+            title: const Text(
+              'Notificaciones push',
+              style: TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              (auth.user?.pushNotificationsEnabled ?? true)
+                  ? 'Recibir avisos de citas, pedidos y novedades.'
+                  : 'Notificaciones silenciadas en este perfil.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.md,
+            ),
+            child: Align(
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      auth.isLoading ? null : () => _runDiagnostics(context),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Verificar notificaciones'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondary,
+                    side: const BorderSide(color: AppColors.secondary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.medium,
                     ),
-                  );
-              },
-        secondary: const Icon(
-          Icons.notifications_active_outlined,
-          color: AppColors.secondary,
-        ),
-        activeThumbColor: AppColors.secondary,
-        activeTrackColor: AppColors.secondary.withValues(alpha: 0.35),
-        title: const Text(
-          'Notificaciones push',
-          style: TextStyle(color: Colors.white),
-        ),
-        subtitle: Text(
-          (auth.user?.pushNotificationsEnabled ?? true)
-              ? 'Recibir avisos de citas, pedidos y novedades.'
-              : 'Notificaciones silenciadas en este perfil.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

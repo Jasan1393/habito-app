@@ -1350,20 +1350,16 @@ class HabitoBookingApi {
       ],
     );
 
-    final appointmentId = _asInt(
-      appointment['id'] ??
-          payload['appointment_id'] ??
-          payload['appointmentId'] ??
-          responseData['appointment_id'] ??
-          responseData['appointmentId'],
+    final appointmentId = _extractCreatedAppointmentId(
+      payload: payload,
+      responseData: responseData,
+      appointment: appointment,
     );
 
-    final bookingId = _asInt(
-      booking['id'] ??
-          payload['booking_id'] ??
-          payload['bookingId'] ??
-          responseData['booking_id'] ??
-          responseData['bookingId'],
+    final bookingId = _extractCreatedBookingId(
+      payload: payload,
+      responseData: responseData,
+      booking: booking,
     );
 
     final bookingExtras = _extractBookingExtras(booking);
@@ -1503,6 +1499,185 @@ class HabitoBookingApi {
     }
 
     return <String, dynamic>{};
+  }
+
+  static int? _extractCreatedAppointmentId({
+    required Map<String, dynamic> payload,
+    required Map<String, dynamic> responseData,
+    required Map<String, dynamic> appointment,
+  }) {
+    return _firstPositiveInt([
+      appointment['id'],
+      appointment['appointmentId'],
+      appointment['appointment_id'],
+      payload['appointment_id'],
+      payload['appointmentId'],
+      responseData['appointment_id'],
+      responseData['appointmentId'],
+      _deepFirstIntByKeys(payload, const ['appointment_id', 'appointmentId']),
+      _deepObjectIdByKeys(payload, const ['appointment']),
+      _deepFirstIntByKeys(
+        responseData,
+        const ['appointment_id', 'appointmentId'],
+      ),
+      _deepObjectIdByKeys(responseData, const ['appointment']),
+    ]);
+  }
+
+  static int? _extractCreatedBookingId({
+    required Map<String, dynamic> payload,
+    required Map<String, dynamic> responseData,
+    required Map<String, dynamic> booking,
+  }) {
+    return _firstPositiveInt([
+      booking['id'],
+      booking['bookingId'],
+      booking['booking_id'],
+      booking['customerBookingId'],
+      booking['customer_booking_id'],
+      payload['booking_id'],
+      payload['bookingId'],
+      payload['customerBookingId'],
+      payload['customer_booking_id'],
+      responseData['booking_id'],
+      responseData['bookingId'],
+      responseData['customerBookingId'],
+      responseData['customer_booking_id'],
+      _deepFirstIntByKeys(
+        payload,
+        const [
+          'booking_id',
+          'bookingId',
+          'customerBookingId',
+          'customer_booking_id',
+        ],
+      ),
+      _deepObjectIdByKeys(
+        payload,
+        const ['booking', 'customerBooking', 'customer_booking'],
+      ),
+      _deepFirstBookingId(payload),
+      _deepFirstIntByKeys(
+        responseData,
+        const [
+          'booking_id',
+          'bookingId',
+          'customerBookingId',
+          'customer_booking_id',
+        ],
+      ),
+      _deepObjectIdByKeys(
+        responseData,
+        const ['booking', 'customerBooking', 'customer_booking'],
+      ),
+      _deepFirstBookingId(responseData),
+    ]);
+  }
+
+  static int? _firstPositiveInt(List<dynamic> values) {
+    for (final value in values) {
+      final parsed = _asInt(value);
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  static int? _deepFirstIntByKeys(dynamic source, List<String> keys) {
+    if (source is Map) {
+      for (final key in keys) {
+        final value = source[key];
+        final parsed = _asInt(value);
+        if (parsed != null && parsed > 0) {
+          return parsed;
+        }
+      }
+
+      for (final value in source.values) {
+        final nested = _deepFirstIntByKeys(value, keys);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    if (source is List) {
+      for (final value in source) {
+        final nested = _deepFirstIntByKeys(value, keys);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static int? _deepObjectIdByKeys(dynamic source, List<String> objectKeys) {
+    if (source is Map) {
+      for (final key in objectKeys) {
+        final value = source[key];
+        if (value is Map) {
+          final parsed = _asInt(value['id']);
+          if (parsed != null && parsed > 0) {
+            return parsed;
+          }
+        }
+      }
+
+      for (final value in source.values) {
+        final nested = _deepObjectIdByKeys(value, objectKeys);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    if (source is List) {
+      for (final value in source) {
+        final nested = _deepObjectIdByKeys(value, objectKeys);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static int? _deepFirstBookingId(dynamic source) {
+    if (source is Map) {
+      final bookings = source['bookings'];
+      if (bookings is List) {
+        for (final booking in bookings) {
+          if (booking is Map) {
+            final parsed = _asInt(booking['id']);
+            if (parsed != null && parsed > 0) {
+              return parsed;
+            }
+          }
+        }
+      }
+
+      for (final value in source.values) {
+        final nested = _deepFirstBookingId(value);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    if (source is List) {
+      for (final value in source) {
+        final nested = _deepFirstBookingId(value);
+        if (nested != null && nested > 0) {
+          return nested;
+        }
+      }
+    }
+
+    return null;
   }
 
   static Map<String, dynamic> _firstBookingFromAppointment(

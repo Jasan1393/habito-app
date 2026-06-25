@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -12,7 +13,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
 import '../../../../core/validators/ecuador_id_validator.dart';
 import '../../../../core/validators/form_validators.dart';
-import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../auth/provider/auth_provider.dart';
 
@@ -185,23 +185,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
         return Scaffold(
           backgroundColor: AppColors.primary,
-          appBar: AppTopHeader(
-            leadingIcon: Icons.arrow_back_rounded,
-            leadingTooltip: 'Volver',
-            onLeadingTap: () => Navigator.maybePop(context),
-            titleOverride: const Text(
+          appBar: AppBar(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+            leading: IconButton(
+              tooltip: 'Volver',
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => Navigator.maybePop(context),
+            ),
+            title: const Text(
               'Mis datos personales',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            actionsOverride: const [],
-            cartCount: 0,
-            onSearchTap: () {},
-            onCartTap: () {},
           ),
           body: SafeArea(
             child: SingleChildScrollView(

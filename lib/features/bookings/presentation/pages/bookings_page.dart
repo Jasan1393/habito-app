@@ -57,6 +57,43 @@ class BookingsPage extends StatefulWidget {
   State<BookingsPage> createState() => _BookingsPageState();
 }
 
+class _BookingPaymentMethodsState {
+  final List<ShopPaymentMethod> methods;
+  final bool isLoading;
+  final String? error;
+  final String _signature;
+
+  _BookingPaymentMethodsState({
+    required List<ShopPaymentMethod> methods,
+    required this.isLoading,
+    required this.error,
+  })  : methods = List<ShopPaymentMethod>.unmodifiable(methods),
+        _signature = methods
+            .map(
+              (method) => [
+                method.id,
+                method.title,
+                method.enabled,
+                method.requiresOnlinePayment,
+                method.canCreateManualOrder,
+                method.flow,
+                method.orderStatus,
+              ].join(':'),
+            )
+            .join('|');
+
+  @override
+  bool operator ==(Object other) {
+    return other is _BookingPaymentMethodsState &&
+        other.isLoading == isLoading &&
+        other.error == error &&
+        other._signature == _signature;
+  }
+
+  @override
+  int get hashCode => Object.hash(isLoading, error, _signature);
+}
+
 class _BookingsPageState extends State<BookingsPage> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _middleNameController = TextEditingController();
@@ -98,6 +135,7 @@ class _BookingsPageState extends State<BookingsPage> {
   bool _useBirthdayBonus = false;
   int _availabilityRequestId = 0;
   Timer? _availabilityDebounceTimer;
+  bool _isRefreshingInitialCatalog = false;
 
   bool get _isEditing => widget.appointmentId != null;
 
@@ -258,7 +296,7 @@ class _BookingsPageState extends State<BookingsPage> {
 
     if (!mounted) return;
 
-    final methods = _enabledPaymentMethods(shop);
+    final methods = _enabledPaymentMethods(shop.paymentMethods);
     final selectedExists = methods.any(
       (method) => method.id == _selectedPaymentMethodId,
     );
@@ -275,10 +313,11 @@ class _BookingsPageState extends State<BookingsPage> {
     }
   }
 
-  List<ShopPaymentMethod> _enabledPaymentMethods(ShopProvider shop) {
-    final methods = shop.paymentMethods
-        .where((method) => method.enabled)
-        .toList(growable: true);
+  List<ShopPaymentMethod> _enabledPaymentMethods(
+    List<ShopPaymentMethod> rawMethods,
+  ) {
+    final methods =
+        rawMethods.where((method) => method.enabled).toList(growable: true);
 
     if (methods.isEmpty) {
       return const [ShopPaymentMethod.bankTransfer, ShopPaymentMethod.onSite];
@@ -332,7 +371,7 @@ class _BookingsPageState extends State<BookingsPage> {
           });
         }
 
-        unawaited(_refreshInitialCatalogData());
+        _scheduleInitialCatalogRefresh();
         return;
       }
 
@@ -365,6 +404,9 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   Future<void> _refreshInitialCatalogData() async {
+    if (_isRefreshingInitialCatalog) return;
+
+    _isRefreshingInitialCatalog = true;
     try {
       final freshResults = await Future.wait([
         _loadServicesWithFallback(_services),
@@ -382,7 +424,20 @@ class _BookingsPageState extends State<BookingsPage> {
       );
     } catch (_) {
       // Refresco silencioso: la pantalla ya tiene cache util.
+    } finally {
+      _isRefreshingInitialCatalog = false;
     }
+  }
+
+  void _scheduleInitialCatalogRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isRefreshingInitialCatalog) return;
+
+      Future<void>.delayed(const Duration(milliseconds: 650), () {
+        if (!mounted || _isRefreshingInitialCatalog) return;
+        unawaited(_refreshInitialCatalogData());
+      });
+    });
   }
 
   Future<List<dynamic>> _loadServicesWithFallback(
@@ -1887,7 +1942,9 @@ END:VCALENDAR
 
     final selectedExtras = _selectedExtrasForApi();
     final totalDuration = _getGrandTotalDuration();
-    final paymentMethods = _enabledPaymentMethods(context.read<ShopProvider>());
+    final paymentMethods = _enabledPaymentMethods(
+      context.read<ShopProvider>().paymentMethods,
+    );
     final selectedPaymentMethod = _selectedPaymentMethod(paymentMethods);
 
     if (!selectedPaymentMethod.canCreateManualOrder) {
@@ -2066,12 +2123,10 @@ END:VCALENDAR
           appointmentId != null && appointmentId > 0
               ? appointmentId
               : bookingId;
-
-      if (reservationCodeValue == null || reservationCodeValue <= 0) {
-        throw Exception(
-          'La reserva se creó, pero no pudimos confirmar el código de la cita. Revisa tus citas o intenta actualizar.',
-        );
-      }
+      final reservationCode =
+          reservationCodeValue != null && reservationCodeValue > 0
+              ? reservationCodeValue.toString()
+              : null;
 
       final String backendStatus = (response['status'] ?? 'pending').toString();
       final String backendServiceName =
@@ -2105,7 +2160,7 @@ END:VCALENDAR
             .toString(),
         dateLabel: _formatDate(selectedDate),
         time: selectedTime,
-        reservationCode: reservationCodeValue.toString(),
+        reservationCode: reservationCode,
         statusLabel: _normalizeStatusLabel(backendStatus),
         paymentStatus: response['payment_status']?.toString(),
         paymentMethodTitle: response['payment_title']?.toString() ??
@@ -2478,7 +2533,7 @@ END:VCALENDAR
                       label: 'Compartir por WhatsApp',
                       onTap: () async {
                         await _shareAppointmentOnWhatsApp(
-                          reservationCode: reservationCode ?? '0',
+                          reservationCode: reservationCode ?? 'sin código',
                           serviceName: serviceName,
                           barberName: barberName,
                           branch: locationName,
@@ -2507,7 +2562,7 @@ END:VCALENDAR
                       label: 'Agregar al calendario',
                       onTap: () async {
                         await _addToCalendar(
-                          reservationCode: reservationCode ?? '0',
+                          reservationCode: reservationCode ?? 'sin código',
                           serviceName: serviceName,
                           barberName: barberName,
                           branch: locationName,
@@ -2875,13 +2930,13 @@ END:VCALENDAR
   }
 
   Widget _buildPaymentMethodSection(
-    ShopProvider shop,
+    _BookingPaymentMethodsState paymentState,
     AuthProvider auth,
     PointsProvider pointsProvider,
     PointsRedemptionState pointsState,
     double totalPrice,
   ) {
-    final methods = _enabledPaymentMethods(shop);
+    final methods = _enabledPaymentMethods(paymentState.methods);
     final selectedPaymentMethod = _selectedPaymentMethod(methods);
     final birthdayPromotion = pointsProvider.birthdayPromotion;
     final birthdayBalance = birthdayPromotion?.pointsAvailable ?? 0;
@@ -2922,7 +2977,7 @@ END:VCALENDAR
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (shop.isLoadingPaymentMethods) ...[
+        if (paymentState.isLoading) ...[
           const LinearProgressIndicator(
             minHeight: 3,
             color: AppColors.secondary,
@@ -3117,7 +3172,7 @@ END:VCALENDAR
             ),
           ),
         ],
-        if (shop.paymentMethodsError != null) ...[
+        if (paymentState.error != null) ...[
           const SizedBox(height: AppSpacing.xxs),
           const Text(
             'No pudimos actualizar los métodos de pago. Usamos transferencia como respaldo.',
@@ -3198,11 +3253,18 @@ END:VCALENDAR
 
   @override
   Widget build(BuildContext context) {
-    final shop = context.watch<ShopProvider>();
+    final paymentState =
+        context.select<ShopProvider, _BookingPaymentMethodsState>(
+      (shop) => _BookingPaymentMethodsState(
+        methods: shop.paymentMethods,
+        isLoading: shop.isLoadingPaymentMethods,
+        error: shop.paymentMethodsError,
+      ),
+    );
     final auth = context.watch<AuthProvider>();
     final pointsProvider = context.watch<PointsProvider>();
     final pointsState = _resolvePointsState(auth, pointsProvider);
-    final paymentMethods = _enabledPaymentMethods(shop);
+    final paymentMethods = _enabledPaymentMethods(paymentState.methods);
     final selectedPaymentMethod = _selectedPaymentMethod(paymentMethods);
     final isReadyForSubmit =
         _isFormValid && selectedPaymentMethod.canCreateManualOrder;
@@ -3607,7 +3669,7 @@ END:VCALENDAR
                   _sectionCard(
                     title: 'Método de pago',
                     child: _buildPaymentMethodSection(
-                      shop,
+                      paymentState,
                       auth,
                       pointsProvider,
                       pointsState,
