@@ -18,7 +18,7 @@ class HabitoBookingApi {
   static const _retryDelay = Duration(milliseconds: 650);
   static const _catalogRetryDelay = Duration(milliseconds: 450);
   static const _availabilityCacheTtl = Duration(seconds: 45);
-  static const _myBookingsCacheTtl = Duration(seconds: 60);
+  static const _myBookingsCacheTtl = Duration(minutes: 5);
 
   // ── Caché en memoria ────────────────────────────────────────────────────────
   static const _cacheTtl = Duration(minutes: 10);
@@ -822,6 +822,42 @@ class HabitoBookingApi {
     if (data['success'] != true) {
       throw Exception(_extractErrorMessage(data));
     }
+  }
+
+  static Future<List<dynamic>> getNotificationHistory({
+    required String token,
+    int limit = 80,
+  }) async {
+    final normalizedToken = token.trim();
+    if (normalizedToken.isEmpty) {
+      return <dynamic>[];
+    }
+
+    final uri = Uri.parse('$baseUrl/notifications').replace(
+      queryParameters: {
+        'limit': limit.clamp(1, 100).toString(),
+      },
+    );
+
+    final response = await http
+        .get(
+          uri,
+          headers: _authHeaders(normalizedToken),
+        )
+        .timeout(_timeout);
+
+    final data = _decodeResponse(response);
+
+    if (data['success'] != true) {
+      throw Exception(_extractErrorMessage(data));
+    }
+
+    final payload = data['data'];
+    if (payload is Map<String, dynamic> && payload['items'] is List) {
+      return List<dynamic>.from(payload['items'] as List);
+    }
+
+    return <dynamic>[];
   }
 
   static Future<Map<String, dynamic>> getMyBookings({

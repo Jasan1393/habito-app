@@ -124,6 +124,54 @@ class NotificationInboxService {
     await _save(items.take(_maxItems).toList());
   }
 
+  static Future<List<Map<String, dynamic>>> syncRemoteItems(
+    List<dynamic> remoteItems,
+  ) async {
+    if (remoteItems.isEmpty) {
+      return load();
+    }
+
+    final localItems = await load();
+    final byId = <String, Map<String, dynamic>>{};
+
+    for (final item in localItems) {
+      final id = (item['id'] ?? '').toString();
+      if (id.isNotEmpty) {
+        byId[id] = item;
+      }
+    }
+
+    for (final rawItem in remoteItems) {
+      if (rawItem is! Map) continue;
+
+      final normalized = _normalizeRemoteItem(rawItem);
+      if (!_isMeaningfulItem(normalized)) continue;
+
+      final id = (normalized['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+
+      final existing = byId[id];
+      if (existing != null && existing['read'] == true) {
+        normalized['read'] = true;
+      }
+
+      byId[id] = normalized;
+    }
+
+    final merged = byId.values.toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse((a['received_at'] ?? '').toString());
+        final bDate = DateTime.tryParse((b['received_at'] ?? '').toString());
+        final aMs = aDate?.millisecondsSinceEpoch ?? 0;
+        final bMs = bDate?.millisecondsSinceEpoch ?? 0;
+        return bMs.compareTo(aMs);
+      });
+
+    final limited = merged.take(_maxItems).toList();
+    await _save(limited);
+    return limited;
+  }
+
   static Future<void> markRead(String id) async {
     final items = await load();
     var changed = false;
@@ -239,6 +287,55 @@ class NotificationInboxService {
         data: data,
       ),
       'read': item['read'] == true,
+    };
+  }
+
+  static Map<String, dynamic> _normalizeRemoteItem(Map rawItem) {
+    final data = _normalizeData(rawItem['data']);
+    final targetScreen = (rawItem['target_screen'] ??
+            rawItem['targetScreen'] ??
+            data['target_screen'] ??
+            data['targetScreen'] ??
+            '')
+        .toString()
+        .trim();
+    final rawId =
+        (rawItem['id'] ?? rawItem['notification_id'] ?? '').toString().trim();
+    final title =
+        (rawItem['title'] ?? data['title'] ?? 'Habito').toString().trim();
+    final body = (rawItem['body'] ?? data['body'] ?? data['message'] ?? '')
+        .toString()
+        .trim();
+    final receivedAt = _safeReceivedAt(
+      _parseReceivedAt(rawItem['received_at'] ?? rawItem['created_at']),
+    );
+    final remoteId = rawId.isNotEmpty
+        ? 'remote:$rawId'
+        : 'remote:${_buildId(
+            title: title,
+            body: body,
+            data: data,
+            receivedAt: receivedAt,
+          )}';
+
+    final normalizedData = {
+      ...data,
+      if (targetScreen.isNotEmpty) 'target_screen': targetScreen,
+    };
+
+    return {
+      'id': remoteId,
+      'title': title.isEmpty ? 'Habito' : title,
+      'body': body,
+      'data': normalizedData,
+      'category': _normalizeCategory(
+        rawItem['category'],
+        title: title,
+        body: body,
+        data: normalizedData,
+      ),
+      'received_at': receivedAt.toIso8601String(),
+      'read': rawItem['read'] == true,
     };
   }
 

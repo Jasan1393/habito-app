@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/notification_inbox_service.dart';
@@ -9,6 +10,8 @@ import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
+import '../../../auth/provider/auth_provider.dart';
+import '../../../shop/data/services/habito_booking_api.dart';
 import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_loading_shimmer.dart';
 
@@ -42,7 +45,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _load() async {
-    final items = await NotificationInboxService.load();
+    List<Map<String, dynamic>> items;
+    final auth = context.read<AuthProvider>();
+    final token = auth.token;
+
+    if (token != null && token.isNotEmpty && auth.isLoggedIn) {
+      try {
+        final remoteItems = await HabitoBookingApi.getNotificationHistory(
+          token: token,
+        );
+        items = await NotificationInboxService.syncRemoteItems(remoteItems);
+      } catch (_) {
+        items = await NotificationInboxService.load();
+      }
+    } else {
+      items = await NotificationInboxService.load();
+    }
+
     if (!mounted) return;
     setState(() {
       _items = items;

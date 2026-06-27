@@ -1157,25 +1157,67 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   bool get _isCustomerFiscalDataValid {
-    if (_contactType == 'business' &&
-        FormValidators.requiredMaxLength(
-              _businessNameController.text,
-              field: 'la razón social',
-            ) !=
-            null) {
-      return false;
+    return _customerFiscalDataBlockingReason == null;
+  }
+
+  String? get _customerFiscalDataBlockingReason {
+    if (_contactType == 'business') {
+      final businessNameError = FormValidators.requiredMaxLength(
+        _businessNameController.text,
+        field: 'la razón social',
+      );
+      if (businessNameError != null) return businessNameError;
     }
 
-    return _validateBookingIdentificationNumber(
-              _taxNumberController.text,
-            ) ==
-            null &&
-        _cityController.text.trim().isNotEmpty &&
-        FormValidators.requiredMaxLength(
-              _addressController.text,
-              field: 'la dirección principal',
-            ) ==
-            null;
+    final taxNumberError = _validateBookingIdentificationNumber(
+      _taxNumberController.text,
+    );
+    if (taxNumberError != null) return taxNumberError;
+
+    if (_cityController.text.trim().isEmpty) {
+      return 'Ingresa el cantón o ciudad.';
+    }
+
+    final addressError = FormValidators.requiredMaxLength(
+      _addressController.text,
+      field: 'la dirección principal',
+    );
+    if (addressError != null) return addressError;
+
+    return null;
+  }
+
+  String? _bookingFormBlockingReason(
+    ShopPaymentMethod selectedPaymentMethod,
+  ) {
+    if (_selectedService == null) return 'Selecciona un servicio.';
+    if (_selectedLocation == null) return 'Selecciona una sucursal.';
+    if (_selectedEmployee == null) return 'Selecciona un barbero.';
+    if (_selectedDate == null) return 'Selecciona la fecha de tu cita.';
+    if (!(_selectedTimeSlot?.isNotEmpty ?? false)) {
+      return 'Selecciona un horario disponible.';
+    }
+    if (_firstNameController.text.trim().isEmpty) {
+      return 'Ingresa tu primer nombre.';
+    }
+    if (_lastNameController.text.trim().isEmpty) {
+      return 'Ingresa tus apellidos.';
+    }
+    if (!_isValidPhone(_phoneController.text)) {
+      return 'Ingresa un celular ecuatoriano válido.';
+    }
+    if (!_isValidEmail(_emailController.text)) {
+      return 'Ingresa un correo electrónico válido.';
+    }
+
+    final fiscalReason = _customerFiscalDataBlockingReason;
+    if (fiscalReason != null) return fiscalReason;
+
+    if (!selectedPaymentMethod.canCreateManualOrder) {
+      return '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.';
+    }
+
+    return null;
   }
 
   String _normalizeIdentificationType(String? value) {
@@ -2351,6 +2393,16 @@ END:VCALENDAR
     }
 
     if (_containsAny(lower, [
+      'booking_reference_not_confirmed',
+      'no confirmo el codigo',
+      'no confirmó el código',
+      'codigo de la cita',
+      'código de la cita',
+    ])) {
+      return 'La reserva pudo haberse registrado, pero no recibimos el código de confirmación. Revisa tus citas antes de intentarlo nuevamente.';
+    }
+
+    if (_containsAny(lower, [
       'faltan campos obligatorios',
       'debes enviar customerid',
       'datos del cliente',
@@ -3266,8 +3318,9 @@ END:VCALENDAR
     final pointsState = _resolvePointsState(auth, pointsProvider);
     final paymentMethods = _enabledPaymentMethods(paymentState.methods);
     final selectedPaymentMethod = _selectedPaymentMethod(paymentMethods);
-    final isReadyForSubmit =
-        _isFormValid && selectedPaymentMethod.canCreateManualOrder;
+    final bookingBlockingReason =
+        _bookingFormBlockingReason(selectedPaymentMethod);
+    final isReadyForSubmit = bookingBlockingReason == null;
     final canConfirmBooking = isReadyForSubmit && !_isSubmittingBooking;
     final String title = _selectedService?['title'] ?? 'Selecciona un servicio';
     final totalPrice = _getGrandTotalPrice();
@@ -3766,6 +3819,42 @@ END:VCALENDAR
                         _infoLine(
                             'Hora', _selectedTimeSlot ?? 'No seleccionada'),
                         _infoLine('Pago', selectedPaymentMethod.title),
+                        if (bookingBlockingReason != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.warningSoft,
+                              borderRadius: AppRadius.tile,
+                              border: Border.all(
+                                color: AppColors.borderStrong,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  color: AppColors.warningDeep,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    bookingBlockingReason,
+                                    style: const TextStyle(
+                                      color: AppColors.warningDeep,
+                                      fontSize: AppTextSize.bodyStrong,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_getSelectedExtrasDetailed().isNotEmpty) ...[
                           const SizedBox(
                               height: AppSpacing.xs + AppSpacing.xxs),
@@ -3828,26 +3917,16 @@ END:VCALENDAR
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
-                  if (!_isFormValid)
-                    const Text(
-                      'Completa servicio, sucursal, barbero, horario y todos los datos fiscales para continuar.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: AppTextSize.bodyStrong,
-                        height: 1.4,
-                      ),
-                    )
-                  else if (!selectedPaymentMethod.canCreateManualOrder)
+                  if (bookingBlockingReason != null)
                     Text(
-                      '${selectedPaymentMethod.title} estará disponible pronto para reservas desde la app.',
+                      bookingBlockingReason,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: AppTextSize.bodyStrong,
                         height: 1.4,
                       ),
-                    ),
+                    )
                 ],
               ),
       ),

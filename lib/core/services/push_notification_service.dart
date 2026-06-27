@@ -118,7 +118,7 @@ class PushNotificationService {
     );
 
     await _localNotif.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: androidInit,
         iOS: iosInit,
       ),
@@ -329,10 +329,10 @@ class PushNotificationService {
     );
 
     await _localNotif.show(
-      message.hashCode,
-      title,
-      body,
-      notificationDetails,
+      id: message.hashCode,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
       payload: _encodePayload(message.data),
     );
   }
