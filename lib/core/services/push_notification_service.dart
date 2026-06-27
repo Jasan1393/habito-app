@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -77,11 +78,15 @@ class PushNotificationService {
   static const String _androidNotificationIcon =
       '@drawable/ic_stat_habito_notification';
   static const int _tokenRegistrationMaxAttempts = 6;
+  static const int _deferredTokenRegistrationMaxAttempts = 30;
   static const Duration _tokenRegistrationRetryDelay = Duration(seconds: 2);
+  static const Duration _deferredTokenRegistrationDelay = Duration(seconds: 10);
 
   static String? _currentAuthToken;
   static String? _cachedDeviceId;
   static String? _cachedAppVersion;
+  static bool _deferredTokenRegistrationRunning = false;
+  static String? _deferredTokenRegistrationAuthToken;
 
   static Future<void> initialize() async {
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
@@ -153,7 +158,7 @@ class PushNotificationService {
           error: e,
           stackTrace: stackTrace,
         );
-        // No critico: el proximo login o refresh volvera a registrarlo.
+        _scheduleDeferredTokenRegistration(authToken);
       }
     });
   }
@@ -186,6 +191,7 @@ class PushNotificationService {
     final fcmToken = await _getTokenWithRetry();
     if (fcmToken == null || fcmToken.isEmpty) {
       AppLogger.warning('No se obtuvo token FCM para registrar en backend.');
+      _scheduleDeferredTokenRegistration(authToken);
       return;
     }
 
@@ -197,7 +203,7 @@ class PushNotificationService {
         error: e,
         stackTrace: stackTrace,
       );
-      // No critico: el usuario puede seguir usando la app.
+      _scheduleDeferredTokenRegistration(authToken);
     }
   }
 
@@ -261,6 +267,68 @@ class PushNotificationService {
       deviceName: _buildDeviceName(),
       appVersion: await _getAppVersion(),
     );
+  }
+
+  static void _scheduleDeferredTokenRegistration(String authToken) {
+    if (authToken.isEmpty) {
+      return;
+    }
+
+    _deferredTokenRegistrationAuthToken = authToken;
+
+    if (_deferredTokenRegistrationRunning) {
+      return;
+    }
+
+    unawaited(_runDeferredTokenRegistration());
+  }
+
+  static Future<void> _runDeferredTokenRegistration() async {
+    _deferredTokenRegistrationRunning = true;
+
+    try {
+      while (_deferredTokenRegistrationAuthToken != null) {
+        final authToken = _deferredTokenRegistrationAuthToken;
+        _deferredTokenRegistrationAuthToken = null;
+
+        if (authToken == null || authToken.isEmpty) {
+          return;
+        }
+
+        for (var attempt = 0;
+            attempt < _deferredTokenRegistrationMaxAttempts;
+            attempt++) {
+          if (_currentAuthToken != authToken) {
+            break;
+          }
+
+          await Future.delayed(_deferredTokenRegistrationDelay);
+
+          if (_currentAuthToken != authToken) {
+            break;
+          }
+
+          final fcmToken = await getToken(waitForApns: Platform.isIOS);
+          if (fcmToken == null || fcmToken.isEmpty) {
+            continue;
+          }
+
+          try {
+            await _saveToken(fcmToken, authToken);
+            AppLogger.info('Token FCM registrado en reintento diferido.');
+            return;
+          } catch (e, stackTrace) {
+            AppLogger.warning(
+              'No se pudo guardar el token FCM en reintento diferido.',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          }
+        }
+      }
+    } finally {
+      _deferredTokenRegistrationRunning = false;
+    }
   }
 
   static Future<NotificationSettings> _requestNotificationPermission() {

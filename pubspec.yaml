@@ -2,7 +2,7 @@ name: habito
 description: "App móvil de Hábito"
 publish_to: 'none'
 
-version: 3.0.11+42
+version: 3.0.11+43
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
