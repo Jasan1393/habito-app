@@ -13,7 +13,12 @@ import 'forgot_password_page.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final bool popOnSuccess;
+
+  const LoginPage({
+    super.key,
+    this.popOnSuccess = true,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -47,7 +52,9 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     if (ok) {
-      Navigator.pop(context, true);
+      if (widget.popOnSuccess) {
+        Navigator.pop(context, true);
+      }
       return;
     }
 
@@ -101,7 +108,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!mounted || created != true) return;
 
-    Navigator.pop(context, true);
+    if (widget.popOnSuccess) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override

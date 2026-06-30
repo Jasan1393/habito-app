@@ -404,11 +404,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Razon social',
+                                label: 'Razon social (opcional)',
                                 icon: Icons.business_outlined,
                               ),
                               validator: (value) {
                                 if (_contactType != 'business') return null;
+                                if ((value ?? '').trim().isEmpty) return null;
                                 return FormValidators.requiredMaxLength(
                                   value,
                                   field: 'la razón social',
@@ -452,7 +453,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             autofillHints: const [AutofillHints.username],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: _documentLabel,
+                              label: '$_documentLabel (opcional)',
                               icon: Icons.badge_outlined,
                             ),
                             validator: _validateIdentificationNumber,
@@ -489,13 +490,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             autofillHints: const [AutofillHints.addressCity],
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: 'Canton o ciudad',
+                              label: 'Canton o ciudad (opcional)',
                               icon: Icons.location_city_outlined,
                             ),
-                            validator: (value) => FormValidators.requiredText(
-                              value,
-                              field: 'el canton o ciudad',
-                            ),
+                            validator: (value) {
+                              if ((value ?? '').trim().isEmpty) return null;
+                              return FormValidators.requiredText(
+                                value,
+                                field: 'el canton o ciudad',
+                              );
+                            },
                           ),
                           const SizedBox(height: AppSpacing.lg),
                           TextFormField(
@@ -510,14 +514,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             maxLength: FormValidators.longTextMaxLength,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: 'Dirección principal',
+                              label: 'Dirección principal (opcional)',
                               icon: Icons.home_outlined,
                             ),
-                            validator: (value) =>
-                                FormValidators.requiredMaxLength(
-                              value,
-                              field: 'la dirección principal',
-                            ),
+                            validator: (value) {
+                              if ((value ?? '').trim().isEmpty) return null;
+                              return FormValidators.requiredMaxLength(
+                                value,
+                                field: 'la dirección principal',
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -544,7 +550,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             onTap: auth.isLoading ? null : _pickBirthday,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: 'Cumpleanos',
+                              label: 'Cumpleanos (opcional)',
                               icon: Icons.cake_outlined,
                               suffix: IconButton(
                                 tooltip: 'Seleccionar fecha de cumpleaños',
@@ -629,6 +635,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String? _validateIdentificationNumber(String? value) {
+    if ((value ?? '').trim().isEmpty) return null;
+
     return EcuadorIdValidator.validate(
       identificationType: _identificationType,
       value: value,

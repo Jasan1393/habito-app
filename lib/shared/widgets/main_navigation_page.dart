@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/navigation/app_navigator.dart';
-import '../../core/routes/app_routes.dart';
 import '../../core/services/app_update_service.dart';
 import '../../features/auth/provider/auth_provider.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/bookings/presentation/pages/my_appointments_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/points/presentation/pages/points_page.dart';
@@ -30,7 +30,6 @@ class MainNavigationPage extends StatefulWidget {
 class _MainNavigationPageState extends State<MainNavigationPage> {
   late int _currentIndex;
   late final List<Widget?> _pages;
-  bool _didGuardInitialProtectedIndex = false;
   bool _didScheduleAppUpdateCheck = false;
 
   static const List<int> _protectedIndexes = [2, 3];
@@ -63,12 +62,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         AppUpdateService.maybePromptForUpdate(context);
       });
     }
-
-    if (_didGuardInitialProtectedIndex) return;
-    _didGuardInitialProtectedIndex = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureInitialProtectedTabAccess();
-    });
   }
 
   @override
@@ -114,30 +107,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     }
   }
 
-  Future<void> _ensureInitialProtectedTabAccess() async {
-    if (!mounted || !_protectedIndexes.contains(_currentIndex)) return;
-
-    final requestedIndex = _currentIndex;
-    final auth = context.read<AuthProvider>();
-    if (auth.isLoggedIn) return;
-
-    setState(() {
-      _currentIndex = 0;
-      _pages[0] ??= _buildPage(0);
-    });
-
-    await Navigator.pushNamed(context, AppRoutes.login);
-
-    if (!mounted) return;
-
-    if (context.read<AuthProvider>().isLoggedIn) {
-      setState(() {
-        _currentIndex = requestedIndex;
-        _pages[requestedIndex] = _buildPage(requestedIndex);
-      });
-    }
-  }
-
   Future<void> _onDestinationSelected(
     int index, {
     bool refreshMyAppointments = false,
@@ -145,27 +114,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final auth = context.read<AuthProvider>();
     final requiresAuth = _protectedIndexes.contains(index);
 
-    if (requiresAuth && !auth.isLoggedIn) {
-      await Navigator.pushNamed(context, AppRoutes.login);
-
-      if (!mounted) return;
-
-      final authAfterLogin = context.read<AuthProvider>();
-      if (authAfterLogin.isLoggedIn) {
-        setState(() {
-          _currentIndex = index;
-          if (refreshMyAppointments && index == 2) {
-            _pages[index] = _buildPage(index);
-          } else {
-            _pages[index] ??= _buildPage(index);
-          }
-        });
-      }
-      return;
-    }
-
     setState(() {
       _currentIndex = index;
+      if (requiresAuth && !auth.isLoggedIn) return;
+
       if (refreshMyAppointments && index == 2) {
         _pages[index] = _buildPage(index);
       } else {
@@ -174,8 +126,20 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     });
   }
 
+  Widget _resolvePage(int index, bool isLoggedIn) {
+    if (_protectedIndexes.contains(index) && !isLoggedIn) {
+      return const LoginPage(popOnSuccess: false);
+    }
+
+    return _pages[index] ??= _buildPage(index);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = context.select<AuthProvider, bool>(
+      (auth) => auth.isLoggedIn,
+    );
+
     return MainNavigationScope(
       selectTab: _onDestinationSelected,
       child: Scaffold(
@@ -183,7 +147,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           index: _currentIndex,
           children: List<Widget>.generate(
             _pages.length,
-            (index) => _pages[index] ?? const SizedBox.shrink(),
+            (index) => _resolvePage(index, isLoggedIn),
           ),
         ),
         bottomNavigationBar: HabitoBottomNavigationBar(

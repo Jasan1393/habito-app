@@ -303,7 +303,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               autofillHints: const [AutofillHints.birthday],
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Fecha de nacimiento',
+                                label: 'Fecha de nacimiento (opcional)',
                                 icon: Icons.cake_outlined,
                                 suffix: const Icon(
                                   Icons.calendar_month_rounded,
@@ -312,10 +312,8 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                               validator: (value) {
                                 final text = value?.trim() ?? '';
-                                if (text.isEmpty) {
-                                  return 'Selecciona tu fecha de nacimiento';
-                                }
-                                if (_parseDate(text) == null) {
+                                if (text.isNotEmpty &&
+                                    _parseDate(text) == null) {
                                   return 'Usa una fecha válida';
                                 }
                                 return null;
@@ -361,7 +359,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   SizedBox(width: AppSpacing.gutter),
                                   Expanded(
                                     child: Text(
-                                      'Usaremos estos datos para tus facturas, reservas y futura vinculacion con puntos y compras en local.',
+                                      'Estos datos son opcionales y solo se usan si necesitas facturación o beneficios que requieran verificación.',
                                       style: TextStyle(
                                         color: AppColors.textOnDarkMuted,
                                         height: 1.38,
@@ -416,6 +414,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                                 validator: (value) {
                                   if (_contactType != 'business') return null;
+                                  if ((value ?? '').trim().isEmpty) return null;
                                   return FormValidators.requiredMaxLength(
                                     value,
                                     field: 'la razón social',
@@ -468,7 +467,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ],
                                   style: const TextStyle(color: Colors.white),
                                   decoration: _inputDecoration(
-                                    label: _documentLabel,
+                                    label: '$_documentLabel (opcional)',
                                     icon: Icons.credit_card_outlined,
                                   ),
                                   validator: (value) =>
@@ -527,13 +526,17 @@ class _RegisterPageState extends State<RegisterPage> {
                               autofillHints: const [AutofillHints.addressCity],
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Canton o ciudad',
+                                label: 'Canton o ciudad (opcional)',
                                 icon: Icons.location_city_outlined,
                               ),
-                              validator: (value) => FormValidators.requiredText(
-                                value,
-                                field: 'el canton o ciudad',
-                              ),
+                              validator: (value) {
+                                final text = value?.trim() ?? '';
+                                if (text.isEmpty) return null;
+                                return FormValidators.requiredText(
+                                  value,
+                                  field: 'el canton o ciudad',
+                                );
+                              },
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             TextFormField(
@@ -548,14 +551,17 @@ class _RegisterPageState extends State<RegisterPage> {
                               maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Dirección principal',
+                                label: 'Dirección principal (opcional)',
                                 icon: Icons.home_outlined,
                               ),
-                              validator: (value) =>
-                                  FormValidators.requiredMaxLength(
-                                value,
-                                field: 'la dirección principal',
-                              ),
+                              validator: (value) {
+                                final text = value?.trim() ?? '';
+                                if (text.isEmpty) return null;
+                                return FormValidators.requiredMaxLength(
+                                  value,
+                                  field: 'la dirección principal',
+                                );
+                              },
                             ),
                             const SizedBox(height: AppSpacing.xl),
                             _sectionTitle('Acceso'),
@@ -840,6 +846,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   String? _validateIdentificationNumber(String? value) {
+    if ((value ?? '').trim().isEmpty) return null;
+
     return EcuadorIdValidator.validate(
       identificationType: _identificationType,
       value: value,

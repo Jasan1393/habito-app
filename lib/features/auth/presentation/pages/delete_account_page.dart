@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -19,7 +16,6 @@ class DeleteAccountPage extends StatefulWidget {
 
 class _DeleteAccountPageState extends State<DeleteAccountPage> {
   String? _lastMessage;
-  String? _lastWebUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -146,40 +142,18 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                                   color: Colors.black,
                                 ),
                               )
-                            : const Icon(Icons.mail_outline_rounded),
+                            : const Icon(Icons.delete_forever_outlined),
                         label: Text(
                           auth.isLoading
-                              ? 'Enviando confirmación...'
-                              : 'Enviar enlace de eliminación',
+                              ? 'Eliminando cuenta...'
+                              : 'Eliminar mi cuenta',
                           style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      height: AppSpacing.deleteActionHeight,
-                      child: OutlinedButton.icon(
-                        onPressed: _openDeletionWebPage,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.16),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppRadius.medium,
-                          ),
-                        ),
-                        icon: const Icon(Icons.open_in_browser_outlined),
-                        label: const Text(
-                          'Abrir página web de eliminación',
-                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.formNotice),
                     const Text(
-                      'Te enviaremos un enlace a tu correo para confirmar la eliminación. La cuenta seguirá activa hasta que completes esa confirmación.',
+                      'La eliminación se completa desde esta app. No necesitas abrir enlaces, escribir por correo ni contactar soporte.',
                       style: TextStyle(
                         color: Colors.white54,
                         fontSize: AppTextSize.body,
@@ -197,6 +171,9 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   }
 
   Future<void> _requestDeletion() async {
+    final confirmed = await _confirmDeletion();
+    if (!confirmed || !mounted) return;
+
     final response =
         await context.read<AuthProvider>().requestAccountDeletion();
 
@@ -208,7 +185,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       );
 
       setState(() {
-        _lastWebUrl = _defaultDeletionWebUrl;
+        _lastMessage = null;
       });
 
       ScaffoldMessenger.of(context)
@@ -224,65 +201,59 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
     setState(() {
       _lastMessage = response['message'];
-      _lastWebUrl = response['webUrl'];
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          response['message'] ??
-              'Te enviamos un enlace para confirmar la eliminación.',
+          response['message'] ?? 'Tu cuenta fue eliminada correctamente.',
         ),
       ),
     );
-  }
 
-  Future<void> _openDeletionWebPage() async {
-    final url = _lastWebUrl ?? _defaultDeletionWebUrl;
-    final uri = Uri.tryParse(url);
-
-    if (uri == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir la página web de eliminación.'),
-        ),
-      );
-      return;
-    }
-
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-
-    if (!mounted || opened) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('No pudimos abrir la página web de eliminación.'),
-      ),
-    );
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   String _friendlyDeletionErrorMessage(String? error) {
-    final normalizedError = (error ?? '').toLowerCase();
-    final isRouteMissing = normalizedError.contains('ninguna ruta') ||
-        normalizedError.contains('no route') ||
-        normalizedError.contains('not found');
-
-    if (isRouteMissing) {
-      return 'No pudimos iniciar la solicitud desde la app. Puedes continuar desde la página web de eliminación.';
-    }
-
     if (error != null && error.trim().isNotEmpty) {
       return error.trim();
     }
 
-    return 'No pudimos iniciar la solicitud de eliminación.';
+    return 'No pudimos eliminar la cuenta en este momento.';
   }
 
-  String get _defaultDeletionWebUrl => AppConfig.accountDeletionUrl;
+  Future<bool> _confirmDeletion() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppColors.cardDark,
+            title: const Text(
+              'Eliminar cuenta',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: const Text(
+              'Esta acción eliminará tu cuenta de la app, cerrará tu sesión y cancelará citas futuras asociadas. Esta acción no se puede deshacer.',
+              style: TextStyle(color: Colors.white70, height: 1.45),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Eliminar cuenta'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }
 
 class _DeleteAccountPoint extends StatelessWidget {

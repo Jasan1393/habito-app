@@ -25,6 +25,7 @@ import '../../../../shared/widgets/habito_cached_network_image.dart';
 import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
+import '../../../../shared/widgets/main_navigation_scope.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../points/points_calculator.dart';
 import '../../../points/provider/points_provider.dart';
@@ -205,6 +206,7 @@ class _BookingsPageState extends State<BookingsPage> {
 
   void _redirectToLoginIfSessionMissing() {
     if (!mounted || _isEditing || _hasValidBookingSession()) return;
+    if (MainNavigationScope.maybeOf(context) != null) return;
 
     _showMessage('Inicia sesión para reservar tu cita.');
     Navigator.pushReplacementNamed(context, AppRoutes.login);

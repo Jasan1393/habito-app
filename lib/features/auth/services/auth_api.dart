@@ -170,6 +170,9 @@ class AuthApi {
     final response = await _postJson(
       '/auth/request-account-deletion',
       token: token,
+      body: {
+        'confirm': true,
+      },
     );
 
     final data = _unwrapSuccess(response);
@@ -179,8 +182,7 @@ class AuthApi {
     return {
       'message': _extractMessage(
         data,
-        fallback:
-            'Te enviamos un enlace a tu correo para confirmar la eliminación de tu cuenta.',
+        fallback: 'Tu cuenta fue eliminada correctamente.',
       ),
       if (webUrl != null && webUrl.trim().isNotEmpty) 'webUrl': webUrl.trim(),
     };

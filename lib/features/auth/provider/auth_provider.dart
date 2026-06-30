@@ -333,6 +333,8 @@ class AuthProvider extends ChangeNotifier {
       return null;
     }
 
+    await _clearSession(clearStorage: true);
+
     return responseData;
   }
 
