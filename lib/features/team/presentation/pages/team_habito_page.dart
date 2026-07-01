@@ -7,7 +7,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_size.dart';
-import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/habito_portrait_image.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../shop/data/services/habito_booking_api.dart';
 import '../../../bookings/presentation/pages/bookings_page.dart';
@@ -215,11 +215,11 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
         'firstName': firstName,
         'lastName': lastName,
         'fullName': fullName.isEmpty ? 'Barbero Hábito' : fullName,
-        'pictureFullPath': employeeMap['pictureThumbPath'] ??
-            employeeMap['pictureFullPath'] ??
+        'pictureFullPath': employeeMap['pictureFullPath'] ??
             employeeMap['picture'] ??
             employeeMap['image'] ??
-            employeeMap['avatar'],
+            employeeMap['avatar'] ??
+            employeeMap['pictureThumbPath'],
         'description': employeeMap['description'] ?? employeeMap['bio'] ?? '',
         'locationId': locationId,
         'locationIds': locationIds,
@@ -413,14 +413,10 @@ class _BarberCard extends StatelessWidget {
                       child: SizedBox(
                         height: imageHeight,
                         width: double.infinity,
-                        child: imageUrl.isNotEmpty
-                            ? HabitoCachedNetworkImage(
-                                imageUrl: imageUrl,
-                                fit: BoxFit.cover,
-                                alignment: Alignment.topCenter,
-                                errorWidget: _BarberImageFallback(name: name),
-                              )
-                            : _BarberImageFallback(name: name),
+                        child: HabitoPortraitImage(
+                          imageUrl: imageUrl,
+                          fallback: _BarberImageFallback(name: name),
+                        ),
                       ),
                     ),
                     if (isSelected)
@@ -630,14 +626,10 @@ class _BarberProfileModal extends StatelessWidget {
                   child: SizedBox(
                     height: 260,
                     width: double.infinity,
-                    child: imageUrl.isNotEmpty
-                        ? HabitoCachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
-                            errorWidget: _BarberImageFallback(name: name),
-                          )
-                        : _BarberImageFallback(name: name),
+                    child: HabitoPortraitImage(
+                      imageUrl: imageUrl,
+                      fallback: _BarberImageFallback(name: name),
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),

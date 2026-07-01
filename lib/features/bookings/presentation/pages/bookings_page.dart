@@ -26,6 +26,7 @@ import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../../shared/widgets/main_navigation_scope.dart';
+import '../../../../shared/widgets/habito_portrait_image.dart';
 import '../../../auth/provider/auth_provider.dart';
 import '../../../points/points_calculator.dart';
 import '../../../points/provider/points_provider.dart';
@@ -690,11 +691,11 @@ class _BookingsPageState extends State<BookingsPage> {
       'fullName': fullName,
       'email': map['email']?.toString(),
       'phone': map['phone']?.toString(),
-      'image': map['pictureThumbPath'] ??
-          map['pictureFullPath'] ??
+      'image': map['pictureFullPath'] ??
           map['picture'] ??
           map['image'] ??
-          map['avatar'],
+          map['avatar'] ??
+          map['pictureThumbPath'],
       'description': (map['description'] ?? map['bio'] ?? '').toString().trim(),
       'serviceIds': List<int>.from(map['serviceIds'] ?? []),
       'locationId': _safeInt(map['locationId']),
@@ -4874,14 +4875,10 @@ class _BarberPickerCard extends StatelessWidget {
                   child: SizedBox(
                     height: 104,
                     width: double.infinity,
-                    child: imageUrl.isNotEmpty
-                        ? HabitoCachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
-                            errorWidget: const _BarberPickerFallback(),
-                          )
-                        : const _BarberPickerFallback(),
+                    child: HabitoPortraitImage(
+                      imageUrl: imageUrl,
+                      fallback: const _BarberPickerFallback(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
