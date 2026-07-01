@@ -1164,9 +1164,10 @@ class _BookingsPageState extends State<BookingsPage> {
 
   String? get _customerFiscalDataBlockingReason {
     if (_contactType == 'business') {
-      final businessNameError = FormValidators.requiredMaxLength(
+      final businessNameError = FormValidators.maxLength(
         _businessNameController.text,
         field: 'la razón social',
+        max: FormValidators.longTextMaxLength,
       );
       if (businessNameError != null) return businessNameError;
     }
@@ -1176,13 +1177,17 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (taxNumberError != null) return taxNumberError;
 
-    if (_cityController.text.trim().isEmpty) {
-      return 'Ingresa el cantón o ciudad.';
-    }
+    final cityError = FormValidators.maxLength(
+      _cityController.text,
+      field: 'el cantón o ciudad',
+      max: FormValidators.longTextMaxLength,
+    );
+    if (cityError != null) return cityError;
 
-    final addressError = FormValidators.requiredMaxLength(
+    final addressError = FormValidators.maxLength(
       _addressController.text,
       field: 'la dirección principal',
+      max: FormValidators.longTextMaxLength,
     );
     if (addressError != null) return addressError;
 
@@ -1230,6 +1235,8 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   String? _validateBookingIdentificationNumber(String? value) {
+    if ((value ?? '').trim().isEmpty) return null;
+
     return EcuadorIdValidator.validate(
       identificationType: _effectiveIdentificationType,
       value: value,
@@ -1912,9 +1919,10 @@ END:VCALENDAR
     }
 
     if (_contactType == 'business') {
-      final businessNameError = FormValidators.requiredMaxLength(
+      final businessNameError = FormValidators.maxLength(
         _businessNameController.text,
         field: 'la razón social',
+        max: FormValidators.longTextMaxLength,
       );
       if (businessNameError != null) {
         _showMessage(businessNameError);
@@ -1930,14 +1938,20 @@ END:VCALENDAR
       return;
     }
 
-    if (_cityController.text.trim().isEmpty) {
-      _showMessage('Ingresa el cantón o ciudad');
+    final cityError = FormValidators.maxLength(
+      _cityController.text,
+      field: 'el cantón o ciudad',
+      max: FormValidators.longTextMaxLength,
+    );
+    if (cityError != null) {
+      _showMessage(cityError);
       return;
     }
 
-    final addressError = FormValidators.requiredMaxLength(
+    final addressError = FormValidators.maxLength(
       _addressController.text,
       field: 'la dirección principal',
+      max: FormValidators.longTextMaxLength,
     );
     if (addressError != null) {
       _showMessage(addressError);
@@ -1946,7 +1960,7 @@ END:VCALENDAR
 
     if (!_isFormValid) {
       _showMessage(
-        'Completa servicio, sucursal, barbero, fecha, hora y todos tus datos fiscales para continuar.',
+        'Completa servicio, sucursal, barbero, fecha, hora y tus datos de contacto para continuar.',
       );
       return;
     }
@@ -2113,6 +2127,10 @@ END:VCALENDAR
       final String lastNameToSend = _lastNameController.text.trim();
       final String emailToSend = _emailController.text.trim();
       final String phoneToSend = _phoneController.text.trim();
+      final String businessNameToSend = _businessNameController.text.trim();
+      final String taxNumberToSend = _taxNumberController.text.trim();
+      final String cityToSend = _cityController.text.trim();
+      final String addressToSend = _addressController.text.trim();
 
       if (!authProvider.isLoggedIn || user == null || authToken.isEmpty) {
         throw Exception(
@@ -2128,14 +2146,15 @@ END:VCALENDAR
         'phone': phoneToSend,
         'country_phone_iso': 'ec',
         'contact_type': _contactType.trim(),
-        'identification_type': _effectiveIdentificationType,
-        'tax_number': _taxNumberController.text.trim(),
         'province': _province.trim(),
-        'city': _cityController.text.trim(),
-        'address': _addressController.text.trim(),
-        if (_contactType == 'business' &&
-            _businessNameController.text.trim().isNotEmpty)
-          'business_name': _businessNameController.text.trim(),
+        if (taxNumberToSend.isNotEmpty) ...{
+          'identification_type': _effectiveIdentificationType,
+          'tax_number': taxNumberToSend,
+        },
+        if (cityToSend.isNotEmpty) 'city': cityToSend,
+        if (addressToSend.isNotEmpty) 'address': addressToSend,
+        if (_contactType == 'business' && businessNameToSend.isNotEmpty)
+          'business_name': businessNameToSend,
       };
 
       final response = await HabitoBookingApi.createBooking(
@@ -3611,7 +3630,7 @@ END:VCALENDAR
                           const SizedBox(height: AppSpacing.md),
                           _buildTextField(
                             controller: _businessNameController,
-                            label: 'Razon social',
+                            label: 'Razon social (opcional)',
                             icon: Icons.business_outlined,
                             keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
@@ -3646,7 +3665,7 @@ END:VCALENDAR
                         const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _taxNumberController,
-                          label: _bookingDocumentLabel,
+                          label: '$_bookingDocumentLabel (opcional)',
                           icon: Icons.badge_outlined,
                           keyboardType:
                               _effectiveIdentificationType == 'pasaporte'
@@ -3678,7 +3697,7 @@ END:VCALENDAR
                         const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _cityController,
-                          label: 'Canton o ciudad',
+                          label: 'Canton o ciudad (opcional)',
                           icon: Icons.location_city_outlined,
                           keyboardType: TextInputType.name,
                           textInputAction: TextInputAction.next,
@@ -3687,7 +3706,7 @@ END:VCALENDAR
                         const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _addressController,
-                          label: 'Dirección principal',
+                          label: 'Dirección principal (opcional)',
                           icon: Icons.home_outlined,
                           keyboardType: TextInputType.streetAddress,
                           textInputAction: TextInputAction.newline,

@@ -19,6 +19,8 @@ class HabitoBookingApi {
   static const _catalogRetryDelay = Duration(milliseconds: 450);
   static const _availabilityCacheTtl = Duration(seconds: 45);
   static const _myBookingsCacheTtl = Duration(minutes: 5);
+  static const _bookingTimeZone = 'America/Guayaquil';
+  static const _bookingUtcOffsetMinutes = -300;
 
   // ── Caché en memoria ────────────────────────────────────────────────────────
   static const _cacheTtl = Duration(minutes: 10);
@@ -583,6 +585,8 @@ class HabitoBookingApi {
       'country_phone_iso': countryPhoneIso,
       'locale': locale,
       'notify_participants': notifyParticipants,
+      'time_zone': _bookingTimeZone,
+      'utc_offset': _bookingUtcOffsetMinutes,
       'extras': normalizedExtras,
       if (redeemPoints > 0) 'redeem_points': _amountNumber(redeemPoints),
       if (redeemAmount > 0 || birthdayBonusAmount > 0)
@@ -771,7 +775,11 @@ class HabitoBookingApi {
     final response = await _retryingPost(
       uri,
       headers: _jsonAuthHeaders(authToken),
-      body: jsonEncode({'booking_start': newBookingStart}),
+      body: jsonEncode({
+        'booking_start': newBookingStart,
+        'time_zone': _bookingTimeZone,
+        'utc_offset': _bookingUtcOffsetMinutes,
+      }),
       idempotencyKey: newIdempotencyKey(prefix: 'habito-booking-reschedule'),
       timeoutMessage:
           'No pudimos confirmar el cambio de horario a tiempo. Revisa la cita antes de intentarlo nuevamente.',
