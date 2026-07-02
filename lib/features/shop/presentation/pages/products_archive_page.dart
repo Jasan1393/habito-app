@@ -328,11 +328,11 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
                     ? 'Resultados para "$_searchQuery"'
                     : _categoryName.isNotEmpty
                         ? 'Productos de $_categoryName'
-                        : 'Catalogo completo',
+                        : 'Catálogo completo',
                 subtitle: _searchQuery.isNotEmpty
-                    ? 'Mostrando coincidencias por producto y categoria dentro del catalogo.'
+                    ? 'Mostrando coincidencias por producto y categoría dentro del catálogo.'
                     : _categoryName.isNotEmpty
-                        ? 'Filtro activo por categoria. Puedes buscar dentro de esta seleccion.'
+                        ? 'Filtro activo por categoría. Puedes buscar dentro de esta selección.'
                         : 'Descubre productos premium para cabello, barba y cuidado personal.',
               ),
               const SizedBox(height: AppSpacing.md + AppSpacing.xs),

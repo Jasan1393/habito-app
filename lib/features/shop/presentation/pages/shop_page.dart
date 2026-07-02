@@ -115,7 +115,7 @@ class _ShopPageState extends State<ShopPage> {
         _categories = items;
       });
     } catch (_) {
-      // Si fallan las categorias, no bloqueamos la tienda.
+      // Si fallan las categorías, no bloqueamos la tienda.
     }
   }
 
@@ -287,7 +287,7 @@ class _ShopPageState extends State<ShopPage> {
               const SizedBox(height: AppSpacing.xxl - AppSpacing.xs),
               _BlockHeader(
                 title: 'Productos destacados',
-                action: 'Ver mas',
+                action: 'Ver más',
                 onTap: _openArchive,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -327,7 +327,7 @@ class _ShopPageState extends State<ShopPage> {
                 ),
               const SizedBox(height: AppSpacing.xxl - AppSpacing.xs),
               _BlockHeader(
-                title: 'Categorias',
+                title: 'Categorías',
               ),
               const SizedBox(height: AppSpacing.md),
               if (_productsError != null && _categories.isEmpty)
@@ -339,7 +339,7 @@ class _ShopPageState extends State<ShopPage> {
               else if (_loadingProducts)
                 const _CategorySkeleton()
               else if (_categories.isEmpty)
-                const _EmptyStrip(message: 'No hay categorias disponibles.')
+                const _EmptyStrip(message: 'No hay categorías disponibles.')
               else
                 SizedBox(
                   height: 58,
@@ -572,7 +572,7 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = (category['name'] ?? 'Categoria').toString();
+    final title = (category['name'] ?? 'Categoría').toString();
     final count = int.tryParse((category['count'] ?? '').toString()) ?? 0;
 
     return Material(
@@ -939,7 +939,7 @@ class _EmptyStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return HabitoEmptyState(
       icon: Icons.info_outline_rounded,
-      title: 'Nada para mostrar por ahora',
+      title: 'Aún no hay contenido disponible',
       message: message,
       compact: true,
     );

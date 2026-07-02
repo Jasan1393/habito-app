@@ -101,6 +101,59 @@ class _PointsPageState extends State<PointsPage> {
     }
   }
 
+  Future<void> _shareReferralLink(Rect? sharePositionOrigin) async {
+    final referrals = context.read<PointsProvider>().referrals;
+    final link = referrals?.link.trim() ?? '';
+    final code = referrals?.code.trim() ?? '';
+
+    if (link.isEmpty && code.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'No encontramos un enlace de referido para compartir.',
+            ),
+          ),
+        );
+      return;
+    }
+
+    try {
+      final uri = Uri.tryParse(link);
+      if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+        await Share.shareUri(
+          uri,
+          sharePositionOrigin: sharePositionOrigin,
+        );
+      } else {
+        await Share.share(
+          'Reserva en Hábito con mi código $code.',
+          subject: 'Invitación Hábito Barbería',
+          sharePositionOrigin: sharePositionOrigin,
+        );
+      }
+    } catch (_) {
+      if (link.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: link));
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              link.isNotEmpty
+                  ? 'No se pudo abrir compartir. Copiamos tu enlace.'
+                  : 'No se pudo abrir compartir. Intenta nuevamente.',
+            ),
+          ),
+        );
+    }
+  }
+
   Future<void> _prefillPendingReferralCode() async {
     final code = await ReferralLinkService.getPendingReferralCode();
     if (!mounted || code == null || code.isEmpty) return;
@@ -209,11 +262,7 @@ class _PointsPageState extends State<PointsPage> {
                           ),
                         );
                     },
-                    onShare: () {
-                      Share.share(
-                        'Reserva en Hábito con mi código ${points.referrals!.code}. Abre mi invitación aquí: ${points.referrals!.link}',
-                      );
-                    },
+                    onShare: _shareReferralLink,
                     onApplyCode: _applyReferralCode,
                   ),
                   const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
@@ -563,7 +612,7 @@ class _ReferralInviteCard extends StatelessWidget {
   final ReferralsSummary referrals;
   final TextEditingController applyController;
   final VoidCallback onCopy;
-  final VoidCallback onShare;
+  final ValueChanged<Rect?> onShare;
   final VoidCallback onApplyCode;
 
   const _ReferralInviteCard({
@@ -640,19 +689,23 @@ class _ReferralInviteCard extends StatelessWidget {
           icon: const Icon(Icons.copy_rounded),
           label: const Text('Copiar enlace'),
         );
-        final shareButton = ElevatedButton.icon(
-          onPressed: onShare,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary,
-            foregroundColor: AppColors.primary,
-            elevation: 0,
-            minimumSize: const Size.fromHeight(AppSpacing.actionHeight),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadius.large,
-            ),
-          ),
-          icon: const Icon(Icons.ios_share_rounded),
-          label: const Text('Compartir'),
+        final shareButton = Builder(
+          builder: (buttonContext) {
+            return ElevatedButton.icon(
+              onPressed: () => onShare(_shareOriginFrom(buttonContext)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: AppColors.primary,
+                elevation: 0,
+                minimumSize: const Size.fromHeight(AppSpacing.actionHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.large,
+                ),
+              ),
+              icon: const Icon(Icons.ios_share_rounded),
+              label: const Text('Compartir'),
+            );
+          },
         );
 
         return Container(
@@ -873,6 +926,13 @@ class _ReferralInviteCard extends StatelessWidget {
         );
       },
     );
+  }
+
+  Rect? _shareOriginFrom(BuildContext context) {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return null;
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    return topLeft & renderObject.size;
   }
 
   String _formatRewardPoints(double value) {

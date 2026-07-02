@@ -322,8 +322,8 @@ class _TeamHabitoPageState extends State<TeamHabitoPage> {
                                 ? 2
                                 : 1;
                         final isTabletGrid = width >= 560;
-                        final imageHeight = isTabletGrid ? 210.0 : 190.0;
-                        final cardHeight = isTabletGrid ? 500.0 : 475.0;
+                        final imageHeight = isTabletGrid ? 320.0 : 350.0;
+                        final cardHeight = isTabletGrid ? 610.0 : 635.0;
 
                         return GridView.builder(
                           itemCount: _barbers.length,
@@ -624,7 +624,7 @@ class _BarberProfileModal extends StatelessWidget {
                 ClipRRect(
                   borderRadius: AppRadius.extraLarge,
                   child: SizedBox(
-                    height: 260,
+                    height: 360,
                     width: double.infinity,
                     child: HabitoPortraitImage(
                       imageUrl: imageUrl,

@@ -222,7 +222,7 @@ class _TeamHabitoHomeSectionState extends State<TeamHabitoHomeSection> {
         ),
         const SizedBox(height: AppSpacing.md),
         SizedBox(
-          height: 256,
+          height: 296,
           child: _isLoading
               ? ListView.separated(
                   scrollDirection: Axis.horizontal,
@@ -344,7 +344,7 @@ class _MiniBarberCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: AppRadius.large,
                   child: SizedBox(
-                    height: 128,
+                    height: 168,
                     width: double.infinity,
                     child: HabitoPortraitImage(
                       imageUrl: imageUrl,
@@ -468,7 +468,7 @@ class _BarberProfileModal extends StatelessWidget {
                 ClipRRect(
                   borderRadius: AppRadius.extraLarge,
                   child: SizedBox(
-                    height: 260,
+                    height: 360,
                     width: double.infinity,
                     child: HabitoPortraitImage(
                       imageUrl: imageUrl,

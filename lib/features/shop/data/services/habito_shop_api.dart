@@ -263,7 +263,7 @@ class HabitoShopApi {
         .timeout(_timeout);
     final decoded = jsonDecode(response.body);
     if (decoded is! List) {
-      throw Exception('No pudimos cargar las categorias.');
+      throw Exception('No pudimos cargar las categorías.');
     }
 
     final categories = decoded

@@ -507,7 +507,7 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
             ),
             SizedBox(width: AppSpacing.md),
             Text(
-              'Buscando productos y categorias...',
+              'Buscando productos y categorías...',
               style: TextStyle(
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w700,
@@ -526,7 +526,7 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'No encontramos coincidencias rapidas',
+              'No encontramos coincidencias rápidas',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -534,7 +534,7 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
             ),
             const SizedBox(height: AppIconSize.actionDot),
             const Text(
-              'Puedes ver todos los resultados del catalogo.',
+              'Puedes ver todos los resultados del catálogo.',
               style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: AppTextSize.body,
@@ -551,10 +551,10 @@ class _SearchSuggestionsOverlay extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (categorySuggestions.isNotEmpty) ...[
-          const _SuggestionSectionHeader(title: 'Categorias'),
+          const _SuggestionSectionHeader(title: 'Categorías'),
           ...categorySuggestions.map(
             (category) => _CategorySuggestionTile(
-              name: (category['name'] ?? 'Categoria').toString(),
+              name: (category['name'] ?? 'Categoría').toString(),
               count: int.tryParse((category['count'] ?? '').toString()) ?? 0,
               onTap: () => onCategoryTap(category),
             ),

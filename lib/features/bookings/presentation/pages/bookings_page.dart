@@ -3771,7 +3771,7 @@ END:VCALENDAR
                                 width: AppSpacing.sm + AppSpacing.xxs),
                             const Expanded(
                               child: Text(
-                                'Resumen rápido',
+                                'Resumen de la reserva',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: AppTextSize.titleMedium,
@@ -4302,7 +4302,7 @@ END:VCALENDAR
     }
 
     return SizedBox(
-      height: 214,
+      height: 260,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _filteredEmployees.length,
@@ -4856,7 +4856,7 @@ class _BarberPickerCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.panel,
         child: Ink(
-          width: 156,
+          width: 168,
           decoration: BoxDecoration(
             color: selected ? AppColors.goldSurface : AppColors.surfaceElevated,
             borderRadius: AppRadius.panel,
@@ -4873,7 +4873,7 @@ class _BarberPickerCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: AppRadius.large,
                   child: SizedBox(
-                    height: 104,
+                    height: 148,
                     width: double.infinity,
                     child: HabitoPortraitImage(
                       imageUrl: imageUrl,

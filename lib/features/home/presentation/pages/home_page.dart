@@ -10,6 +10,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_top_header.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
 import '../../../auth/provider/auth_provider.dart';
+import '../../../points/models/points_summary.dart';
+import '../../../points/provider/points_provider.dart';
 import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
@@ -53,7 +55,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppTopHeader(
-        searchHint: 'Buscar productos y favoritos',
+        searchHint: 'Buscar productos en tienda',
         cartCount: cartCount,
         onSearchTap: () {
           Navigator.push(
@@ -84,7 +86,7 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
           const _SectionHeader(
             title: 'Accesos rápidos',
-            subtitle: 'Todo lo importante a un toque.',
+            subtitle: 'Reserva, compra y revisa tus beneficios.',
           ),
           const SizedBox(height: AppSpacing.md + AppSpacing.xs),
           LayoutBuilder(
@@ -104,28 +106,28 @@ class HomePage extends StatelessWidget {
                   _QuickActionCard(
                     icon: Icons.calendar_month_rounded,
                     title: 'Reservar cita',
-                    subtitle: 'Agenda tu próximo espacio',
+                    subtitle: 'Elige servicio, barbero y horario',
                     onTap: () => _openBookings(context),
                     compact: compact,
                   ),
                   _QuickActionCard(
                     icon: Icons.shopping_bag_rounded,
                     title: 'Tienda',
-                    subtitle: 'Compra productos Hábito',
+                    subtitle: 'Productos para tu cuidado diario',
                     onTap: () => _goToTab(context, 1),
                     compact: compact,
                   ),
                   _QuickActionCard(
                     icon: Icons.workspace_premium_rounded,
                     title: 'Puntos',
-                    subtitle: 'Consulta tus beneficios',
+                    subtitle: 'Saldo, referidos y cumpleaños',
                     onTap: () => _goToTab(context, 3),
                     compact: compact,
                   ),
                   _QuickActionCard(
                     icon: Icons.storefront_rounded,
                     title: 'Sucursales',
-                    subtitle: 'Encuentra la más cercana',
+                    subtitle: 'Ubicación y contacto directo',
                     onTap: () => Navigator.pushNamed(
                       context,
                       AppRoutes.locations,
@@ -136,7 +138,7 @@ class HomePage extends StatelessWidget {
                   _QuickActionCard(
                     icon: Icons.person_outline_rounded,
                     title: 'Perfil',
-                    subtitle: 'Edita tu información',
+                    subtitle: 'Datos, pedidos y notificaciones',
                     onTap: () => _goToTab(context, 4),
                     compact: compact,
                   ),
@@ -148,15 +150,17 @@ class HomePage extends StatelessWidget {
           const TeamHabitoHomeSection(),
           const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
           const _SectionHeader(
-            title: 'Momentos Hábito',
-            subtitle: 'Una experiencia cuidada, precisa y elegante.',
+            title: 'Beneficios Hábito',
+            subtitle: 'Gana, comparte y celebra dentro de tu cuenta.',
           ),
           const SizedBox(height: AppSpacing.md + AppSpacing.xs),
-          const _EditorialStrip(),
+          _BenefitsStrip(
+            onBenefitsTap: () => _goToTab(context, 3),
+          ),
           const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
           const _SectionHeader(
             title: 'Tu actividad',
-            subtitle: 'Resumen rápido de tu cuenta.',
+            subtitle: 'Citas, puntos y perfil en un solo lugar.',
           ),
           const SizedBox(height: AppSpacing.md),
           const _ActivityCard(),
@@ -496,25 +500,44 @@ class _QuickActionCard extends StatelessWidget {
   }
 }
 
-class _EditorialStrip extends StatelessWidget {
-  const _EditorialStrip();
+class _BenefitsStrip extends StatelessWidget {
+  final VoidCallback onBenefitsTap;
+
+  const _BenefitsStrip({
+    required this.onBenefitsTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cards = [
-      (
-        'Presencia',
-        'Negro, blanco y detalles dorados para una imagen limpia y segura.'
+      const _BenefitCardData(
+        icon: Icons.workspace_premium_rounded,
+        eyebrow: 'Puntos',
+        title: 'Reserva y acumula',
+        description:
+            'Cada cita o compra válida suma puntos para usar en próximos beneficios.',
+        actionLabel: 'Ver saldo',
       ),
-      (
-        'Cuidado',
-        'Cada reserva y cada compra deben sentirse fluidas y bien resueltas.'
+      const _BenefitCardData(
+        icon: Icons.group_add_rounded,
+        eyebrow: 'Referidos',
+        title: 'Invita y gana',
+        description:
+            'Comparte tu enlace personal y recibe puntos cuando tu referido complete su primera cita.',
+        actionLabel: 'Compartir',
       ),
-      ('Detalle', 'Menos ruido visual y mejor foco en los pasos que importan.'),
+      const _BenefitCardData(
+        icon: Icons.cake_rounded,
+        eyebrow: 'Cumpleaños',
+        title: 'Bono especial',
+        description:
+            'En tu mes de cumpleaños puedes recibir un bono para reservar tu próxima experiencia.',
+        actionLabel: 'Revisar bono',
+      ),
     ];
 
     return SizedBox(
-      height: 188,
+      height: 214,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
@@ -523,55 +546,10 @@ class _EditorialStrip extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = cards[index];
           final darkCard = index == 1;
-          return Container(
-            width: 210,
-            padding: const EdgeInsets.all(AppSpacing.xl - AppSpacing.xs),
-            decoration: BoxDecoration(
-              color: darkCard ? AppColors.primary : AppColors.surface,
-              borderRadius: AppRadius.extraLarge,
-              border: Border.all(
-                color: darkCard
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : AppColors.border,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 34,
-                  height: AppSpacing.xs,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: AppRadius.full,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg + AppSpacing.xs),
-                Text(
-                  item.$1,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: darkCard ? Colors.white : AppColors.textPrimary,
-                      ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
-                Expanded(
-                  child: Text(
-                    item.$2,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          height: 1.4,
-                          color: darkCard
-                              ? AppColors.textOnDark
-                              : AppColors.textSecondary,
-                        ),
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+          return _BenefitCard(
+            data: item,
+            darkCard: darkCard,
+            onTap: onBenefitsTap,
           );
         },
       ),
@@ -579,23 +557,218 @@ class _EditorialStrip extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard();
+class _BenefitCardData {
+  final IconData icon;
+  final String eyebrow;
+  final String title;
+  final String description;
+  final String actionLabel;
+
+  const _BenefitCardData({
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+  });
+}
+
+class _BenefitCard extends StatelessWidget {
+  final _BenefitCardData data;
+  final bool darkCard;
+  final VoidCallback onTap;
+
+  const _BenefitCard({
+    required this.data,
+    required this.darkCard,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
+    final foreground = darkCard ? Colors.white : AppColors.textPrimary;
+    final muted = darkCard ? AppColors.textOnDark : AppColors.textSecondary;
+    final chipBackground = darkCard
+        ? Colors.white.withValues(alpha: 0.1)
+        : AppColors.secondary.withValues(alpha: 0.18);
+
+    return SizedBox(
+      width: 226,
+      child: Material(
+        color: darkCard ? AppColors.primary : AppColors.surface,
+        borderRadius: AppRadius.extraLarge,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.extraLarge,
+          child: Ink(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.extraLarge,
+              border: Border.all(
+                color: darkCard
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : AppColors.border,
+              ),
+              boxShadow: darkCard ? AppShadows.medium : AppShadows.light,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: chipBackground,
+                        borderRadius: AppRadius.large,
+                      ),
+                      child: Icon(
+                        data.icon,
+                        size: AppIconSize.md,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        data.eyebrow,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: darkCard
+                                  ? AppColors.goldLight
+                                  : AppColors.goldDeep,
+                              fontWeight: FontWeight.w800,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  data.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: foreground,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    data.description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          height: 1.35,
+                          color: muted,
+                        ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Text(
+                      data.actionLabel,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: darkCard
+                                ? AppColors.goldLight
+                                : AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: AppIconSize.sm,
+                      color: darkCard
+                          ? AppColors.goldLight
+                          : AppColors.primary,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatefulWidget {
+  const _ActivityCard();
+
+  @override
+  State<_ActivityCard> createState() => _ActivityCardState();
+}
+
+class _ActivityCardState extends State<_ActivityCard> {
+  bool _requestedPointsLoad = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadPointsIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActivityCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadPointsIfNeeded();
+  }
+
+  void _loadPointsIfNeeded() {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      _requestedPointsLoad = false;
+      return;
+    }
+
+    if (_requestedPointsLoad) return;
+    _requestedPointsLoad = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final points = context.read<PointsProvider>();
+      if (!points.isLoading) {
+        points.load();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<AuthProvider, PointsProvider>(
+      builder: (context, auth, points, _) {
         final user = auth.user;
         final isLoggedIn = auth.isLoggedIn;
-        final pointsEnabled = user?.pointsEnabled ?? false;
-        final pointsLabel = (user?.pointsLabel ?? 'pts').trim();
-        final pointsBalance = user?.pointsBalance ?? 0;
-        final pointsValue = !isLoggedIn
-            ? 'Inicia sesión'
-            : !pointsEnabled
-                ? 'No activo'
-                : '${_formatPoints(pointsBalance)} ${pointsLabel.isEmpty ? 'pts' : pointsLabel}';
+        final pointsValue = _pointsValue(
+          isLoggedIn: isLoggedIn,
+          points: points,
+          fallback: user == null
+              ? null
+              : PointsSummary(
+                  enabled: user.pointsEnabled,
+                  mycredAvailable: user.pointsEnabled,
+                  balance: user.pointsBalance,
+                  totalEarned: user.pointsTotalEarned,
+                  pointType: user.pointsType,
+                  label: user.pointsLabel,
+                  nextGoal: user.pointsNextGoal ?? 0,
+                  toNextGoal: 0,
+                  redeemEnabled: user.pointsRedeemEnabled,
+                  redeemProductsEnabled: user.pointsRedeemProductsEnabled,
+                  redeemBookingsEnabled: user.pointsRedeemBookingsEnabled,
+                  redeemPointsPerUsd: user.pointsRedeemPointsPerUsd,
+                  redeemMinPoints: user.pointsRedeemMinPoints,
+                  redeemMaxPercent: user.pointsRedeemMaxPercent,
+                  bookingPointsEnabled: user.pointsEnabled,
+                  orderPointsEnabled: user.pointsEnabled,
+                ),
+        );
 
         return Container(
           padding: const EdgeInsets.all(AppSpacing.lg + AppSpacing.xxs),
@@ -635,11 +808,20 @@ class _ActivityCard extends StatelessWidget {
     );
   }
 
-  String _formatPoints(double value) {
-    final normalized = value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(2);
-    return normalized.replaceAll(RegExp(r'\.?0+$'), '');
+  String _pointsValue({
+    required bool isLoggedIn,
+    required PointsProvider points,
+    required PointsSummary? fallback,
+  }) {
+    if (!isLoggedIn) return 'Inicia sesión';
+
+    final summary = points.summary ?? fallback;
+    if (summary == null && points.isLoading) return 'Actualizando';
+    if (summary == null) return 'Sin datos';
+    if (!summary.enabled || !summary.mycredAvailable) return 'No activo';
+
+    final label = summary.label.trim().isEmpty ? 'Puntos' : summary.label;
+    return '${summary.formattedBalance} $label';
   }
 }
 
@@ -669,7 +851,7 @@ class _ActivityHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Estado de tu cuenta',
+                'Tu cuenta Hábito',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -677,7 +859,7 @@ class _ActivityHeader extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xxs),
               Text(
-                'Resumen rápido de tus datos principales.',
+                'Consulta tu agenda, beneficios y estado de sesión.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
