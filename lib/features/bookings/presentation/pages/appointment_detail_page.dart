@@ -15,6 +15,7 @@ import '../../../shop/data/services/habito_booking_api.dart';
 import '../../../shop/presentation/pages/cart_page.dart';
 import '../../../shop/presentation/pages/products_archive_page.dart';
 import '../../../shop/provider/shop_provider.dart';
+import '../../utils/booking_datetime_parser.dart';
 import 'bookings_page.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
@@ -286,19 +287,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   DateTime? _parseBackendDateTime(String value) {
-    final clean = value.trim();
-    if (clean.isEmpty) return null;
-
-    try {
-      return DateTime.parse(clean).toLocal();
-    } catch (_) {}
-
-    try {
-      final normalized = clean.replaceFirst(' ', 'T');
-      return DateTime.parse(normalized).toLocal();
-    } catch (_) {}
-
-    return null;
+    return parseBookingWallDateTime(value);
   }
 
   String _formatBackendDate(String? value) {
