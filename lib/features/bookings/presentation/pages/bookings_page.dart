@@ -97,6 +97,26 @@ class _BookingPaymentMethodsState {
 }
 
 class _BookingsPageState extends State<BookingsPage> {
+  static const List<String> _authSessionErrorFragments = [
+    '401',
+    'sesi',
+    'inicia sesión',
+    'inicia sesion',
+    'no se pudo autenticar',
+    'no pudimos autenticar',
+    'no se pudo validar el usuario',
+    'no pudimos validar tu sesión',
+    'no pudimos validar tu sesion',
+    'token no encontrado',
+    'token inválido',
+    'token invalido',
+    'token de autenticación',
+    'token de autenticacion',
+    'habito_auth_invalid',
+    'rest_not_logged_in',
+    'jwt',
+  ];
+
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _middleNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
@@ -1236,8 +1256,6 @@ class _BookingsPageState extends State<BookingsPage> {
   }
 
   String? _validateBookingIdentificationNumber(String? value) {
-    if ((value ?? '').trim().isEmpty) return null;
-
     return EcuadorIdValidator.validate(
       identificationType: _effectiveIdentificationType,
       value: value,
@@ -2015,9 +2033,11 @@ END:VCALENDAR
 
     String? pointsReservationId;
     PointsProvider? pointsProviderForReservation;
+    AuthProvider? authProviderForSession;
 
     try {
       final authProvider = context.read<AuthProvider>();
+      authProviderForSession = authProvider;
       final pointsProvider = context.read<PointsProvider>();
       pointsProviderForReservation = pointsProvider;
 
@@ -2147,11 +2167,9 @@ END:VCALENDAR
         'phone': phoneToSend,
         'country_phone_iso': 'ec',
         'contact_type': _contactType.trim(),
+        'identification_type': _effectiveIdentificationType,
+        'tax_number': taxNumberToSend,
         'province': _province.trim(),
-        if (taxNumberToSend.isNotEmpty) ...{
-          'identification_type': _effectiveIdentificationType,
-          'tax_number': taxNumberToSend,
-        },
         if (cityToSend.isNotEmpty) 'city': cityToSend,
         if (addressToSend.isNotEmpty) 'address': addressToSend,
         if (_contactType == 'business' && businessNameToSend.isNotEmpty)
@@ -2251,6 +2269,9 @@ END:VCALENDAR
           error: e,
         ),
       );
+      if (_isAuthSessionError(e)) {
+        await authProviderForSession?.expireSession();
+      }
       if (!mounted) return;
       _showMessage('No se pudo crear la reserva: ${_friendlyBookingError(e)}');
     } finally {
@@ -2333,6 +2354,12 @@ END:VCALENDAR
     return false;
   }
 
+  bool _isAuthSessionError(Object error) {
+    final message = _cleanBookingErrorMessage(error).toLowerCase();
+    if (message.isEmpty) return false;
+    return _containsAny(message, _authSessionErrorFragments);
+  }
+
   String _friendlyAvailabilityError(Object error) {
     final message = _cleanBookingErrorMessage(error);
     final lower = message.toLowerCase();
@@ -2341,7 +2368,7 @@ END:VCALENDAR
       return 'No pudimos actualizar los horarios disponibles. Intenta nuevamente en unos segundos.';
     }
 
-    if (_containsAny(lower, ['sesi', 'token', '401'])) {
+    if (_containsAny(lower, _authSessionErrorFragments)) {
       return 'Tu sesión venció. Inicia sesión nuevamente para consultar horarios.';
     }
 
@@ -2386,7 +2413,7 @@ END:VCALENDAR
       return 'inténtalo nuevamente en unos segundos.';
     }
 
-    if (_containsAny(lower, ['sesi', 'token', '401'])) {
+    if (_containsAny(lower, _authSessionErrorFragments)) {
       return 'Tu sesión venció. Inicia sesión nuevamente para continuar.';
     }
 
@@ -3666,7 +3693,7 @@ END:VCALENDAR
                         const SizedBox(height: AppSpacing.md),
                         _buildTextField(
                           controller: _taxNumberController,
-                          label: '$_bookingDocumentLabel (opcional)',
+                          label: _bookingDocumentLabel,
                           icon: Icons.badge_outlined,
                           keyboardType:
                               _effectiveIdentificationType == 'pasaporte'

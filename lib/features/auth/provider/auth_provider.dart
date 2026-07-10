@@ -13,6 +13,28 @@ import '../services/auth_storage.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const Duration _pendingSyncRetryCooldown = Duration(minutes: 10);
+  static const List<String> _sessionExpiredFragments = [
+    '401',
+    '403',
+    'sesión',
+    'sesion',
+    'token no encontrado',
+    'token inválido',
+    'token invalido',
+    'token de autenticación',
+    'token de autenticacion',
+    'ya no es válida',
+    'ya no es valida',
+    'no se pudo validar',
+    'no pudimos validar',
+    'no se pudo autenticar',
+    'no pudimos autenticar',
+    'inicia sesión',
+    'inicia sesion',
+    'rest_not_logged_in',
+    'habito_auth_invalid',
+    'jwt',
+  ];
 
   final AuthApi _api;
   final AuthStorage _storage;
@@ -90,12 +112,17 @@ class AuthProvider extends ChangeNotifier {
           await _storage.saveSession(token: token, user: refreshedUser);
           shouldNotify = true;
         }
-      } catch (_) {
-        // Si falla el refresh, mantenemos la sesion local existente.
+      } catch (e) {
+        if (_token == token && _isSessionExpiredError(e)) {
+          await _clearSession(clearStorage: true);
+          shouldNotify = true;
+        }
       }
 
       try {
-        await PushNotificationService.registerToken(authToken: token);
+        if (_token == token) {
+          await PushNotificationService.registerToken(authToken: token);
+        }
       } catch (_) {
         // No critico: el proximo login o refresh volvera a registrarlo.
       }
@@ -354,8 +381,13 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
       return true;
-    } catch (_) {
-      // Mantenemos la sesion actual si el refresh falla.
+    } catch (e) {
+      if (_isSessionExpiredError(e)) {
+        await _clearSession(clearStorage: true);
+        if (notify) {
+          notifyListeners();
+        }
+      }
       return false;
     }
   }
@@ -414,6 +446,24 @@ class AuthProvider extends ChangeNotifier {
     HabitoBookingApi.clearMyBookingsCache();
     MyAppointmentsPage.clearCachedState();
     notifyListeners();
+  }
+
+  Future<void> expireSession() async {
+    await _clearSession(clearStorage: true);
+    notifyListeners();
+  }
+
+  bool _isSessionExpiredError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.trim().isEmpty) return false;
+
+    for (final fragment in _sessionExpiredFragments) {
+      if (message.contains(fragment)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void clearError() {
