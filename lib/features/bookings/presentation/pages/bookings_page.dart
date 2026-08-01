@@ -22,6 +22,7 @@ import '../../../../core/theme/app_text_size.dart';
 import '../../../../core/validators/ecuador_id_validator.dart';
 import '../../../../core/validators/form_validators.dart';
 import '../../../../shared/widgets/habito_cached_network_image.dart';
+import '../../../../shared/widgets/habito_booking_progress_overlay.dart';
 import '../../../../shared/widgets/habito_empty_state.dart';
 import '../../../../shared/widgets/habito_loading_shimmer.dart';
 import '../../../../shared/widgets/main_navigation_page.dart';
@@ -3398,586 +3399,602 @@ END:VCALENDAR
         ? _formatDurationLabel(_getGrandTotalDuration())
         : '-';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          _isEditing ? 'Reagendar cita' : 'Reservar cita',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
+    return PopScope(
+      canPop: !_isSubmittingBooking,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          centerTitle: true,
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: Text(
+            _isEditing ? 'Reagendar cita' : 'Reservar cita',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Padding(
-                padding: EdgeInsets.all(AppSpacing.lg),
-                child: HabitoLoadingShimmer(
-                  itemCount: 5,
-                  itemHeight: 118,
-                ),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: AppRadius.panel,
-                      boxShadow: AppShadows.panel,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: AppRadius.large,
-                            child: Container(
-                              width: AppIconSize.serviceThumbnail,
-                              height: AppIconSize.serviceThumbnail,
-                              color: AppColors.surfaceMuted,
-                              child: image != null && image.isNotEmpty
-                                  ? HabitoCachedNetworkImage(
-                                      imageUrl: image,
-                                      fit: BoxFit.cover,
-                                      semanticLabel:
-                                          'Imagen del servicio $title',
-                                      errorWidget: _serviceFallback(),
-                                    )
-                                  : Semantics(
-                                      label: 'Imagen del servicio $title',
-                                      image: true,
-                                      child: _serviceFallback(),
-                                    ),
-                            ),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(AppSpacing.lg),
+                      child: HabitoLoadingShimmer(
+                        itemCount: 5,
+                        itemHeight: 118,
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: AppRadius.panel,
+                            boxShadow: AppShadows.panel,
                           ),
-                          const SizedBox(width: AppSpacing.md + AppSpacing.xxs),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
                               children: [
-                                const Text(
-                                  'Servicio seleccionado',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: AppTextSize.bodySmall,
-                                    fontWeight: FontWeight.w600,
+                                ClipRRect(
+                                  borderRadius: AppRadius.large,
+                                  child: Container(
+                                    width: AppIconSize.serviceThumbnail,
+                                    height: AppIconSize.serviceThumbnail,
+                                    color: AppColors.surfaceMuted,
+                                    child: image != null && image.isNotEmpty
+                                        ? HabitoCachedNetworkImage(
+                                            imageUrl: image,
+                                            fit: BoxFit.cover,
+                                            semanticLabel:
+                                                'Imagen del servicio $title',
+                                            errorWidget: _serviceFallback(),
+                                          )
+                                        : Semantics(
+                                            label: 'Imagen del servicio $title',
+                                            image: true,
+                                            child: _serviceFallback(),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(
-                                    height: AppSpacing.xs + AppSpacing.xxs),
-                                Text(
-                                  title,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: AppTextSize.titleLarge,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(
-                                    height: AppSpacing.sm + AppSpacing.xxs),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 7,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.goldSoft,
-                                        borderRadius: AppRadius.full,
-                                      ),
-                                      child: Text(
-                                        price,
-                                        style: const TextStyle(
-                                          color: AppColors.goldDeep,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: AppTextSize.base,
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 7,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surfaceMuted,
-                                        borderRadius: AppRadius.full,
-                                      ),
-                                      child: Text(
-                                        durationLabel,
-                                        style: const TextStyle(
+                                    width: AppSpacing.md + AppSpacing.xxs),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Servicio seleccionado',
+                                        style: TextStyle(
                                           color: AppColors.textSecondary,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: AppTextSize.body,
+                                          fontSize: AppTextSize.bodySmall,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(
+                                          height:
+                                              AppSpacing.xs + AppSpacing.xxs),
+                                      Text(
+                                        title,
+                                        style: const TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: AppTextSize.titleLarge,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(
+                                          height:
+                                              AppSpacing.sm + AppSpacing.xxs),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 7,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.goldSoft,
+                                              borderRadius: AppRadius.full,
+                                            ),
+                                            child: Text(
+                                              price,
+                                              style: const TextStyle(
+                                                color: AppColors.goldDeep,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: AppTextSize.base,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 7,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surfaceMuted,
+                                              borderRadius: AppRadius.full,
+                                            ),
+                                            child: Text(
+                                              durationLabel,
+                                              style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: AppTextSize.body,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Servicio',
-                    child: _buildServiceDropdown(),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Extras del servicio',
-                    child: _buildExtrasSection(),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Sucursal',
-                    child: _buildLocationDropdown(),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Barbero',
-                    child: _buildEmployeeDropdown(),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Fecha',
-                    child: InkWell(
-                      onTap: _pickDate,
-                      borderRadius: AppRadius.tile,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 16,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceElevated,
-                          borderRadius: AppRadius.tile,
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_month_rounded,
-                              color: AppColors.goldDeep,
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Text(
-                                _selectedDate == null
-                                    ? 'Selecciona el día de tu reserva'
-                                    : _formatDate(_selectedDate!),
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: AppTextSize.titleSmall,
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.textSecondary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Horarios disponibles',
-                    child: _buildAvailabilitySection(),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Datos del cliente y facturación',
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          controller: _firstNameController,
-                          label: 'Primer nombre',
-                          icon: Icons.person_outline_rounded,
-                          keyboardType: TextInputType.name,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.givenName],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _middleNameController,
-                          label: 'Segundo nombre',
-                          icon: Icons.person_outline_rounded,
-                          keyboardType: TextInputType.name,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.middleName],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _lastNameController,
-                          label: 'Apellidos',
-                          icon: Icons.badge_outlined,
-                          keyboardType: TextInputType.name,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.familyName],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildDropdownField(
-                          label: 'Tipo de cliente',
-                          icon: Icons.apartment_outlined,
-                          value: _contactType,
-                          items: kContactTypeLabels.entries
-                              .map(
-                                (entry) => DropdownMenuItem<String>(
-                                  value: entry.key,
-                                  child: Text(entry.value),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _contactType = value;
-                              if (_contactType == 'business') {
-                                _identificationType = 'ruc';
-                              }
-                            });
-                          },
-                        ),
-                        if (_contactType == 'business') ...[
-                          const SizedBox(height: AppSpacing.md),
-                          _buildTextField(
-                            controller: _businessNameController,
-                            label: 'Razon social (opcional)',
-                            icon: Icons.business_outlined,
-                            keyboardType: TextInputType.name,
-                            textInputAction: TextInputAction.next,
-                            autofillHints: const [
-                              AutofillHints.organizationName,
-                            ],
-                            maxLength: FormValidators.longTextMaxLength,
-                          ),
-                        ],
-                        const SizedBox(height: AppSpacing.md),
-                        _buildDropdownField(
-                          label: 'Tipo de identificacion',
-                          icon: Icons.credit_card_outlined,
-                          value: _effectiveIdentificationType,
-                          items: _bookingIdentificationTypes
-                              .map(
-                                (type) => DropdownMenuItem<String>(
-                                  value: type,
-                                  child: Text(
-                                    kIdentificationTypeLabels[type] ?? type,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _identificationType = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _taxNumberController,
-                          label: _bookingDocumentLabel,
-                          icon: Icons.badge_outlined,
-                          keyboardType:
-                              _effectiveIdentificationType == 'pasaporte'
-                                  ? TextInputType.text
-                                  : TextInputType.number,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.username],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildDropdownField(
-                          label: 'Provincia',
-                          icon: Icons.map_outlined,
-                          value: _province,
-                          items: kEcuadorProvinces
-                              .map(
-                                (province) => DropdownMenuItem<String>(
-                                  value: province,
-                                  child: Text(province),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _province = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _cityController,
-                          label: 'Canton o ciudad (opcional)',
-                          icon: Icons.location_city_outlined,
-                          keyboardType: TextInputType.name,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.addressCity],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _addressController,
-                          label: 'Dirección principal (opcional)',
-                          icon: Icons.home_outlined,
-                          keyboardType: TextInputType.streetAddress,
-                          textInputAction: TextInputAction.newline,
-                          autofillHints: const [
-                            AutofillHints.fullStreetAddress,
-                          ],
-                          maxLength: FormValidators.longTextMaxLength,
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _phoneController,
-                          label: 'Celular',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [
-                            AutofillHints.telephoneNumber,
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildTextField(
-                          controller: _emailController,
-                          label: 'Correo electronico',
-                          icon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.done,
-                          autofillHints: const [AutofillHints.email],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                  _sectionCard(
-                    title: 'Método de pago',
-                    child: _buildPaymentMethodSection(
-                      paymentState,
-                      auth,
-                      pointsProvider,
-                      pointsState,
-                      totalPrice,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: AppRadius.panel,
-                      boxShadow: AppShadows.panel,
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.receipt_long_rounded,
-                              color: AppColors.goldDeep,
-                            ),
-                            const SizedBox(
-                                width: AppSpacing.sm + AppSpacing.xxs),
-                            const Expanded(
-                              child: Text(
-                                'Resumen de la reserva',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: AppTextSize.titleMedium,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isReadyForSubmit
-                                    ? AppColors.successSoft
-                                    : AppColors.warningSoft,
-                                borderRadius: AppRadius.full,
-                              ),
-                              child: Text(
-                                isReadyForSubmit ? 'Listo' : 'Incompleto',
-                                style: TextStyle(
-                                  color: isReadyForSubmit
-                                      ? AppColors.success
-                                      : AppColors.warningDeep,
-                                  fontSize: AppTextSize.label,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Servicio',
+                          child: _buildServiceDropdown(),
                         ),
                         const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
-                        _infoLine('Servicio', title),
-                        _infoLine(
-                          'Base',
-                          _formatCurrency(_getBaseServicePrice()),
+                        _sectionCard(
+                          title: 'Extras del servicio',
+                          child: _buildExtrasSection(),
                         ),
-                        if (_getSelectedExtrasDetailed().isNotEmpty)
-                          _infoLine(
-                            'Extras',
-                            _formatCurrency(_getSelectedExtrasPriceTotal()),
-                          ),
-                        if (birthdayDiscount > 0)
-                          _infoLine(
-                            'Bono cumpleaños',
-                            '-${_formatCurrency(birthdayDiscount)}',
-                          ),
-                        if (pointsDiscount > 0)
-                          _infoLine(
-                            'Descuento por puntos',
-                            '-${_formatCurrency(pointsDiscount)}',
-                          ),
-                        _infoLine('Total', price),
-                        _infoLine('Duración', durationLabel),
-                        _infoLine(
-                            'Sucursal', _selectedLocation?['name'] ?? '-'),
-                        _infoLine(
-                          'Barbero',
-                          _selectedEmployee?['fullName'] ?? '-',
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Sucursal',
+                          child: _buildLocationDropdown(),
                         ),
-                        _infoLine(
-                          'Fecha',
-                          _selectedDate == null
-                              ? 'No seleccionada'
-                              : _formatDate(_selectedDate!),
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Barbero',
+                          child: _buildEmployeeDropdown(),
                         ),
-                        _infoLine(
-                            'Hora', _selectedTimeSlot ?? 'No seleccionada'),
-                        _infoLine('Pago', selectedPaymentMethod.title),
-                        if (bookingBlockingReason != null) ...[
-                          const SizedBox(height: AppSpacing.md),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.warningSoft,
-                              borderRadius: AppRadius.tile,
-                              border: Border.all(
-                                color: AppColors.borderStrong,
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Fecha',
+                          child: InkWell(
+                            onTap: _pickDate,
+                            borderRadius: AppRadius.tile,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceElevated,
+                                borderRadius: AppRadius.tile,
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    color: AppColors.goldDeep,
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Text(
+                                      _selectedDate == null
+                                          ? 'Selecciona el día de tu reserva'
+                                          : _formatDate(_selectedDate!),
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppTextSize.titleSmall,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.info_outline_rounded,
-                                  color: AppColors.warningDeep,
-                                  size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Horarios disponibles',
+                          child: _buildAvailabilitySection(),
+                        ),
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Datos del cliente y facturación',
+                          child: Column(
+                            children: [
+                              _buildTextField(
+                                controller: _firstNameController,
+                                label: 'Primer nombre',
+                                icon: Icons.person_outline_rounded,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.givenName],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _middleNameController,
+                                label: 'Segundo nombre',
+                                icon: Icons.person_outline_rounded,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.middleName],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _lastNameController,
+                                label: 'Apellidos',
+                                icon: Icons.badge_outlined,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.familyName],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildDropdownField(
+                                label: 'Tipo de cliente',
+                                icon: Icons.apartment_outlined,
+                                value: _contactType,
+                                items: kContactTypeLabels.entries
+                                    .map(
+                                      (entry) => DropdownMenuItem<String>(
+                                        value: entry.key,
+                                        child: Text(entry.value),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _contactType = value;
+                                    if (_contactType == 'business') {
+                                      _identificationType = 'ruc';
+                                    }
+                                  });
+                                },
+                              ),
+                              if (_contactType == 'business') ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _buildTextField(
+                                  controller: _businessNameController,
+                                  label: 'Razon social (opcional)',
+                                  icon: Icons.business_outlined,
+                                  keyboardType: TextInputType.name,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.organizationName,
+                                  ],
+                                  maxLength: FormValidators.longTextMaxLength,
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    bookingBlockingReason,
-                                    style: const TextStyle(
-                                      color: AppColors.warningDeep,
-                                      fontSize: AppTextSize.bodyStrong,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.w700,
+                              ],
+                              const SizedBox(height: AppSpacing.md),
+                              _buildDropdownField(
+                                label: 'Tipo de identificacion',
+                                icon: Icons.credit_card_outlined,
+                                value: _effectiveIdentificationType,
+                                items: _bookingIdentificationTypes
+                                    .map(
+                                      (type) => DropdownMenuItem<String>(
+                                        value: type,
+                                        child: Text(
+                                          kIdentificationTypeLabels[type] ??
+                                              type,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _identificationType = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _taxNumberController,
+                                label: _bookingDocumentLabel,
+                                icon: Icons.badge_outlined,
+                                keyboardType:
+                                    _effectiveIdentificationType == 'pasaporte'
+                                        ? TextInputType.text
+                                        : TextInputType.number,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.username],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildDropdownField(
+                                label: 'Provincia',
+                                icon: Icons.map_outlined,
+                                value: _province,
+                                items: kEcuadorProvinces
+                                    .map(
+                                      (province) => DropdownMenuItem<String>(
+                                        value: province,
+                                        child: Text(province),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _province = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _cityController,
+                                label: 'Canton o ciudad (opcional)',
+                                icon: Icons.location_city_outlined,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [
+                                  AutofillHints.addressCity
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _addressController,
+                                label: 'Dirección principal (opcional)',
+                                icon: Icons.home_outlined,
+                                keyboardType: TextInputType.streetAddress,
+                                textInputAction: TextInputAction.newline,
+                                autofillHints: const [
+                                  AutofillHints.fullStreetAddress,
+                                ],
+                                maxLength: FormValidators.longTextMaxLength,
+                                maxLines: 2,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _phoneController,
+                                label: 'Celular',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [
+                                  AutofillHints.telephoneNumber,
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildTextField(
+                                controller: _emailController,
+                                label: 'Correo electronico',
+                                icon: Icons.mail_outline_rounded,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.done,
+                                autofillHints: const [AutofillHints.email],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md + AppSpacing.xxs),
+                        _sectionCard(
+                          title: 'Método de pago',
+                          child: _buildPaymentMethodSection(
+                            paymentState,
+                            auth,
+                            pointsProvider,
+                            pointsState,
+                            totalPrice,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg + AppSpacing.xxs),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: AppRadius.panel,
+                            boxShadow: AppShadows.panel,
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.receipt_long_rounded,
+                                    color: AppColors.goldDeep,
+                                  ),
+                                  const SizedBox(
+                                      width: AppSpacing.sm + AppSpacing.xxs),
+                                  const Expanded(
+                                    child: Text(
+                                      'Resumen de la reserva',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: AppTextSize.titleMedium,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isReadyForSubmit
+                                          ? AppColors.successSoft
+                                          : AppColors.warningSoft,
+                                      borderRadius: AppRadius.full,
+                                    ),
+                                    child: Text(
+                                      isReadyForSubmit ? 'Listo' : 'Incompleto',
+                                      style: TextStyle(
+                                        color: isReadyForSubmit
+                                            ? AppColors.success
+                                            : AppColors.warningDeep,
+                                        fontSize: AppTextSize.label,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(
+                                  height: AppSpacing.md + AppSpacing.xxs),
+                              _infoLine('Servicio', title),
+                              _infoLine(
+                                'Base',
+                                _formatCurrency(_getBaseServicePrice()),
+                              ),
+                              if (_getSelectedExtrasDetailed().isNotEmpty)
+                                _infoLine(
+                                  'Extras',
+                                  _formatCurrency(
+                                      _getSelectedExtrasPriceTotal()),
+                                ),
+                              if (birthdayDiscount > 0)
+                                _infoLine(
+                                  'Bono cumpleaños',
+                                  '-${_formatCurrency(birthdayDiscount)}',
+                                ),
+                              if (pointsDiscount > 0)
+                                _infoLine(
+                                  'Descuento por puntos',
+                                  '-${_formatCurrency(pointsDiscount)}',
+                                ),
+                              _infoLine('Total', price),
+                              _infoLine('Duración', durationLabel),
+                              _infoLine('Sucursal',
+                                  _selectedLocation?['name'] ?? '-'),
+                              _infoLine(
+                                'Barbero',
+                                _selectedEmployee?['fullName'] ?? '-',
+                              ),
+                              _infoLine(
+                                'Fecha',
+                                _selectedDate == null
+                                    ? 'No seleccionada'
+                                    : _formatDate(_selectedDate!),
+                              ),
+                              _infoLine('Hora',
+                                  _selectedTimeSlot ?? 'No seleccionada'),
+                              _infoLine('Pago', selectedPaymentMethod.title),
+                              if (bookingBlockingReason != null) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.warningSoft,
+                                    borderRadius: AppRadius.tile,
+                                    border: Border.all(
+                                      color: AppColors.borderStrong,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline_rounded,
+                                        color: AppColors.warningDeep,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Expanded(
+                                        child: Text(
+                                          bookingBlockingReason,
+                                          style: const TextStyle(
+                                            color: AppColors.warningDeep,
+                                            fontSize: AppTextSize.bodyStrong,
+                                            height: 1.35,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
-                            ),
-                          ),
-                        ],
-                        if (_getSelectedExtrasDetailed().isNotEmpty) ...[
-                          const SizedBox(
-                              height: AppSpacing.xs + AppSpacing.xxs),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Complementos elegidos',
-                              style: const TextStyle(
-                                color: AppColors.goldDeep,
-                                fontWeight: FontWeight.w800,
-                                fontSize: AppTextSize.bodyStrong,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          ..._getSelectedExtrasDetailed().map(
-                            (extra) => _infoLine(
-                              '${extra['quantity']}x',
-                              '${extra['name']} (${_formatCurrency(_safeDouble(extra['totalPrice']) ?? 0)})',
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: canConfirmBooking ? _confirmBooking : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        disabledBackgroundColor: AppColors.border,
-                        foregroundColor: AppColors.primary,
-                        disabledForegroundColor: AppColors.textMuted,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 17),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadius.large,
-                        ),
-                      ),
-                      child: _isSubmittingBooking
-                          ? const SizedBox(
-                              width: AppIconSize.progress,
-                              height: AppIconSize.progress,
-                              child: CircularProgressIndicator(
-                                strokeWidth: AppSpacing.progressStroke,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.primary,
+                              if (_getSelectedExtrasDetailed().isNotEmpty) ...[
+                                const SizedBox(
+                                    height: AppSpacing.xs + AppSpacing.xxs),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Complementos elegidos',
+                                    style: const TextStyle(
+                                      color: AppColors.goldDeep,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: AppTextSize.bodyStrong,
+                                    ),
+                                  ),
                                 ),
+                                const SizedBox(height: AppSpacing.sm),
+                                ..._getSelectedExtrasDetailed().map(
+                                  (extra) => _infoLine(
+                                    '${extra['quantity']}x',
+                                    '${extra['name']} (${_formatCurrency(_safeDouble(extra['totalPrice']) ?? 0)})',
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl - AppSpacing.xxs),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed:
+                                canConfirmBooking ? _confirmBooking : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              disabledBackgroundColor: AppColors.border,
+                              foregroundColor: AppColors.primary,
+                              disabledForegroundColor: AppColors.textMuted,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 17),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.large,
                               ),
-                            )
-                          : Text(
+                            ),
+                            child: Text(
                               _isEditing ? 'Guardar cambios' : 'Confirmar cita',
                               style: const TextStyle(
                                 fontSize: AppTextSize.titleMedium,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
+                        if (bookingBlockingReason != null)
+                          Text(
+                            bookingBlockingReason,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: AppTextSize.bodyStrong,
+                              height: 1.4,
+                            ),
+                          )
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm + AppSpacing.xxs),
-                  if (bookingBlockingReason != null)
-                    Text(
-                      bookingBlockingReason,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: AppTextSize.bodyStrong,
-                        height: 1.4,
-                      ),
-                    )
-                ],
-              ),
+              if (_isSubmittingBooking)
+                HabitoBookingProgressOverlay(
+                  title: _isEditing
+                      ? 'Estamos actualizando tu cita'
+                      : 'Estamos confirmando tu cita',
+                  message: _isEditing
+                      ? 'Verificamos el nuevo horario y guardamos los cambios.'
+                      : 'Verificamos el horario y guardamos tu reserva en Hábito.',
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
