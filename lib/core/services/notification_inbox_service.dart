@@ -340,17 +340,39 @@ class NotificationInboxService {
   }
 
   static Map<String, dynamic> _normalizeData(dynamic rawData) {
+    Map<String, dynamic> normalized;
+
     if (rawData is Map<String, dynamic>) {
-      return rawData.map(
+      normalized = rawData.map(
         (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
       );
-    }
-    if (rawData is Map) {
-      return rawData.map(
+    } else if (rawData is Map) {
+      normalized = rawData.map(
         (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
       );
+    } else {
+      return <String, dynamic>{};
     }
-    return <String, dynamic>{};
+
+    final rawPayload = normalized['payload']?.toString().trim() ?? '';
+    if (rawPayload.isEmpty) return normalized;
+
+    try {
+      final decoded = jsonDecode(rawPayload);
+      if (decoded is Map) {
+        final payloadData = decoded.map(
+          (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+        );
+        return {
+          ...payloadData,
+          ...normalized,
+        };
+      }
+    } catch (_) {
+      // Algunas notificaciones no usan payload JSON; se conservan tal cual.
+    }
+
+    return normalized;
   }
 
   static bool _isMeaningfulItem(Map<String, dynamic> item) {

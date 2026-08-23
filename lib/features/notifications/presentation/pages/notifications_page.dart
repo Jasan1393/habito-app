@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/notification_inbox_service.dart';
@@ -207,6 +208,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           data['screen'] ??
           data['target'],
     );
+    final action = _NotificationAction.fromItem(item);
 
     await _load();
     if (!mounted) return;
@@ -236,6 +238,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
       return;
     }
 
+    if (action.hasUrl &&
+        (action.isSriDocument || targetScreen == 'notifications')) {
+      await _openExternalActionUrl(action.url);
+      return;
+    }
+
     switch (targetScreen) {
       case 'shop':
         _openMainTab(1);
@@ -260,6 +268,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         );
         return;
       case 'notifications':
+        await _showNotificationPreview(item);
         return;
       case 'orders':
         Navigator.pushNamed(
@@ -289,6 +298,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _showNotificationPreview(Map<String, dynamic> item) async {
     final dateLabel = _formatDate((item['received_at'] ?? '').toString());
     final meta = _NotificationMeta.fromItem(item);
+    final action = _NotificationAction.fromItem(item);
     final title = (item['title'] ?? 'Hábito').toString();
     final body = (item['body'] ?? '').toString().trim();
     final previewText = body.isNotEmpty
@@ -399,12 +409,60 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     height: 1.5,
                   ),
                 ),
+                if (action.hasUrl) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppSpacing.actionHeight,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        unawaited(_openExternalActionUrl(action.url));
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.full,
+                        ),
+                      ),
+                      icon: Icon(action.icon),
+                      label: Text(
+                        action.label,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _openExternalActionUrl(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !_NotificationAction.isHttpUri(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+              content: Text('El enlace del documento no es válido.')),
+        );
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (opened || !mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('No pudimos abrir el documento.')),
+      );
   }
 
   String _formatDate(String value) {
@@ -931,6 +989,7 @@ class _NotificationCard extends StatelessWidget {
     final title = (item['title'] ?? 'Hábito').toString();
     final body = (item['body'] ?? '').toString().trim();
     final meta = _NotificationMeta.fromItem(item);
+    final action = _NotificationAction.fromItem(item);
 
     return Material(
       color: Colors.transparent,
@@ -1029,6 +1088,10 @@ class _NotificationCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (action.hasUrl) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _NotificationActionCue(action: action),
+                    ],
                     if (dateLabel.isNotEmpty) ...[
                       const SizedBox(
                           height: AppSpacing.sm + AppSpacing.xxs / 2),
@@ -1047,6 +1110,49 @@ class _NotificationCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationActionCue extends StatelessWidget {
+  final _NotificationAction action;
+
+  const _NotificationActionCue({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: AppRadius.full,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            action.icon,
+            color: Colors.white,
+            size: AppIconSize.sm,
+          ),
+          const SizedBox(width: AppSpacing.xs + AppSpacing.xxs),
+          Flexible(
+            child: Text(
+              action.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: AppTextSize.label,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1122,6 +1228,23 @@ class _NotificationMeta {
     final orderId = _parseInt(
       data['orderId'] ?? data['order_id'] ?? data['order'],
     );
+
+    if (_NotificationAction.isSriData(data)) {
+      final documentLabel =
+          (data['document_label'] ?? 'Factura electrónica').toString().trim();
+      final sriNumber =
+          (data['sri_number'] ?? data['sriNumber'] ?? '').toString().trim();
+      return _NotificationMeta(
+        icon: Icons.receipt_long_rounded,
+        iconBackground: AppColors.goldMuted,
+        iconColor: AppColors.goldDeep,
+        badgeLabel: 'Documento',
+        badgeBackground: AppColors.goldMuted,
+        badgeForeground: AppColors.goldDeep,
+        detailLine:
+            sriNumber.isNotEmpty ? '$documentLabel $sriNumber' : documentLabel,
+      );
+    }
 
     if (category == NotificationInboxService.categoryOrder ||
         type.contains('order') ||
@@ -1272,6 +1395,88 @@ class _NotificationMeta {
     if (value == null) return null;
     if (value is int) return value;
     return int.tryParse(value.toString());
+  }
+}
+
+class _NotificationAction {
+  final String url;
+  final String label;
+  final IconData icon;
+  final bool isSriDocument;
+
+  const _NotificationAction._({
+    required this.url,
+    required this.label,
+    required this.icon,
+    required this.isSriDocument,
+  });
+
+  bool get hasUrl => url.isNotEmpty;
+
+  factory _NotificationAction.fromItem(Map<String, dynamic> item) {
+    final data = _asMap(item['data']);
+    final url = _firstHttpUrl(data);
+    final isSriDocument = isSriData(data);
+
+    if (url.isEmpty) {
+      return const _NotificationAction._(
+        url: '',
+        label: '',
+        icon: Icons.open_in_new_rounded,
+        isSriDocument: false,
+      );
+    }
+
+    return _NotificationAction._(
+      url: url,
+      label: isSriDocument ? 'Descargar RIDE PDF' : 'Abrir enlace',
+      icon: isSriDocument
+          ? Icons.picture_as_pdf_rounded
+          : Icons.open_in_new_rounded,
+      isSriDocument: isSriDocument,
+    );
+  }
+
+  static bool isSriData(Map<String, dynamic> data) {
+    final type = (data['type'] ?? '').toString().toLowerCase();
+    return type.contains('sri') ||
+        type.contains('electronic_document') ||
+        data.containsKey('sri_number') ||
+        data.containsKey('sriNumber') ||
+        data.containsKey('access_key') ||
+        data.containsKey('document_type');
+  }
+
+  static bool isHttpUri(Uri uri) {
+    return (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.trim().isNotEmpty;
+  }
+
+  static String _firstHttpUrl(Map<String, dynamic> data) {
+    const keys = [
+      'ride_url',
+      'download_url',
+      'document_url',
+      'url',
+      'link',
+      'external_url',
+    ];
+
+    for (final key in keys) {
+      final value = (data[key] ?? '').toString().trim();
+      final uri = Uri.tryParse(value);
+      if (uri != null && isHttpUri(uri)) return value;
+    }
+
+    return '';
+  }
+
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return <String, dynamic>{};
   }
 }
 

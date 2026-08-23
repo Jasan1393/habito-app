@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/shop/data/services/habito_booking_api.dart';
 import '../navigation/app_navigator.dart';
@@ -516,6 +517,14 @@ class PushNotificationService {
       return;
     }
 
+    final actionUrl = _firstNotificationActionUrl(normalized);
+    if (actionUrl.isNotEmpty &&
+        (_isSriDocumentData(normalized, type) ||
+            targetScreen == 'notifications')) {
+      _safeLaunchExternalUrl(actionUrl);
+      return;
+    }
+
     switch (targetScreen) {
       case 'shop':
         _safeNavigateToMainTab(1);
@@ -565,10 +574,12 @@ class PushNotificationService {
     int? orderId = _parseInt(
       data['orderId'] ?? data['order_id'] ?? data['order'],
     );
+    var payloadData = <String, dynamic>{};
 
     final rawPayload = data['payload'];
     if (rawPayload is String && rawPayload.trim().isNotEmpty) {
       final decoded = _decodePayload(rawPayload);
+      payloadData = decoded;
       appointmentId ??= _parseInt(
         decoded['appointmentId'] ??
             decoded['appointment_id'] ??
@@ -585,6 +596,7 @@ class PushNotificationService {
       final payloadMap = rawPayload.map(
         (key, value) => MapEntry(key.toString(), value),
       );
+      payloadData = payloadMap;
       appointmentId ??= _parseInt(
         payloadMap['appointmentId'] ??
             payloadMap['appointment_id'] ??
@@ -602,11 +614,72 @@ class PushNotificationService {
     }
 
     return {
+      ...payloadData,
       ...data,
       'appointmentId': appointmentId,
       'bookingId': bookingId,
       'orderId': orderId,
     };
+  }
+
+  static String _firstNotificationActionUrl(Map<String, dynamic> data) {
+    const keys = [
+      'ride_url',
+      'download_url',
+      'document_url',
+      'url',
+      'link',
+      'external_url',
+    ];
+
+    for (final key in keys) {
+      final value = (data[key] ?? '').toString().trim();
+      final uri = Uri.tryParse(value);
+      if (uri != null && _isHttpUri(uri)) return value;
+    }
+
+    return '';
+  }
+
+  static bool _isSriDocumentData(Map<String, dynamic> data, String type) {
+    return type.contains('sri') ||
+        type.contains('electronic_document') ||
+        data.containsKey('sri_number') ||
+        data.containsKey('sriNumber') ||
+        data.containsKey('access_key') ||
+        data.containsKey('document_type');
+  }
+
+  static bool _isHttpUri(Uri uri) {
+    return (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.trim().isNotEmpty;
+  }
+
+  static void _safeLaunchExternalUrl(String url) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_launchExternalUrl(url));
+    });
+  }
+
+  static Future<void> _launchExternalUrl(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !_isHttpUri(uri)) return;
+
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        AppLogger.warning('No se pudo abrir el enlace del push: $url');
+      }
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'No se pudo abrir el enlace externo del push.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   static void _safeNavigateToPushAppointment(Map<String, dynamic> arguments) {
