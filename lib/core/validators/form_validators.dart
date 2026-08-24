@@ -29,7 +29,7 @@ class FormValidators {
     final text = (value ?? '').trim();
     if (text.isEmpty) return 'Ingresa $field.';
     if (!isValidEmail(text)) {
-      return 'Ingresa un correo electronico valido.';
+      return 'Ingresa un correo electrónico válido.';
     }
     return null;
   }
@@ -53,7 +53,7 @@ class FormValidators {
     final text = (value ?? '').trim();
     if (text.isEmpty) return 'Ingresa $field.';
     if (!isValidPhone(text)) {
-      return 'Ingresa un celular ecuatoriano valido.';
+      return 'Ingresa un celular ecuatoriano válido.';
     }
     return null;
   }

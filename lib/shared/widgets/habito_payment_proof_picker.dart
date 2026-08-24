@@ -101,11 +101,11 @@ class HabitoPaymentProofPicker {
     final sizeBytes = await file.length();
 
     if (sizeBytes <= 0) {
-      return 'La imagen seleccionada esta vacia. Intenta con otra foto.';
+      return 'La imagen seleccionada está vacía. Intenta con otra foto.';
     }
 
     if (sizeBytes > maxSizeBytes) {
-      return 'La imagen pesa ${formatSize(sizeBytes)}. El maximo permitido es 5 MB.';
+      return 'La imagen pesa ${formatSize(sizeBytes)}. El máximo permitido es 5 MB.';
     }
 
     return null;

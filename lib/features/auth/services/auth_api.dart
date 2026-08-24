@@ -97,6 +97,15 @@ class AuthApi {
     return _extractUser(data);
   }
 
+  Future<AuthResult> refreshSession(String token) async {
+    final response = await _postJson(
+      '/auth/refresh',
+      token: token,
+    );
+
+    return AuthResult.fromJson(_unwrapSuccess(response));
+  }
+
   Future<AuthUser> updateProfile({
     required String token,
     required String firstName,

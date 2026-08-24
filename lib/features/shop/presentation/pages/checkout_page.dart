@@ -2420,7 +2420,7 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
             maxLength: FormValidators.longTextMaxLength,
             decoration: InputDecoration(
               labelText: documentType == 'ruc'
-                  ? 'Razon social o nombre'
+                  ? 'Razón social o nombre'
                   : 'Nombre del cliente',
             ),
             validator: (value) => FormValidators.requiredMaxLength(
@@ -2436,7 +2436,7 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(
-              labelText: 'Correo electronico',
+              labelText: 'Correo electrónico',
             ),
             validator: FormValidators.email,
           ),
@@ -2462,7 +2462,7 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
             items: const [
               DropdownMenuItem(
                 value: 'cedula',
-                child: Text('Cedula'),
+                child: Text('Cédula'),
               ),
               DropdownMenuItem(
                 value: 'ruc',
@@ -2488,7 +2488,7 @@ class _HabitoBillingDetailsForm extends StatelessWidget {
               helperText: documentType == 'ruc'
                   ? 'Usa RUC si la compra es para empresa.'
                   : documentType == 'pasaporte'
-                      ? 'Ingresa el numero de pasaporte.'
+                      ? 'Ingresa el número de pasaporte.'
                       : 'Por defecto se usa cédula para la compra.',
             ),
             validator: documentValidator,

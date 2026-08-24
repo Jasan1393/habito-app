@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -153,7 +154,10 @@ class _ProductsArchivePageState extends State<ProductsArchivePage> {
         _isLoading = false;
         _isRefreshing = false;
         _isLoadingMore = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar los productos. Intenta nuevamente.',
+        );
       });
     }
   }

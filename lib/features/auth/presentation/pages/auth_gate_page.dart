@@ -71,6 +71,11 @@ class _AuthGatePageState extends State<AuthGatePage>
       NotificationInboxService.refreshUnreadCount();
       _queuePendingSyncRepair();
 
+      final auth = context.read<AuthProvider>();
+      if (auth.isInitialized && auth.isLoggedIn) {
+        auth.refreshSession();
+      }
+
       if (_needsBiometricGate && !_isAuthenticating) {
         _queueAutomaticBiometricPrompt();
       }

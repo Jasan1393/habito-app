@@ -135,7 +135,7 @@ class ProfilePage extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Ya tienes la versión más reciente disponible para testers.',
+                              'Ya tienes la versión más reciente disponible.',
                             ),
                           ),
                         );
@@ -400,10 +400,10 @@ class _AppVersionCardState extends State<_AppVersionCard> {
         final version = info?.version.trim() ?? '';
         final build = info?.buildNumber.trim() ?? '';
         final versionLabel = version.isEmpty
-            ? 'Version no disponible'
+            ? 'Versión no disponible'
             : build.isEmpty
-                ? 'Version $version'
-                : 'Version $version ($build)';
+                ? 'Versión $version'
+                : 'Versión $version ($build)';
 
         return Card(
           color: AppColors.cardDark,
@@ -417,7 +417,7 @@ class _AppVersionCardState extends State<_AppVersionCard> {
               color: AppColors.secondary,
             ),
             title: const Text(
-              'Version de la app',
+              'Versión de la app',
               style: TextStyle(color: Colors.white),
             ),
             subtitle: Text(

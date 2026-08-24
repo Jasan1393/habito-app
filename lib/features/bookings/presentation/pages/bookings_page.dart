@@ -735,6 +735,14 @@ class _BookingsPageState extends State<BookingsPage> {
       'address': (map['address'] ?? '').toString().trim(),
       'description': (map['description'] ?? '').toString().trim(),
       'phone': (map['phone'] ?? '').toString().trim(),
+      'image': (map['imageUrl'] ??
+              map['image'] ??
+              map['picture'] ??
+              map['photo'] ??
+              map['thumbnail'] ??
+              '')
+          .toString()
+          .trim(),
       'latitude': map['latitude'],
       'longitude': map['longitude'],
       'status': (map['status'] ?? '').toString().trim(),
@@ -1116,10 +1124,10 @@ class _BookingsPageState extends State<BookingsPage> {
     }
   }
 
-  Future<void> _onServiceChanged(String value) async {
-    final selected = _services.firstWhere(
-      (service) => service['title'] == value,
-    );
+  Future<void> _onServiceSelected(Map<String, dynamic> selected) async {
+    if (_safeInt(_selectedService?['id']) == _safeInt(selected['id'])) {
+      return;
+    }
 
     setState(() {
       _selectedService = selected;
@@ -1127,6 +1135,25 @@ class _BookingsPageState extends State<BookingsPage> {
       _availableTimeSlots = [];
       _selectedExtrasQty.clear();
       _wantsServiceExtras = false;
+      _showAllTimeSlots = true;
+    });
+
+    _applyEmployeesForCurrentSelection(
+      showMessageIfAdjusted: true,
+    );
+
+    await _loadAvailabilityIfPossible();
+  }
+
+  Future<void> _onLocationSelected(Map<String, dynamic> location) async {
+    if (_safeInt(_selectedLocation?['id']) == _safeInt(location['id'])) {
+      return;
+    }
+
+    setState(() {
+      _selectedLocation = location;
+      _selectedTimeSlot = null;
+      _availableTimeSlots = [];
       _showAllTimeSlots = true;
     });
 
@@ -1929,7 +1956,7 @@ END:VCALENDAR
     }
 
     if (!_isValidPhone(_phoneController.text)) {
-      _showMessage('Ingresa un numero de celular ecuatoriano valido');
+      _showMessage('Ingresa un número de celular ecuatoriano válido');
       return;
     }
 
@@ -2137,6 +2164,13 @@ END:VCALENDAR
         return;
       }
 
+      // Renueva la sesión justo antes de confirmar. La pantalla puede haber
+      // permanecido abierta mientras el token seguía en memoria, pero ya no
+      // era válido para el Bridge.
+      await authProvider.refreshSession(
+        force: true,
+      );
+
       final token = authProvider.token;
       final user = authProvider.user;
       final authToken = token?.trim() ?? '';
@@ -2302,6 +2336,9 @@ END:VCALENDAR
     }
 
     final authProvider = context.read<AuthProvider>();
+    await authProvider.refreshSession(
+      force: true,
+    );
     final token = authProvider.token?.trim();
 
     if (!authProvider.isLoggedIn || token == null || token.isEmpty) {
@@ -3667,7 +3704,7 @@ END:VCALENDAR
                                 const SizedBox(height: AppSpacing.md),
                                 _buildTextField(
                                   controller: _businessNameController,
-                                  label: 'Razon social (opcional)',
+                                  label: 'Razón social (opcional)',
                                   icon: Icons.business_outlined,
                                   keyboardType: TextInputType.name,
                                   textInputAction: TextInputAction.next,
@@ -3679,7 +3716,7 @@ END:VCALENDAR
                               ],
                               const SizedBox(height: AppSpacing.md),
                               _buildDropdownField(
-                                label: 'Tipo de identificacion',
+                                label: 'Tipo de identificación',
                                 icon: Icons.credit_card_outlined,
                                 value: _effectiveIdentificationType,
                                 items: _bookingIdentificationTypes
@@ -3770,7 +3807,7 @@ END:VCALENDAR
                               const SizedBox(height: AppSpacing.md),
                               _buildTextField(
                                 controller: _emailController,
-                                label: 'Correo electronico',
+                                label: 'Correo electrónico',
                                 icon: Icons.mail_outline_rounded,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.done,
@@ -4212,112 +4249,83 @@ END:VCALENDAR
   }
 
   Widget _buildServiceDropdown() {
-    final String? selectedTitle = _selectedService?['title'];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: _isEditing ? AppColors.surfaceMuted : AppColors.surfaceElevated,
-        borderRadius: AppRadius.tile,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: selectedTitle,
-          dropdownColor: Colors.white,
-          isExpanded: true,
-          icon: Icon(
-            _isEditing
-                ? Icons.lock_outline_rounded
-                : Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textSecondary,
-          ),
-          hint: const Text(
-            'Selecciona un servicio',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: AppTextSize.titleSmall,
-            fontWeight: FontWeight.w600,
-          ),
-          items: _services.map((service) {
-            return DropdownMenuItem<String>(
-              value: service['title'] as String,
-              child: Text(service['title'] as String),
-            );
-          }).toList(),
-          onChanged: _isEditing
-              ? null
-              : (value) async {
-                  if (value == null) return;
-                  await _onServiceChanged(value);
-                },
+    if (_services.isEmpty) {
+      return const Text(
+        'No encontramos servicios disponibles en este momento.',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: AppTextSize.bodyStrong,
+          height: 1.4,
         ),
+      );
+    }
+
+    final cardWidth = (MediaQuery.sizeOf(context).width * 0.72)
+        .clamp(224.0, 286.0)
+        .toDouble();
+
+    return SizedBox(
+      height: 226,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        primary: false,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _services.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+        itemBuilder: (context, index) {
+          final service = _services[index];
+          final selected =
+              _safeInt(_selectedService?['id']) == _safeInt(service['id']);
+
+          return _ServicePickerCard(
+            service: service,
+            width: cardWidth,
+            selected: selected,
+            locked: _isEditing,
+            onTap: _isEditing ? null : () => _onServiceSelected(service),
+          );
+        },
       ),
     );
   }
 
   Widget _buildLocationDropdown() {
-    final selectedName = _selectedLocation?['name']?.toString();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: _isEditing ? AppColors.surfaceMuted : AppColors.surfaceElevated,
-        borderRadius: AppRadius.tile,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: selectedName,
-          dropdownColor: Colors.white,
-          isExpanded: true,
-          icon: Icon(
-            _isEditing
-                ? Icons.lock_outline_rounded
-                : Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textSecondary,
-          ),
-          hint: const Text(
-            'Selecciona una sucursal',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: AppTextSize.titleSmall,
-            fontWeight: FontWeight.w600,
-          ),
-          items: _locations.map((location) {
-            final name = location['name']?.toString() ?? '';
-            return DropdownMenuItem<String>(
-              value: name,
-              child: Text(name),
-            );
-          }).toList(),
-          onChanged: _isEditing
-              ? null
-              : (value) async {
-                  if (value == null) return;
-
-                  final location = _locations.firstWhere(
-                    (item) => item['name'] == value,
-                  );
-
-                  setState(() {
-                    _selectedLocation = location;
-                    _selectedTimeSlot = null;
-                    _availableTimeSlots = [];
-                    _showAllTimeSlots = true;
-                  });
-
-                  _applyEmployeesForCurrentSelection(
-                    showMessageIfAdjusted: true,
-                  );
-
-                  await _loadAvailabilityIfPossible();
-                },
+    if (_locations.isEmpty) {
+      return const Text(
+        'No encontramos sucursales disponibles en este momento.',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: AppTextSize.bodyStrong,
+          height: 1.4,
         ),
+      );
+    }
+
+    final cardWidth = (MediaQuery.sizeOf(context).width * 0.72)
+        .clamp(224.0, 286.0)
+        .toDouble();
+
+    return SizedBox(
+      height: 174,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        primary: false,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _locations.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+        itemBuilder: (context, index) {
+          final location = _locations[index];
+          final selected =
+              _safeInt(_selectedLocation?['id']) == _safeInt(location['id']);
+
+          return _LocationPickerCard(
+            location: location,
+            width: cardWidth,
+            selected: selected,
+            locked: _isEditing,
+            onTap: _isEditing ? null : () => _onLocationSelected(location),
+          );
+        },
       ),
     );
   }
@@ -4873,6 +4881,362 @@ class _BookingPaymentMethodTile extends StatelessWidget {
     }
 
     return 'Selecciona este método para confirmar tu cita.';
+  }
+}
+
+class _ServicePickerCard extends StatelessWidget {
+  final Map<String, dynamic> service;
+  final double width;
+  final bool selected;
+  final bool locked;
+  final Future<void> Function()? onTap;
+
+  const _ServicePickerCard({
+    required this.service,
+    required this.width,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = service['title']?.toString().trim() ?? 'Servicio Hábito';
+    final imageUrl = service['image']?.toString().trim() ?? '';
+    final placeholderImage = service['placeholderImage']?.toString().trim() ??
+        'assets/images/services/service_default.png';
+    final price = service['price']?.toString().trim() ?? '-';
+    final duration = _serviceDurationLabel(service['duration']);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: !locked,
+      label: '$title${selected ? ', seleccionado' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.panel,
+          child: Ink(
+            width: width,
+            decoration: BoxDecoration(
+              color:
+                  selected ? AppColors.goldSurface : AppColors.surfaceElevated,
+              borderRadius: AppRadius.panel,
+              border: Border.all(
+                color: selected ? AppColors.secondary : AppColors.border,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: AppRadius.large,
+                        child: SizedBox(
+                          height: 104,
+                          width: double.infinity,
+                          child: imageUrl.isNotEmpty
+                              ? HabitoCachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  fit: BoxFit.cover,
+                                  semanticLabel: 'Imagen del servicio $title',
+                                  errorWidget: _ServicePickerFallback(
+                                    placeholderImage: placeholderImage,
+                                  ),
+                                )
+                              : _ServicePickerFallback(
+                                  placeholderImage: placeholderImage,
+                                ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.secondary
+                                : AppColors.primary.withValues(alpha: 0.72),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              selected
+                                  ? Icons.check_rounded
+                                  : locked
+                                      ? Icons.lock_outline_rounded
+                                      : Icons.touch_app_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: AppTextSize.baseLarge,
+                      height: 1.12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      _PickerBadge(
+                        label: price,
+                        color: AppColors.goldSoft,
+                        textColor: AppColors.goldDeep,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      _PickerBadge(
+                        label: duration,
+                        color: AppColors.surfaceMuted,
+                        textColor: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _serviceDurationLabel(dynamic value) {
+    final duration = int.tryParse(value?.toString() ?? '') ?? 0;
+    return duration > 0 ? '$duration min' : 'Duración pendiente';
+  }
+}
+
+class _LocationPickerCard extends StatelessWidget {
+  final Map<String, dynamic> location;
+  final double width;
+  final bool selected;
+  final bool locked;
+  final Future<void> Function()? onTap;
+
+  const _LocationPickerCard({
+    required this.location,
+    required this.width,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = location['name']?.toString().trim() ?? 'Sucursal Hábito';
+    final address = location['address']?.toString().trim() ?? '';
+    final imageUrl = location['image']?.toString().trim() ?? '';
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: !locked,
+      label: '$name${selected ? ', seleccionada' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.panel,
+          child: Ink(
+            width: width,
+            decoration: BoxDecoration(
+              color:
+                  selected ? AppColors.goldSurface : AppColors.surfaceElevated,
+              borderRadius: AppRadius.panel,
+              border: Border.all(
+                color: selected ? AppColors.secondary : AppColors.border,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: AppRadius.large,
+                    child: SizedBox(
+                      width: 66,
+                      height: 66,
+                      child: imageUrl.isNotEmpty
+                          ? HabitoCachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              semanticLabel: 'Imagen de la sucursal $name',
+                              errorWidget: const _LocationPickerFallback(),
+                            )
+                          : const _LocationPickerFallback(),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: AppTextSize.baseLarge,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Icon(
+                              selected
+                                  ? Icons.check_circle_rounded
+                                  : locked
+                                      ? Icons.lock_outline_rounded
+                                      : Icons.chevron_right_rounded,
+                              color: selected
+                                  ? AppColors.goldDeep
+                                  : AppColors.textSecondary,
+                              size: 22,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          address.isNotEmpty
+                              ? address
+                              : selected
+                                  ? 'Sucursal seleccionada'
+                                  : 'Toca para seleccionar',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: selected
+                                ? AppColors.goldDeep
+                                : AppColors.textSecondary,
+                            fontSize: AppTextSize.bodySmall,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  const _PickerBadge({
+    required this.label,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: AppRadius.full,
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: textColor,
+            fontSize: AppTextSize.captionSm,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServicePickerFallback extends StatelessWidget {
+  final String placeholderImage;
+
+  const _ServicePickerFallback({required this.placeholderImage});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      placeholderImage,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primarySoft, AppColors.goldDeep],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.content_cut_rounded,
+            color: Colors.white,
+            size: 32,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationPickerFallback extends StatelessWidget {
+  const _LocationPickerFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primarySoft, AppColors.goldDeep],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.storefront_rounded,
+          color: Colors.white,
+          size: 30,
+        ),
+      ),
+    );
   }
 }
 

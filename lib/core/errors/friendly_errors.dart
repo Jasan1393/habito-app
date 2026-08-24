@@ -150,6 +150,15 @@ class FriendlyErrors {
   static bool _looksTechnical(String message) {
     final lower = message.toLowerCase();
     if (message.length > 220) return true;
+    if (lower.contains('socketexception') ||
+        lower.contains('clientexception') ||
+        lower.contains('timeoutexception') ||
+        lower.contains('handshakeexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('connection reset') ||
+        lower.contains('connection refused')) {
+      return true;
+    }
     if (lower.contains('<html') || lower.contains('<!doctype')) return true;
     if (lower.contains('sqlstate') || lower.contains('stack trace')) {
       return true;

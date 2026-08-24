@@ -428,8 +428,8 @@ class ShopProvider extends ChangeNotifier {
           success: false,
           requiresCartReset: true,
           message: requestedMethod == ShopFulfillmentMethod.pickup
-              ? 'Tu carrito ya esta asociado a otra forma de entrega o a otra sucursal. Para continuar, reemplazaremos el carrito actual.'
-              : 'Tu carrito actual esta preparado para retiro en tienda. Para continuar con envio, reemplazaremos el carrito actual.',
+              ? 'Tu carrito ya está asociado a otra forma de entrega o a otra sucursal. Para continuar, reemplazaremos el carrito actual.'
+              : 'Tu carrito actual está preparado para retiro en tienda. Para continuar con envío, reemplazaremos el carrito actual.',
         );
       }
 
@@ -459,7 +459,7 @@ class ShopProvider extends ChangeNotifier {
         notifyListeners();
         return const ShopCartActionResult(
           success: false,
-          message: 'Ya tienes el maximo disponible de este producto.',
+          message: 'Ya tienes el máximo disponible de este producto.',
         );
       }
       if (maxQuantity != null) {
@@ -468,7 +468,7 @@ class ShopProvider extends ChangeNotifier {
           notifyListeners();
           return const ShopCartActionResult(
             success: false,
-            message: 'Ya tienes el maximo disponible de este producto.',
+            message: 'Ya tienes el máximo disponible de este producto.',
           );
         }
         if (addedQuantity > remaining) {
@@ -730,7 +730,7 @@ class ShopProvider extends ChangeNotifier {
         canCheckout: false,
         cartChanged: false,
         endpointAvailable: true,
-        message: 'Tu carrito esta vacio.',
+        message: 'Tu carrito está vacío.',
         items: [],
       );
     }
@@ -800,7 +800,7 @@ class ShopProvider extends ChangeNotifier {
     double redeemAmount = 0,
   }) async {
     if (_cartItems.isEmpty) {
-      _checkoutError = 'Tu carrito esta vacio.';
+      _checkoutError = 'Tu carrito está vacío.';
       notifyListeners();
       return null;
     }

@@ -16,7 +16,7 @@ class AppUpdateInfo {
   final int currentBuild;
   final String latestVersion;
   final int latestBuild;
-  final String apkUrl;
+  final String updateUrl;
   final String notes;
   final bool forceUpdate;
 
@@ -25,7 +25,7 @@ class AppUpdateInfo {
     required this.currentBuild,
     required this.latestVersion,
     required this.latestBuild,
-    required this.apkUrl,
+    required this.updateUrl,
     required this.notes,
     required this.forceUpdate,
   });
@@ -34,6 +34,8 @@ class AppUpdateInfo {
 class AppUpdateService {
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
   static const String _dismissedBuildKey = 'dismissed_app_update_build';
+  static const String _androidStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.habitobarberia.app';
   static bool _dialogVisible = false;
 
   const AppUpdateService._();
@@ -75,7 +77,7 @@ class AppUpdateService {
 
     final enabled = data['enabled'] == true;
     final updateAvailable = data['update_available'] == true;
-    final apkUrl = (data['apk_url'] ?? '').toString().trim();
+    final storeUrl = (data['store_url'] ?? _androidStoreUrl).toString().trim();
     final latestVersion = (data['latest_version'] ?? '').toString().trim();
     final latestBuild = _parseInt(data['latest_build']);
     final newerThanInstalled = _isRemoteBuildNewer(
@@ -85,7 +87,10 @@ class AppUpdateService {
       latestBuild: latestBuild,
     );
 
-    if (!enabled || !updateAvailable || apkUrl.isEmpty || !newerThanInstalled) {
+    if (!enabled ||
+        !updateAvailable ||
+        storeUrl.isEmpty ||
+        !newerThanInstalled) {
       await _clearDismissedBuild();
       return null;
     }
@@ -101,7 +106,7 @@ class AppUpdateService {
       currentBuild: currentBuild,
       latestVersion: latestVersion,
       latestBuild: latestBuild,
-      apkUrl: apkUrl,
+      updateUrl: storeUrl,
       notes: (data['notes'] ?? '').toString().trim(),
       forceUpdate: data['force_update'] == true,
     );
@@ -148,7 +153,7 @@ class AppUpdateService {
         barrierDismissible: !update.forceUpdate,
         builder: (dialogContext) {
           final notes = update.notes.isEmpty
-              ? 'Tenemos mejoras y correcciones listas para esta versión de prueba.'
+              ? 'Tenemos mejoras y correcciones listas para esta versión.'
               : update.notes;
 
           return AlertDialog(
@@ -228,7 +233,7 @@ class AppUpdateService {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'La descarga se abrirá en el navegador o gestor de archivos del dispositivo.',
+                  'La ficha oficial de Google Play se abrirá para completar la actualización de forma segura.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: AppTextSize.bodySmall,
@@ -251,7 +256,7 @@ class AppUpdateService {
               ElevatedButton.icon(
                 onPressed: () async {
                   final messenger = ScaffoldMessenger.maybeOf(context);
-                  final launched = await _launchApk(update.apkUrl);
+                  final launched = await _launchStore(update.updateUrl);
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
                   }
@@ -259,7 +264,7 @@ class AppUpdateService {
                     messenger?.showSnackBar(
                       const SnackBar(
                         content: Text(
-                          'No pudimos abrir la descarga del APK. Revisa el enlace publicado.',
+                          'No pudimos abrir Google Play. Revisa tu conexión e intenta nuevamente.',
                         ),
                       ),
                     );
@@ -272,9 +277,9 @@ class AppUpdateService {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                icon: const Icon(Icons.download_rounded),
+                icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text(
-                  'Descargar APK',
+                  'Abrir Google Play',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -287,8 +292,8 @@ class AppUpdateService {
     }
   }
 
-  static Future<bool> _launchApk(String apkUrl) async {
-    final uri = Uri.tryParse(apkUrl);
+  static Future<bool> _launchStore(String storeUrl) async {
+    final uri = Uri.tryParse(storeUrl);
     if (uri == null) return false;
     return launchUrl(uri, mode: LaunchMode.externalApplication);
   }

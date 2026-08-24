@@ -61,14 +61,14 @@ class EcuadorIdValidator {
         return 'El RUC debe tener 13 dígitos.';
       }
       if (!isValidRuc(text)) {
-        return 'El RUC ingresado no es valido.';
+        return 'El RUC ingresado no es válido.';
       }
       return null;
     }
 
     if (type == 'pasaporte') {
       if (text.length < 5) {
-        return 'Ingresa un pasaporte valido.';
+        return 'Ingresa un pasaporte válido.';
       }
       return null;
     }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/services/location_launcher_service.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -162,9 +163,10 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
       return 'No pudimos conectar con tus citas. Revisa tu internet e intenta nuevamente.';
     }
 
-    return text.isEmpty
-        ? 'No pudimos cargar tus citas. Intenta nuevamente.'
-        : text;
+    return FriendlyErrors.loadData(
+      error,
+      fallback: 'No pudimos cargar tus citas. Intenta nuevamente.',
+    );
   }
 
   Future<void> _loadAppointments({
@@ -179,6 +181,17 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage>
       setState(() {
         _isLoading = true;
         _error = null;
+      });
+      return;
+    }
+
+    await auth.refreshSession(notify: false);
+    if (!auth.isLoggedIn) {
+      setState(() {
+        _loadedToken = null;
+        _isLoading = false;
+        _error = null;
+        _allAppointments = [];
       });
       return;
     }

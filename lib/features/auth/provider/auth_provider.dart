@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/errors/friendly_errors.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../bookings/presentation/pages/my_appointments_page.dart';
@@ -13,6 +14,7 @@ import '../services/auth_storage.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const Duration _pendingSyncRetryCooldown = Duration(minutes: 10);
+  static const Duration _sessionRefreshCooldown = Duration(minutes: 5);
   static const List<String> _sessionExpiredFragments = [
     '401',
     '403',
@@ -57,6 +59,8 @@ class AuthProvider extends ChangeNotifier {
   DateTime? _lastPendingSyncRetryAt;
   bool _isPendingSyncRepairRunning = false;
   bool _isDisposed = false;
+  Future<bool>? _sessionRefreshFuture;
+  DateTime? _lastSessionRefreshAt;
 
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
@@ -106,10 +110,20 @@ class AuthProvider extends ChangeNotifier {
       var shouldNotify = false;
 
       try {
-        final refreshedUser = await _api.getProfile(token);
+        final refreshedSession = await _api.refreshSession(token);
         if (_token == token && _user != null) {
-          _user = refreshedUser;
-          await _storage.saveSession(token: token, user: refreshedUser);
+          final refreshedToken = refreshedSession.token.trim();
+          if (refreshedToken.isEmpty) {
+            throw Exception('El servidor no devolvió una sesión válida.');
+          }
+
+          _token = refreshedToken;
+          _user = refreshedSession.user;
+          _lastSessionRefreshAt = DateTime.now();
+          await _storage.saveSession(
+            token: refreshedToken,
+            user: refreshedSession.user,
+          );
           shouldNotify = true;
         }
       } catch (e) {
@@ -120,15 +134,16 @@ class AuthProvider extends ChangeNotifier {
       }
 
       try {
-        if (_token == token) {
-          await PushNotificationService.registerToken(authToken: token);
+        final currentToken = _token;
+        if (currentToken != null && currentToken.isNotEmpty) {
+          await PushNotificationService.registerToken(authToken: currentToken);
         }
       } catch (_) {
         // No critico: el proximo login o refresh volvera a registrarlo.
       }
 
       try {
-        if (_token == token) {
+        if (_token != null && _token!.isNotEmpty) {
           await _identifyAnalyticsUser(_user);
         }
       } catch (_) {
@@ -392,6 +407,83 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> refreshSession({
+    bool notify = true,
+    bool force = false,
+  }) {
+    final currentToken = _token;
+    if (currentToken == null || currentToken.isEmpty || !isLoggedIn) {
+      return Future.value(false);
+    }
+
+    final existing = _sessionRefreshFuture;
+    if (existing != null) {
+      return _releaseSessionRefresh(existing);
+    }
+
+    final lastRefresh = _lastSessionRefreshAt;
+    if (!force &&
+        lastRefresh != null &&
+        DateTime.now().difference(lastRefresh) < _sessionRefreshCooldown) {
+      return Future.value(true);
+    }
+
+    final future = _refreshSessionInternal(
+      token: currentToken,
+      notify: notify,
+    );
+    _sessionRefreshFuture = future;
+    return _releaseSessionRefresh(future);
+  }
+
+  Future<bool> _releaseSessionRefresh(Future<bool> future) async {
+    try {
+      return await future;
+    } finally {
+      if (identical(_sessionRefreshFuture, future)) {
+        _sessionRefreshFuture = null;
+      }
+    }
+  }
+
+  Future<bool> _refreshSessionInternal({
+    required String token,
+    required bool notify,
+  }) async {
+    try {
+      final refreshedSession = await _api.refreshSession(token);
+      if (_token != token) return false;
+
+      final refreshedToken = refreshedSession.token.trim();
+      if (refreshedToken.isEmpty) {
+        throw Exception('El servidor no devolvió una sesión válida.');
+      }
+
+      _token = refreshedToken;
+      _user = refreshedSession.user;
+      _lastSessionRefreshAt = DateTime.now();
+      await _storage.saveSession(
+        token: refreshedToken,
+        user: refreshedSession.user,
+      );
+
+      if (notify && !_isDisposed) {
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      if (_token == token && _isSessionExpiredError(e)) {
+        await _clearSession(clearStorage: true);
+        // La limpieza de sesión siempre debe propagarse: las pantallas
+        // protegidas no pueden quedarse mostrando una sesión local inválida.
+        if (!_isDisposed) {
+          notifyListeners();
+        }
+      }
+      return false;
+    }
+  }
+
   Future<void> retryPendingSyncIfNeeded({bool force = false}) async {
     final currentToken = _token;
     final currentUser = _user;
@@ -442,6 +534,7 @@ class AuthProvider extends ChangeNotifier {
     _isSessionRestoreTasksRunning = false;
     _lastPendingSyncRetryAt = null;
     _isPendingSyncRepairRunning = false;
+    _lastSessionRefreshAt = null;
     PushNotificationService.clearSession();
     HabitoBookingApi.clearMyBookingsCache();
     MyAppointmentsPage.clearCachedState();
@@ -480,7 +573,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       return await action();
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = FriendlyErrors.clean(
+        e,
+        fallback: 'No pudimos completar la solicitud. Intenta nuevamente.',
+      );
       return false;
     } finally {
       _isLoading = false;
@@ -492,6 +588,7 @@ class AuthProvider extends ChangeNotifier {
     _token = token;
     _user = user;
     _restoredSavedSession = false;
+    _lastSessionRefreshAt = DateTime.now();
     await _storage.saveSession(token: token, user: user);
     _registerPushTokenInBackground(token);
   }
@@ -549,6 +646,7 @@ class AuthProvider extends ChangeNotifier {
     _isSessionRestoreTasksRunning = false;
     _lastPendingSyncRetryAt = null;
     _isPendingSyncRepairRunning = false;
+    _lastSessionRefreshAt = null;
 
     if (clearStorage) {
       await _storage.clearSession();

@@ -14,7 +14,13 @@ fun truthy(value: String?): Boolean {
 }
 
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
+val configuredKeystorePropertiesPath = providers.gradleProperty("HABITO_KEY_PROPERTIES_FILE").orNull
+    ?: System.getenv("HABITO_KEY_PROPERTIES_FILE")
+val keystorePropertiesFile = if (!configuredKeystorePropertiesPath.isNullOrBlank()) {
+    file(configuredKeystorePropertiesPath)
+} else {
+    rootProject.file("key.properties")
+}
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 val requestedReleaseBuild = gradle.startParameter.taskNames.any {
     val task = it.lowercase()
@@ -31,6 +37,9 @@ if (requestedReleaseBuild && !hasReleaseKeystore) {
 if (hasReleaseKeystore) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
+
+val configuredKeystorePath = providers.gradleProperty("HABITO_KEYSTORE_FILE").orNull
+    ?: System.getenv("HABITO_KEYSTORE_FILE")
 
 val facebookAppId = providers.gradleProperty("FACEBOOK_APP_ID").orNull
     ?: System.getenv("FACEBOOK_APP_ID")
@@ -113,7 +122,9 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                val configuredStoreFile = configuredKeystorePath
+                    ?: (keystoreProperties["storeFile"] as String)
+                storeFile = file(configuredStoreFile)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String

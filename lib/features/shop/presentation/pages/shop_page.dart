@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -75,7 +76,10 @@ class _ShopPageState extends State<ShopPage> {
       if (!mounted) return;
       setState(() {
         _loadingServices = false;
-        _servicesError = e.toString().replaceFirst('Exception: ', '');
+        _servicesError = FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar los servicios. Intenta nuevamente.',
+        );
       });
     }
   }
@@ -100,7 +104,10 @@ class _ShopPageState extends State<ShopPage> {
       if (!mounted) return;
       setState(() {
         _loadingProducts = false;
-        _productsError = e.toString().replaceFirst('Exception: ', '');
+        _productsError = FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar los productos. Intenta nuevamente.',
+        );
       });
     }
   }

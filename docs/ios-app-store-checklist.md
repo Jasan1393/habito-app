@@ -4,11 +4,11 @@
 
 - Bundle ID principal: `com.habitobarberia.app`.
 - Extension de notificaciones: `com.habitobarberia.app.ImageNotification`.
-- Version publica: `3.0.11`.
-- Build number: `30`.
+- Version publicada actualmente: `3.0.12`.
+- Siguiente release preparada en el código: `3.0.13 (50)`.
 - Firebase iOS plist agregado en `ios/Runner/GoogleService-Info.plist`.
 - App icon 1024x1024 sin alpha verificado.
-- `flutter analyze`, `flutter test` y build de iOS simulator pasan localmente.
+- La build de simulador y el archive de iOS se generan localmente; la exportación IPA queda bloqueada si falta el provisioning profile de `ImageNotification`.
 - Tracking publicitario activo por defecto.
 
 ## Cuando Apple apruebe la cuenta Developer
@@ -18,6 +18,7 @@
 3. Seleccionar el mismo Team en target `ImageNotification`.
 4. Activar Push Notifications en Apple Developer para:
    - `com.habitobarberia.app`
+   - `com.habitobarberia.app.ImageNotification`
 5. Activar Associated Domains si se quiere que los links `https://habitobarberia.com/referir...` abran la app en iOS.
 6. Subir la clave APNs a Firebase Cloud Messaging.
 7. Generar y subir build:

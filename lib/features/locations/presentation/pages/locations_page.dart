@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/location_coordinate_cache_service.dart';
 import '../../../../core/services/location_launcher_service.dart';
@@ -84,7 +85,10 @@ class _LocationsPageState extends State<LocationsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar las sucursales. Intenta nuevamente.',
+        );
       });
     } finally {
       if (mounted) {

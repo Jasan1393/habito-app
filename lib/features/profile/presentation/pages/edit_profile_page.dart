@@ -404,7 +404,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               maxLength: FormValidators.longTextMaxLength,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Razon social (opcional)',
+                                label: 'Razón social (opcional)',
                                 icon: Icons.business_outlined,
                               ),
                               validator: (value) {
@@ -423,7 +423,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             dropdownColor: AppColors.primaryMuted,
                             style: const TextStyle(color: Colors.white),
                             decoration: _inputDecoration(
-                              label: 'Tipo de identificacion',
+                              label: 'Tipo de identificación',
                               icon: Icons.credit_card_outlined,
                             ),
                             items: _availableIdentificationTypes

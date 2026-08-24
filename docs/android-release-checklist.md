@@ -9,6 +9,7 @@
 - Guardar el `.jks` fuera del repo, por ejemplo en `keystores/habito-release.jks`
 - Confirmar que `targetSdk` sea 35 o superior. Con Flutter 3.44.2 el proyecto usa `targetSdk 36`.
 - Confirmar en Play Console la ficha Data safety para cuenta, reservas, compras, ubicación aproximada/precisa, fotos seleccionadas, analíticas y crash reports.
+- La build debug actual muestra el warning de migración futura de Kotlin Gradle Plugin. No bloquea esta release; planificar la migración a built-in Kotlin junto con Flutter 3.47+ y plugins compatibles.
 
 ## Firma release
 
@@ -20,13 +21,13 @@ Si el archivo no existe, `flutter build appbundle --release` falla a propósito 
 
 ### APK release
 
-```powershell
+```bash
 flutter build apk --release --no-pub
 ```
 
 ### AAB para Google Play
 
-```powershell
+```bash
 flutter build appbundle --release --no-pub
 ```
 

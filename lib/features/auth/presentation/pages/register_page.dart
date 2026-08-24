@@ -330,7 +330,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               ],
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Correo electronico',
+                                label: 'Correo electrónico',
                                 icon: Icons.alternate_email_rounded,
                               ),
                               validator: FormValidators.email,
@@ -409,7 +409,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 maxLength: FormValidators.longTextMaxLength,
                                 style: const TextStyle(color: Colors.white),
                                 decoration: _inputDecoration(
-                                  label: 'Razon social',
+                                  label: 'Razón social',
                                   icon: Icons.business_outlined,
                                 ),
                                 validator: (value) {
@@ -433,7 +433,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   dropdownColor: AppColors.darkInput,
                                   style: const TextStyle(color: Colors.white),
                                   decoration: _inputDecoration(
-                                    label: 'Tipo de identificacion',
+                                    label: 'Tipo de identificación',
                                     icon: Icons.badge_outlined,
                                   ),
                                   items: _availableIdentificationTypes

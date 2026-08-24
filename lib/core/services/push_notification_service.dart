@@ -11,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../errors/friendly_errors.dart';
 import '../../features/shop/data/services/habito_booking_api.dart';
 import '../navigation/app_navigator.dart';
 import '../routes/app_routes.dart';
@@ -237,7 +238,10 @@ class PushNotificationService {
         backendSaved = true;
       }
     } catch (e, stackTrace) {
-      error = e.toString().replaceFirst('Exception: ', '');
+      error = FriendlyErrors.clean(
+        e,
+        fallback: 'No pudimos completar el diagnóstico de notificaciones.',
+      );
       AppLogger.warning(
         'Error ejecutando diagnostico de notificaciones push.',
         error: e,

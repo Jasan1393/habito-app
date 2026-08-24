@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:habito/core/config/app_config.dart';
+import 'package:habito/core/errors/friendly_errors.dart';
 import 'package:habito/features/auth/models/auth_user.dart';
 import 'package:habito/features/bookings/utils/availability_slot_parser.dart';
 import 'package:habito/features/points/models/points_history_entry.dart';
@@ -13,6 +14,17 @@ void main() {
       expect(AppConfig.apiBaseUrl, contains('/wp-json/habito/v1'));
       expect(AppConfig.wooStoreBaseUrl, contains('/wp-json/wc/store/v1'));
       expect(AppConfig.myBookingsTimeout, const Duration(seconds: 35));
+    });
+  });
+
+  group('FriendlyErrors', () {
+    test('no expone detalles técnicos de red al usuario', () {
+      final message = FriendlyErrors.loadData(
+        'SocketException: Failed host lookup: habitobarberia.com',
+        fallback: 'Revisa tu conexión e intenta nuevamente.',
+      );
+
+      expect(message, 'Revisa tu conexión e intenta nuevamente.');
     });
   });
 

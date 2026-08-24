@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -45,19 +46,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     } catch (e) {
       if (!mounted) return;
 
-      final error = e.toString().replaceFirst('Exception: ', '');
+      final error = FriendlyErrors.clean(
+        e,
+        fallback:
+            'No pudimos enviar el enlace ahora. Intenta nuevamente en unos segundos.',
+      );
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
             backgroundColor: AppColors.snackBarDark,
             behavior: SnackBarBehavior.floating,
-            content: Text(
-              error.isNotEmpty
-                  ? error
-                  : 'No pudimos enviar el enlace ahora. Intenta nuevamente en unos segundos.',
-              style: const TextStyle(color: Colors.white),
-            ),
+            content: Text(error, style: const TextStyle(color: Colors.white)),
           ),
         );
     } finally {
@@ -209,7 +209,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           onFieldSubmitted: (_) => _submit(),
                           style: const TextStyle(color: Colors.white),
                           decoration: _inputDecoration(
-                            label: 'Correo electronico',
+                            label: 'Correo electrónico',
                             icon: Icons.alternate_email_rounded,
                           ),
                           validator: FormValidators.email,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/friendly_errors.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_size.dart';
@@ -58,7 +59,10 @@ class _ServicesArchivePageState extends State<ServicesArchivePage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = FriendlyErrors.loadData(
+          e,
+          fallback: 'No pudimos cargar los servicios. Intenta nuevamente.',
+        );
       });
     }
   }
